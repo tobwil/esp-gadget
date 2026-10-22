@@ -1,5 +1,6 @@
 #include "kids.h"
 #include <Preferences.h>
+#include <time.h>
 #include "favs.h"
 
 namespace kids {
@@ -18,12 +19,35 @@ void begin() {
   c.school = p.getBool("school", false);
   c.nap = p.getBool("nap", true);
   p.getString("pin", c.pin, sizeof(c.pin));
+  c.angry = p.getBool("angry", false);
   p.end();
   store.begin();
 }
 
 const Cfg& cfg() { return c; }
 bool on() { return c.on; }
+bool angry() { return c.on && c.angry; }
+
+static int doneToday = 0, doneDay = -1;
+static uint32_t doneLast = 0;
+
+void angryDone() {
+  time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+  if (t.tm_yday != doneDay) { doneDay = t.tm_yday; doneToday = 0; }
+  doneToday++;
+  doneLast = now;
+}
+
+int angryToday() {
+  time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+  return t.tm_yday == doneDay ? doneToday : 0;
+}
+
+uint32_t angryLast() { return doneLast; }
 bool allowed(App a) { return !c.on || (c.apps & a); }
 int limitVolume(int pct) { return c.on ? min(pct, (int)c.maxVol) : pct; }
 
@@ -42,6 +66,7 @@ void set(const Cfg& n) {
   p.putBool("school", c.school);
   p.putBool("nap", c.nap);
   p.putString("pin", c.pin);
+  p.putBool("angry", c.angry);
   p.end();
 }
 

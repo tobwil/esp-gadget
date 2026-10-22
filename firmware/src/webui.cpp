@@ -6,6 +6,7 @@
 #include "hw.h"
 #include "keys.h"
 #include "kids.h"
+#include "music.h"
 #include "net.h"
 #include "radio.h"
 #include "settings.h"
@@ -45,7 +46,7 @@ button.on{background:var(--ok);color:#fff;border-color:var(--ok)}button.kid{back
 .row small{color:var(--dim);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sw{position:relative;width:52px;height:32px;flex:none}.sw input{opacity:0;position:absolute;inset:0;margin:0;min-height:0;z-index:1;cursor:pointer}
 .sw span{position:absolute;inset:0;border-radius:99px;background:var(--line);transition:.2s}.sw span:after{content:"";position:absolute;left:3px;top:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px #0004}
-.sw input:checked+span{background:var(--kid)}.sw input:checked+span:after{transform:translateX(20px)}
+.sw input:checked+span{background:var(--kid)}.angry .sw input:checked+span{background:#d63a2e}.sw input:checked+span:after{transform:translateX(20px)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px;margin-top:10px}
 .seg button{flex:1;background:transparent;color:var(--dim);min-height:38px;padding:4px}.seg button.sel{background:var(--card);color:var(--text);box-shadow:0 1px 3px #0002}
@@ -64,11 +65,14 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 <main>
 <div class="tab sel" id="t-home">
  <section><h2>Uhr</h2><div class="kv" id="info"></div></section>
- <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small id="kidsum"></small></div><label class="sw"><input type="checkbox" id="kon2"><span></span></label></div></section>
+ <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small id="kidsum"></small></div><label class="sw"><input type="checkbox" id="kon2"><span></span></label></div>
+  <div class="row"><div class="t"><b>Wutmodus</b><small>Nur das Wut-Glas</small></div><label class="sw"><input type="checkbox" id="kangry2"><span></span></label></div></section>
 </div>
 
 <div class="tab" id="t-kids">
  <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small>Auf der Uhr keine freie Auswahl mehr</small></div><label class="sw"><input type="checkbox" id="kon"><span></span></label></div></section>
+ <section class="kidc angry"><div class="row"><div class="t"><b>Wutmodus</b><small id="angst"></small></div><label class="sw"><input type="checkbox" id="kangry"><span></span></label></div>
+  <p class="note">Auf der Uhr gibt es dann nur noch das Wut-Glas: ganz fest schütteln, bis alle roten Funken rausgeflogen sind, danach sinkt ruhiger Glitzer und ein Kreis atmet vor. Wischen und Tasten tun nichts, Musik und Funk sind aus.</p></section>
  <section class="kidc"><h2>Tagesablauf</h2><p class="note">Das Zifferblatt zeigt den Tag als Pixel-Geschichte.</p>
   <div class="two"><div><label class="f" for="kw">Aufstehen</label><input type="time" id="kw"></div><div><label class="f" for="kb">Ins Bett</label><input type="time" id="kb"></div></div>
   <div class="seg" id="kplace"><button data-v="0">Kita</button><button data-v="1">Schule</button></div>
@@ -134,7 +138,9 @@ function render(){
  $('stat').textContent=`${s.battery<0?'USB':s.battery+' %'}${s.charging?' ⚡':''} · ${s.ssid||'offline'} · ${s.host}.local`;
  $('info').innerHTML=`<span>Akku</span><span>${s.battery<0?'kein Akku':s.battery+' %'}${s.charging?' · lädt':''}</span><span>WLAN</span><span>${esc(s.ssid||'–')}${s.rssi?' ('+s.rssi+' dBm)':''}</span>
   <span>Adresse</span><span>${esc(s.ip)}</span><span>Spotify</span><span>${s.spotify.connected?esc(s.spotify.user):'nicht verbunden'}</span><span>Funk-Nachbarn</span><span>${s.peers}</span><span>Version</span><span>${esc(s.version)}</span>`;
- $('kon').checked=$('kon2').checked=k.on;
+ $('kon').checked=$('kon2').checked=k.on;$('kangry').checked=$('kangry2').checked=k.angry&&k.on;
+ $('angst').textContent=(k.angryToday?`Heute ${k.angryToday}× Wut rausgeschüttelt`:'Heute noch nicht benutzt')+(k.angryLast?' · zuletzt '+new Date(k.angryLast*1000).toLocaleTimeString('de',{hour:'2-digit',minute:'2-digit'}):'');
+ $('kidb').textContent=k.angry&&k.on?'Wutmodus':'Kindermodus';
  $('kidsum').textContent=k.on?`An · ${k.released.length} Freigaben · bis ${k.maxVol} %`:'Aus';
  if(document.activeElement!==$('kw'))$('kw').value=hm(k.wake);if(document.activeElement!==$('kb'))$('kb').value=hm(k.bed);
  [...$('kplace').children].forEach(b=>b.classList.toggle('sel',+b.dataset.v==+k.school));
@@ -159,6 +165,7 @@ async function search(){const q=val('sq');if(!q)return;$('sres').innerHTML='<p c
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('sel',x==b));
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('sel',t.id=='t-'+b.dataset.t));scrollTo(0,0)});
 $('kon').onchange=$('kon2').onchange=e=>{kids({on:e.target.checked});toast(e.target.checked?'Kindermodus an':'Kindermodus aus')};
+$('kangry').onchange=$('kangry2').onchange=e=>{kids(e.target.checked?{angry:true,on:true}:{angry:false});toast(e.target.checked?'Wutmodus an – nur noch das Wut-Glas':'Wutmodus aus')};
 $('kw').onchange=()=>kids({wake:mins($('kw').value)});$('kb').onchange=()=>kids({bed:mins($('kb').value)});
 $('kplace').onclick=e=>{if(e.target.dataset.v)kids({school:e.target.dataset.v=='1'})};
 $('knap').onchange=e=>kids({nap:e.target.checked});
@@ -251,6 +258,9 @@ static void state() {
   ko["school"] = kc.school;
   ko["nap"] = kc.nap;
   ko["pin"] = kc.pin[0] != 0;  // nie die PIN selbst
+  ko["angry"] = kc.angry;
+  ko["angryToday"] = kids::angryToday();
+  ko["angryLast"] = kids::angryLast();
   addItems(ko["released"].to<JsonArray>(), fv, kids::list(fv, favs::MAX));
   json(200, d);
 }
@@ -260,7 +270,7 @@ static void setKids() {
   JsonDocument d;
   if (!body(d)) return msg("Ungültige Anfrage", 400);
   kids::Cfg c = kids::cfg();
-  bool was = c.on;
+  bool was = c.on, wasAngry = kids::angry();
   c.on = d["on"] | c.on;
   c.wake = d["wake"] | c.wake;
   c.bed = d["bed"] | c.bed;
@@ -268,9 +278,11 @@ static void setKids() {
   c.apps = d["apps"] | c.apps;
   c.school = d["school"] | c.school;
   c.nap = d["nap"] | c.nap;
+  c.angry = d["angry"] | c.angry;
   kids::set(c);
+  if (kids::angry() && !wasAngry) music::stop();  // im Wutmodus läuft nichts anderes
   if (c.on) ui::volumeSet(cfg.volume);  // Obergrenze sofort anwenden
-  if (c.on != was) ui::home();          // Zifferblatt und Apps neu aufbauen
+  if (c.on != was || kids::angry() != wasAngry) ui::home();  // Zifferblatt und Apps neu aufbauen
   msg("Gespeichert");
 }
 

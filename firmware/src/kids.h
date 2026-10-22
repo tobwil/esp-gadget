@@ -18,6 +18,7 @@ struct Cfg {
   bool school;           // tagsüber „Schule“ statt „Kita“
   bool nap;              // Mittagsruhe
   char pin[9];           // Eltern-PIN für die Weboberfläche ("" = keine)
+  bool angry;            // Wutmodus: auf der Uhr gibt es nur noch das Wut-Glas
 };
 
 void begin();
@@ -25,6 +26,12 @@ const Cfg& cfg();
 void set(const Cfg& c);  // speichert; ein Wechsel des Modus führt zurück zum Zifferblatt
 bool on();
 bool allowed(App a);     // außerhalb des Kindermodus immer true
+bool angry();            // Wutmodus aktiv (nur zusammen mit dem Kindermodus)
+
+// Wutmodus: wie oft heute die Wut rausgeschüttelt wurde (nur im Speicher, für die Eltern)
+void angryDone();
+int angryToday();
+uint32_t angryLast();    // Unix-Zeit, 0 = noch nie
 int limitVolume(int pct);
 
 // Freigaben

@@ -1,3 +1,4 @@
+#include <math.h>
 // Taschenfunk – YT-Music-Player, Taschenuhr, Timer und Walkie-Talkie
 // für das Waveshare ESP32-S3-Touch-AMOLED-1.75C.
 //
@@ -55,6 +56,8 @@ bool appCommand(const char* line) {
   else if (!strcmp(line, "perf")) perfLog = !perfLog;
   else if (sscanf(line, "kids %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.on = !strcmp(a, "on"); kids::set(k); ui::home(); }
   else if (!strcmp(line, "kb")) ui::keyboard("Spotify durchsuchen", "", false, nullptr);
+  else if (sscanf(line, "angry %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.angry = !strcmp(a, "on"); if (k.angry) { k.on = true; music::stop(); } kids::set(k); ui::home(); }
+  else if (sscanf(line, "shake %99s", a) == 1) angryTestShake = atof(a);
   else if (sscanf(line, "level %99s", a) == 1) gameTestLevel(atoi(a));
   else if (sscanf(line, "kidtime %99s", a) == 1) { int h = 0, m = 0; kidFaceTestMin = sscanf(a, "%d:%d", &h, &m) == 2 ? h * 60 + m : -1; }
   else if (!strcmp(line, "imu")) { imu::sleep(false); delay(50); float x, y; imu::gravity(x, y); Serial.printf("Neigung: x %.2f y %.2f\n", x, y); }
@@ -104,7 +107,7 @@ static void power() {
   // Tiefschlaf im Akkubetrieb, wenn nichts mehr läuft
   if (!hwScreenOn() && DEEP_SLEEP_MIN && !hwUsb() && hwBattery() >= 0 &&
       hwIdleMs() > (cfg.screenOff + DEEP_SLEEP_MIN * 60UL) * 1000UL && !music::state().active && !cw::busy() &&
-      !radio::transmitting() && !radio::receiving()) {
+      !radio::transmitting() && !radio::receiving() && !kids::angry()) {
     audio::shutdown();
     hwDeepSleep(cw::alarmInS());
   }
@@ -124,6 +127,18 @@ void loop() {
     ui::onButton(b);
   }
   if (hwWakeRequested()) { hwScreen(true); ui::wake(); }
+  // Wutmodus: Schütteln weckt das Display
+  static uint32_t shakeAt = 0;
+  if (kids::angry() && !hwScreenOn() && millis() - shakeAt > 40) {
+    shakeAt = millis();
+    static float lx = 0, ly = 0, lz = 1;
+    float x, y, z;
+    if (imu::accel(x, y, z)) {
+      float d = fabsf(x - lx) + fabsf(y - ly) + fabsf(z - lz);
+      lx = x; ly = y; lz = z;
+      if (d > 1.2f) { hwScreen(true); hwActivity(); ui::wake(); }
+    }
+  }
 
   static uint32_t slow = 0;
   if (millis() - slow > 1000) {

@@ -86,6 +86,8 @@ extern const ui::Page PAGE_WATCH, PAGE_APPS, PAGE_MUSIC, PAGE_BROWSE, PAGE_TIMER
     PAGE_RADIO, PAGE_SETTINGS, PAGE_FACES, PAGE_TILES, PAGE_CONTROL, PAGE_GAME;
 void kidFaceBuild(lv_obj_t* scr);  // Zifferblatt im Kindermodus (ui_kidface.cpp)
 void kidFaceUpdate();
+void angryBuild(lv_obj_t* scr);    // Wutmodus: das Wut-Glas (ui_angry.cpp)
+extern float angryTestShake;       // Test: so viele Sekunden Schütteln vortäuschen
 extern int kidFaceTestMin;          // Testzeit für Bildschirmfotos (−1 = echte Uhrzeit)
 void gameTestLevel(int level);     // Balance: Stufe direkt zeigen (Bildschirmfotos)
 void browseOpen(const char* path);  // Musik-Liste öffnen (Pfad der Brücke)

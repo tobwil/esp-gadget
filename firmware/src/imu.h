@@ -7,5 +7,7 @@ bool begin();
 void sleep(bool on);
 // Schwerkraft in g, umgerechnet auf den Bildschirm: gx > 0 = nach rechts geneigt, gy > 0 = nach unten
 bool gravity(float& gx, float& gy);
+// ganze Beschleunigung in g (x, y wie gravity, z aus dem Bildschirm heraus) – zum Erkennen von Schütteln
+bool accel(float& ax, float& ay, float& az);
 
 }  // namespace imu

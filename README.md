@@ -46,6 +46,19 @@ Ist er an:
   und Zifferblatt-Wahl sind gesperrt.
 - **Lautstärke** hat eine Obergrenze (Standard 60 %), auch wenn die Spotify-App lauter stellt.
 
+**Wutmodus** (ebenfalls nur über die Weboberfläche, schaltet den Kindermodus mit ein). Auf der Uhr gibt es dann
+nur noch das **Wut-Glas**; Wischen und Tasten tun nichts, Musik und Funk sind aus:
+
+1. Rote Wut-Funken sitzen in der Uhr. Nur wer **richtig fest schüttelt**, schleudert sie über den Rand hinaus,
+   höchstens ein paar pro Sekunde. So braucht es eine Weile echte Kraft, bis alles draußen ist. Der rote Ring
+   zeigt, wie viel Wut noch drin ist.
+2. „Alles raus!“: Es wird blau, ruhiger Glitzer sinkt nach unten, ein Kreis atmet vor (4 s ein, 6 s aus,
+   vier Atemzüge).
+3. „Gut gemacht!“ Kommt die Wut zurück, einfach wieder schütteln.
+
+Schütteln weckt das Display; im Wutmodus geht die Uhr nicht in den Tiefschlaf. Die Weboberfläche zeigt, wie
+oft heute die Wut rausgeschüttelt wurde.
+
 ## Bedienung
 
 Aufgebaut wie bei Pixel Watch und Apple Watch: das Zifferblatt ist die Mitte, alles andere liegt eine
@@ -76,7 +89,8 @@ Wischbewegung entfernt.
    Schlüssel eintragen. Die Uhr gibt Schlüssel nie zurück, sie lassen sich nur setzen.
 4. **Spotify:** Auf [developer.spotify.com](https://developer.spotify.com/dashboard) eine App anlegen und
    Client-ID und Secret in die Weboberfläche eintragen. Damit funktioniert die Suche. Dann in der Spotify-App
-   (Premium) die Uhr als Lautsprecher wählen; sie merkt sich das Konto. Bis zu drei Konten sind möglich, jedes
+   (Premium) die Uhr als Lautsprecher wählen (Handy im selben WLAN; auf dem iPhone braucht Spotify die
+   Erlaubnis „Lokales Netzwerk“); sie merkt sich das Konto. Bis zu drei Konten sind möglich, jedes
    koppelt sich auf diese Weise; gewechselt wird in den Einstellungen oder in der Weboberfläche.
 5. **Spracheingabe (optional):** einen Gemini-API-Schlüssel von [aistudio.google.com](https://aistudio.google.com) eintragen.
 
@@ -99,7 +113,7 @@ Befehle im seriellen Monitor:
 - **Eingaben:** `tap X Y`, `hold X Y`, `swipe l|r|u|d`, `boot`, `pwr`, `shot`
 - **Seiten:** `page apps|music|timer|stopwatch|alarm|radio|settings|game|web`, `home`, `browse search:Coldplay`
 - **Musik:** `toggle`, `next`, `vol 60`
-- **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung)
+- **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung), `angry on|off`, `shake 10` (10 s Schütteln vortäuschen)
 - **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status`
 
 ## Technik
@@ -118,7 +132,7 @@ Befehle im seriellen Monitor:
   - `music` mit `spotify`, `podcast` und `favs`
   - `kids`, `voice`, `keys`, `webui`
   - `faces/` (FaceLab-Designs)
-  - `ui/` (Seiten, Kindermodus-Zifferblatt `ui_kidface.cpp`, Spiel `ui_game.cpp` + `game_theme.cpp`)
+  - `ui/` (Seiten, Kindermodus-Zifferblatt `ui_kidface.cpp`, Wut-Glas `ui_angry.cpp`, Spiel `ui_game.cpp` + `game_theme.cpp`)
 
 ## Lizenz
 

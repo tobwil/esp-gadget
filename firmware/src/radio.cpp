@@ -1,4 +1,5 @@
 #include "radio.h"
+#include "kids.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <esp_mac.h>
@@ -224,7 +225,7 @@ static void handle(const RxPkt& p) {
   if (h.from == me) return;
   if (!peerSeen(h, p.rssi, p.lan)) return;
   if (h.to && h.to != me) return;  // an jemand anderen
-  bool listen = cfg.radioRx || screenOpen;
+  bool listen = (cfg.radioRx || screenOpen) && !kids::angry();
   switch (h.type) {
     case P_HELLO: {
       if (p.len < sizeof(Hello)) return;

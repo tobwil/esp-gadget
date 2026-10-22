@@ -371,10 +371,12 @@ static void buildFace(lv_obj_t* scr, int f) {
   fillData(f);
 }
 
-static bool kidShown = false;
+static bool kidShown = false, angryShown = false;
 
 static void build(lv_obj_t* scr) {
   kidShown = kids::on();
+  angryShown = kids::angry();
+  if (angryShown) { faceObj = nullptr; angryBuild(scr); return; }
   if (kidShown) { faceObj = nullptr; kidFaceBuild(scr); return; }
   int f = cfg.face < NFACES ? cfg.face : 0;
   shown = f;
@@ -387,12 +389,13 @@ static void build(lv_obj_t* scr) {
 
 static void update() {
   int f = cfg.face < NFACES ? cfg.face : 0;
-  if (kids::on() != kidShown || (!kidShown && f != shown)) {  // anderes Zifferblatt bzw. Kindermodus gewechselt
+  if (kids::on() != kidShown || kids::angry() != angryShown || (!kidShown && f != shown)) {  // anderes Zifferblatt bzw. Kindermodus gewechselt
     lv_obj_t* scr = topScreen();
     lv_obj_clean(scr);
     build(scr);
     return;
   }
+  if (angryShown) return;  // läuft mit eigenem Takt
   if (kidShown) { kidFaceUpdate(); return; }
   if (f == 0) { updatePocket(); return; }
   // Intro flüssig, danach so oft wie das Design es braucht
@@ -415,7 +418,7 @@ static void update() {
 
 // Aufwachen: Intro neu abspielen (wie beim Handgelenk-Heben)
 static void resume() {
-  if (kidShown) return;
+  if (kidShown || angryShown) return;
   wakeAt = millis();
   wakeN++;
   if (cacheCanvas) { cached = false; lv_obj_add_flag(cacheCanvas, LV_OBJ_FLAG_HIDDEN); }

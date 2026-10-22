@@ -223,7 +223,7 @@ std::string LoginBlob::buildZeroconfInfo() {
   cJSON_AddStringToObject(json_obj, "deviceID", deviceId.c_str());
   cJSON_AddStringToObject(json_obj, "remoteName", name.c_str());
   cJSON_AddStringToObject(json_obj, "publicKey", encodedKey.c_str());
-  cJSON_AddStringToObject(json_obj, "deviceType", "deviceType");
+  cJSON_AddStringToObject(json_obj, "deviceType", "SPEAKER");
 
   char* str = cJSON_PrintUnformatted(json_obj);
   cJSON_Delete(json_obj);

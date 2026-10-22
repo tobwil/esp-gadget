@@ -85,6 +85,9 @@ s = s.replace(key, "      // Stop the current track, if any\n      trackPlayer->
 open(p, "w").write(s)
 PY
 
+# cJSON-Variante meldet sonst „deviceType“ als Gerätetyp – die Spotify-App erwartet SPEAKER
+sed -i.bak 's/"deviceType", "deviceType"/"deviceType", "SPEAKER"/' "$DST/src/cspot/LoginBlob.cpp" && rm "$DST/src/cspot/LoginBlob.cpp.bak"
+
 # Erweiterung: Titel von der Uhr selbst laden (wie ein Load-Frame aus der Spotify-App)
 sed -i.bak 's/  void loadTrackFromURI(const std::string& uri);/  void loadTrackFromURI(const std::string\& uri);\
   \/\/ Taschenfunk: Warteschlange aus Spotify-URIs laden und ab index abspielen\

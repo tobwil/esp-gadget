@@ -335,8 +335,8 @@ void poll() {
     zc->on("/spotify_info", HTTP_POST, zcAdd);
     zc->begin();
   }
-  if (!mdnsDone) {
-    MDNS.addService("spotify-connect", "tcp", ZC_PORT);
+  // erst wenn mDNS läuft (startet in netPoll), sonst geht die Anmeldung still verloren
+  if (!mdnsDone && MDNS.addService("spotify-connect", "tcp", ZC_PORT)) {
     MDNS.addServiceTxt("spotify-connect", "tcp", "VERSION", "1.0");
     MDNS.addServiceTxt("spotify-connect", "tcp", "CPath", "/spotify_info");
     MDNS.addServiceTxt("spotify-connect", "tcp", "Stack", "SP");

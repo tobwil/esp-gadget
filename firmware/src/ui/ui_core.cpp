@@ -28,7 +28,7 @@ bool bezelMoved() { return bzMoved; }
 //   Zifferblatt: ↑ Apps · ↓ Kontrollzentrum · ← Kacheln
 //   sonst: → zurück; Apps auch ↓, Kontrollzentrum auch ↑ (zurück in die Richtung, aus der sie kamen)
 static void gestureCb(lv_event_t*) {
-  if (bezelActive) return;  // Drehen am Rand ist kein Wischen
+  if (bezelActive || kids::angry()) return;  // Drehen am Rand ist kein Wischen; im Wutmodus gibt es nichts anderes
   lv_dir_t d = lv_indev_get_gesture_dir(lv_indev_active());
   const Page* p = top();
   if (!p) return;
@@ -654,6 +654,10 @@ void keyboard(const char* ttl, const char* initial, bool password, void (*done)(
 // ------------------------------------------------------------------ Tasten und Takt
 
 void onButton(BtnEvent e) {
+  if (kids::angry()) {  // Wutmodus: Tasten tun nichts außer einen Wecker stoppen
+    if ((e == BOOT_SHORT || e == BOOT_HOLD) && cw::ringing()) cw::ringStop();
+    return;
+  }
   switch (e) {
     case BOOT_SHORT:
       if (cw::ringing()) cw::ringStop();

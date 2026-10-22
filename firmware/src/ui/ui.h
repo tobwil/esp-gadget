@@ -1,8 +1,9 @@
-// Oberfläche: Seiten-Stapel, Farben und Bausteine für den runden 466-px-Bildschirm.
+// Oberfläche: Seiten-Stapel, Farben und Bausteine – für den runden 466er und den eckigen 480er Bildschirm.
 #pragma once
 #include <lvgl.h>
 #include "../fonts/fonts.h"
 #include "../hw.h"
+#include "pins.h"
 
 namespace ui {
 
@@ -21,7 +22,8 @@ inline lv_color_t C_ALARM() { return lv_color_hex(0xB592FF); }
 inline lv_color_t C_SET() { return lv_color_hex(0xA7A7B0); }
 inline lv_color_t C_RED() { return lv_color_hex(0xFF453A); }
 
-static const int W = 466, H = 466, CX = 233, CY = 233;
+static const int W = LCD_W, H = LCD_H, CX = LCD_W / 2, CY = LCD_H / 2;
+static const bool SQUARE = BOARD_SQUARE;  // eckiges Display: Listen über die volle Breite, Infos in den Ecken
 
 // ------------------------------------------------------------------ Seiten
 struct Page {

@@ -3,10 +3,8 @@
 //   amoled-216   Waveshare ESP32-S3-Touch-AMOLED-2.16  (quadratisch, 480 × 480; Pins aus Waveshares Beispielen)
 #pragma once
 
-// Die Oberfläche ist für den runden 466er-Bildschirm gebaut (LCD_W × LCD_H). Auf dem 2.16er sitzt sie mittig
-// im 480er-Feld (PANEL_*), die Ecken bleiben schwarz.
-#define LCD_W 466
-#define LCD_H 466
+// Größe der Oberfläche (LCD_W × LCD_H) und Lage im Panel (PANEL_*): rund 466, eckig 480 (ganze Fläche,
+// die Ecken zeigen auf dem Zifferblatt Akku, Wetter, Datum und was gerade läuft).
 
 // Display CO5300 (QSPI)
 #define LCD_SDIO0 4
@@ -34,10 +32,13 @@
 
 #if defined(BOARD_AMOLED_216)
 #define BOARD_NAME "AMOLED 2.16"
+#define BOARD_SQUARE 1
+#define LCD_W 480
+#define LCD_H 480
 #define PANEL_W 480
 #define PANEL_H 480
-#define PANEL_X 6          // Lage der Oberfläche im Panel (gerade, der CO5300 will gerade Fensterstarts)
-#define PANEL_Y 6
+#define PANEL_X 0
+#define PANEL_Y 0
 #define LCD_COL_OFS 0
 #define LCD_MADCTL 0xA0    // Ausrichtung wie in Waveshares Beispielen
 #define LCD_RESET 39
@@ -47,6 +48,9 @@
 #define IMU_INT1 21
 #else
 #define BOARD_NAME "AMOLED 1.75C"
+#define BOARD_SQUARE 0
+#define LCD_W 466
+#define LCD_H 466
 #define PANEL_W 466
 #define PANEL_H 466
 #define PANEL_X 0

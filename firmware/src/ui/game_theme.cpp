@@ -2,10 +2,11 @@
 #include "game_theme.h"
 #include <math.h>
 #include <Arduino.h>
+#include "pins.h"
 
 namespace {
 
-constexpr int N = 466, C = 233;
+constexpr int N = LCD_W, C = LCD_W / 2;
 uint16_t* buf;
 uint32_t rs;
 

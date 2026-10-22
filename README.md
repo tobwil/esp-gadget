@@ -1,7 +1,8 @@
 # Taschenfunk
 
 Eine Uhr für die ganze Familie auf dem **Waveshare ESP32-S3-Touch-AMOLED-1.75C** (rund, 466 × 466) und dem
-**ESP32-S3-Touch-AMOLED-2.16** (quadratisch, 480 × 480; die runde Oberfläche sitzt dort mittig): Radio,
+**ESP32-S3-Touch-AMOLED-2.16** (quadratisch, 480 × 480: volle Fläche, Listen über die ganze Breite, in den Ecken
+des Zifferblatts Akku, Wetter, Datum und was gerade läuft): Radio,
 ARD Audiothek mit Fußball live, Podcasts, eine KI-Assistentin mit Stimme, Walkie-Talkie, Radiowecker – und ein
 Kindermodus mit Pixel-Tagesablauf, Freigaben und einem Wut-Glas zum Rausschütteln. Alles läuft auf der Uhr
 selbst, eingerichtet wird vom Handy aus.
@@ -123,6 +124,14 @@ Für Momente, in denen die Gefühle zu groß werden. Ist er an (Weboberfläche),
 ein paar pro Sekunde, so braucht es eine Weile echte Kraft. Ist alles draußen, wird es blau, ruhiger Glitzer
 sinkt, und ein Kreis atmet vor (4 s ein, 6 s aus). Wischen und Tasten tun nichts, Musik und Funk sind aus.
 Die Weboberfläche zeigt, wie oft heute die Wut rausgeschüttelt wurde.
+
+## Funk vom Handy und Uhr finden
+
+- **Funk vom Handy:** In der Weboberfläche „Funk vom Handy“ antippen – das öffnet eine sichere Seite der Uhr
+  (`https://<Uhr>/`). Knopf halten und sprechen, die Uhr spielt die Stimme ab und zeigt „Handy spricht“.
+  Browser geben das Mikrofon nur über HTTPS frei; das Zertifikat stellt sich die Uhr selbst aus, deshalb
+  warnt der Browser beim ersten Mal („trotzdem öffnen“).
+- **Uhr finden:** „Uhr klingeln lassen“ – 30 s Piepen mit „Hier bin ich!“, auch bei dunklem Display.
 
 ## Weboberfläche
 

@@ -232,10 +232,10 @@ void listFit(lv_obj_t* list) {
     int dy = abs((a.y1 + a.y2) / 2 - CY) + (a.y2 - a.y1) / 4;
     int chord = dy >= 228 ? 0 : (int)(2 * sqrtf(228.0f * 228 - dy * dy)) - 24;
     int maxW = lv_obj_has_flag(c, LV_OBJ_FLAG_USER_1) ? 384 : 330;
-    int w = constrain(chord, 240, maxW);
+    int w = SQUARE ? maxW + 56 : constrain(chord, 240, maxW);  // eckig: volle Breite, rund: der Rundung folgen
     if (lv_obj_get_width(c) != w) lv_obj_set_width(c, w);
     int mid = abs((a.y1 + a.y2) / 2 - CY);
-    lv_obj_set_style_opa(c, mid < 150 ? LV_OPA_COVER : (lv_opa_t)max(60, 255 - (mid - 150) * 3), 0);
+    lv_obj_set_style_opa(c, SQUARE || mid < 150 ? LV_OPA_COVER : (lv_opa_t)max(60, 255 - (mid - 150) * 3), 0);
   }
 }
 

@@ -14,10 +14,10 @@ import zlib
 
 import serial
 
-W = H = 466
+W = H = 466  # wird beim ersten Bildschirmfoto aus der Kennung „FB<Breite>“ übernommen (eckig: 480)
 
 
-def png(path, raw):
+def png(path, raw, W=466, H=466):
     rows = bytearray()
     for y in range(H):
         rows.append(0)
@@ -34,7 +34,7 @@ def png(path, raw):
 
 
 def shot(port, path, tries=3):
-    marker = f"\nFB{W}\n".encode()
+    marker = b"\nFB"
     for _ in range(tries):
         port.reset_input_buffer()
         port.write(b"shot\n")
@@ -45,11 +45,15 @@ def shot(port, path, tries=3):
         if marker not in buf:
             continue
         buf = buf.split(marker, 1)[1]
+        while b"\n" not in buf and time.time() < end:
+            buf += port.read(16)
+        size, buf = buf.split(b"\n", 1)
+        W = H = int(size)
         end = time.time() + 20
         while len(buf) < W * H * 2 and time.time() < end:
             buf += port.read(W * H * 2 - len(buf))
         if len(buf) >= W * H * 2:
-            png(path, buf[:W * H * 2])
+            png(path, buf[:W * H * 2], W, H)
             print("gespeichert:", path)
             return
         print(f"unvollständig ({len(buf)} Byte), neuer Versuch")

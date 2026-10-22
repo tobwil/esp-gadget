@@ -1,16 +1,17 @@
 // Zeichen-Kontext für die Zifferblätter aus FaceLab (Garmin-Projekt).
-// Die Designs rechnen in Garmin-Koordinaten (454 px, Mitte 227); Dc rechnet sie auf 466 px um und
+// Die Designs rechnen in Garmin-Koordinaten (454 px, Mitte 227); Dc rechnet sie auf die Displaygröße um und
 // zeichnet über LVGL (kantengeglättet). Dazu die Hilfen aus FaceLab: Farben mischen, Easing,
 // Zufall, Monoline-Strichschrift und Sonne/Mond.
 #pragma once
+#include "pins.h"
 #include <lvgl.h>
 #include <math.h>
 #include <stdint.h>
 
 namespace fc {
 
-static const float K = 466.0f / 454.0f;
-inline float X(float x) { return 233.0f + (x - 227.0f) * K; }
+static const float K = LCD_W / 454.0f;
+inline float X(float x) { return LCD_W / 2.0f + (x - 227.0f) * K; }
 
 struct Dc {
   lv_layer_t* L;

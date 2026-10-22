@@ -374,7 +374,51 @@ static void buildFace(lv_obj_t* scr, int f) {
 
 static bool kidShown = false, angryShown = false;
 
+// Eckiges Display: in den vier Ecken Akku, Wetter, Datum und was gerade läuft
+static lv_obj_t* corner[4];
+
+static void cornersBuild(lv_obj_t* scr) {
+  if (!SQUARE) return;
+  const lv_align_t AL[4] = {LV_ALIGN_TOP_LEFT, LV_ALIGN_TOP_RIGHT, LV_ALIGN_BOTTOM_LEFT, LV_ALIGN_BOTTOM_RIGHT};
+  for (int i = 0; i < 4; i++) {
+    corner[i] = label(scr, &font_text_20, C_DIM(), "");
+    lv_label_set_long_mode(corner[i], LV_LABEL_LONG_DOT);
+    lv_obj_set_size(corner[i], 150, lv_font_get_line_height(&font_text_20));
+    lv_obj_set_style_text_align(corner[i], i % 2 ? LV_TEXT_ALIGN_RIGHT : LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_align(corner[i], AL[i], i % 2 ? -14 : 14, i < 2 ? 12 : -12);
+  }
+}
+
+static void cornersUpdate() {
+  if (!SQUARE || !corner[0]) return;
+  char b[80];
+  int bat = hwBattery();
+  if (bat >= 0) snprintf(b, sizeof(b), "%s %d %%", hwCharging() ? I_CHARGING : I_BATTERY, bat);
+  else snprintf(b, sizeof(b), I_BOLT " USB");
+  lv_label_set_text(corner[0], b);
+  lv_obj_set_style_text_color(corner[0], bat >= 0 && bat < 15 && !hwCharging() ? C_RED() : C_DIM(), 0);
+  weather::Now w = weather::now();
+  if (w.ok) snprintf(b, sizeof(b), "%s %d°", weather::icon(w.code, true), (int)lroundf(w.temp));
+  else b[0] = 0;
+  lv_label_set_text(corner[1], b);
+  static const char* WD[] = {"So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"};
+  if (timeValid()) {
+    time_t now = time(nullptr);
+    struct tm t;
+    localtime_r(&now, &t);
+    snprintf(b, sizeof(b), "%s %d.%d.", WD[t.tm_wday], t.tm_mday, t.tm_mon + 1);
+  } else b[0] = 0;
+  lv_label_set_text(corner[2], b);
+  music::State m = music::state();
+  if (cw::timerRunning()) { char tt[16]; fmtTime(tt, sizeof(tt), cw::timerLeftMs(), false); snprintf(b, sizeof(b), I_HOURGLASS " %s", tt); }
+  else if (m.active) snprintf(b, sizeof(b), "%s %s", m.playing ? I_MUSIC : I_PAUSE, m.title);
+  else if (cfg.alarmOn) snprintf(b, sizeof(b), I_ALARM " %d:%02d", cfg.alarmH, cfg.alarmM);
+  else snprintf(b, sizeof(b), "%s", netOnline() ? I_WIFI : I_WIFI_OFF);
+  lv_label_set_text(corner[3], b);
+}
+
 static void build(lv_obj_t* scr) {
+  corner[0] = nullptr;
   kidShown = kids::on();
   angryShown = kids::angry();
   if (angryShown) { faceObj = nullptr; angryBuild(scr); return; }
@@ -386,6 +430,8 @@ static void build(lv_obj_t* scr) {
   faceObj = nullptr;
   if (f == 0) buildPocket(scr);
   else buildFace(scr, f);
+  cornersBuild(scr);
+  cornersUpdate();
 }
 
 static void update() {
@@ -398,6 +444,8 @@ static void update() {
   }
   if (angryShown) return;  // läuft mit eigenem Takt
   if (kidShown) { kidFaceUpdate(); return; }
+  static uint32_t cAt = 0;
+  if (millis() - cAt > 1000) { cAt = millis(); cornersUpdate(); }
   if (f == 0) { updatePocket(); return; }
   // Intro flüssig, danach so oft wie das Design es braucht
   uint32_t now = millis();

@@ -23,6 +23,7 @@ tools/      Fernsteuerung/Bildschirmfotos über USB, Schrift- und Zertifikat-Gen
 | **Uhr** (Startseite) | Fünf Zifferblätter, **lange drücken** zum Wechseln: **Taschenuhr** sowie vier Designs aus [FaceLab](https://github.com/tobwil/garminwatchface): **Daylight**, **Sternenhimmel**, **Kiesel Text** und **Glitch**. Akku auf jedem Zifferblatt. |
 | **Musik** | **Radio**: Sender aus dem freien Verzeichnis radio-browser.info (nur MP3), Beliebt, Kinderradio, Nachrichten, Genres, Suche; der laufende Songtitel kommt aus dem Stream, Weiter/Zurück wechselt den Sender, **Sender lange drücken = merken**. **ARD Audiothek** (ARD Sounds): Rubriken wie „Für Kinder“, Hörspiel, Wissen, Suche; Folgen mit gemerkter Position; **„Fußball live“** mit den Sportschau-Übertragungen (Konferenz und Einzelspiele, laufende und kommende), **alle ARD-Radiosender live**. **Podcasts** über die iTunes-Suche. **Favoriten** für Sender, Sendungen, Podcasts und Listen. **Spotify** ist eingebaut, Spotify gibt inoffiziellen Geräten bei vielen neueren Konten aber keinen Ton mehr (siehe unten). **Lautstärke:** Finger am Rand entlang ziehen oder Cover antippen; sie gleitet weich. **Sleep-Timer:** Mond unten auf der Musikseite antippen (15/30/45/60/90 Min.), am Ende wird 30 s lang ausgeblendet. |
 | **Sprechen** | Mikrofon-Knopf halten und z. B. „Bibi und Tina Folge 1“ sagen. Gemini macht daraus die Suche. |
+| **KIra** (KI-Assistentin) | Gemini 3.8 Live mit Stimme, nur außerhalb des Kindermodus. App öffnen, **Bildschirm oder BOOT halten und sprechen**, loslassen. Die Figur besteht aus kleinen Pixeln: in Ruhe das „KI/“ von KI/sruptiv, beim Zuhören eine Kugel, die mit der Stimme atmet, beim Nachdenken ein kreisender Ring. Kann im Netz suchen (Google-Suche), Timer und Wecker stellen und – falls eingerichtet – **n8n-Workflows und -Agenten** der eigenen Instanz starten (über deren MCP-Server). Freigegeben wird in der Weboberfläche (Reiter „KI“); vor Aktionen, die etwas verschicken oder ändern, fragt sie nach. Anlegen, Ändern oder Löschen in n8n kann sie nicht. |
 | **Funk** | Walkie-Talkie: großen Knopf halten und sprechen. In der Nähe per **ESP-NOW** (ohne Router), im selben WLAN zusätzlich per UDP-Multicast. |
 | **Timer · Stoppuhr · Wecker** | Restzeit als Ring am Rand, Runden, Schlummern; der Wecker weckt auch aus dem Tiefschlaf. **Radiowecker:** „Wecken mit“ Ton, tagesschau in 100 Sekunden, einem gemerkten Sender oder der neuesten Folge einer gemerkten Audiothek-Sendung; leise beginnend, über 45 s lauter; ohne WLAN oder Ton nach 20 s wird klassisch geklingelt. |
 | **Wetter** | Open-Meteo, Standort per IP. |
@@ -123,7 +124,7 @@ Befehle im seriellen Monitor:
 
 - **Eingaben:** `tap X Y`, `hold X Y`, `swipe l|r|u|d`, `boot`, `pwr`, `shot`
 - **Seiten:** `page apps|music|timer|stopwatch|alarm|radio|settings|game|web`, `home`, `browse search:Coldplay`
-- **Musik:** `toggle`, `next`, `vol 60`, `browse rl:tag:kids`, `browse ard:soccer`, `voice start` / `voice stop`, `sleep 1` (Sleep-Timer), `alarm 7:30`, `alarmsrc ard:set:10815223 Name` (`-` = Ton)
+- **Musik:** `toggle`, `next`, `vol 60`, `browse rl:tag:kids`, `browse ard:soccer`, `voice start` / `voice stop`, `page assist`, `talk on` / `talk off` (Assistentin), `sleep 1` (Sleep-Timer), `alarm 7:30`, `alarmsrc ard:set:10815223 Name` (`-` = Ton)
 - **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung), `angry on|off`, `shake 10` (10 s Schütteln vortäuschen)
 - **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status`
 
@@ -142,6 +143,7 @@ Befehle im seriellen Monitor:
   - `hw`, `audio`, `net`, `radio`, `clockwork`, `weather`, `imu`
   - `music` mit `spotify`, `podcast` (MP3-Spieler, auch live), `webradio`, `ard` und `favs`
   - `kids`, `voice`, `keys`, `webui`
+  - `assist` (Gemini Live), `wsock` (WebSocket über TLS), `n8n` (MCP-Client mit Freigabeliste)
   - `faces/` (FaceLab-Designs)
   - `ui/` (Seiten, Kindermodus-Zifferblatt `ui_kidface.cpp`, Wut-Glas `ui_angry.cpp`, Spiel `ui_game.cpp` + `game_theme.cpp`)
 

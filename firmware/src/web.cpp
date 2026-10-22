@@ -90,10 +90,23 @@ int post(const String& url, const String& body, const char* contentType, String&
   int code = -1;
   if (h->begin(*tls, url)) {
     h->setTimeout(20000);
+    h->useHTTP10(true);  // kein Chunked-Encoding: große Antworten (n8n, Gemini) sonst abgeschnitten
     addHeaders(*h, headers);
     h->addHeader("Content-Type", contentType);
     code = h->POST((uint8_t*)body.c_str(), body.length());
-    if (code > 0) out = h->getString();
+    if (code > 0) {
+      NetworkClient* s = h->getStreamPtr();
+      int size = h->getSize();
+      out = "";
+      uint8_t buf[2048];
+      uint32_t idle = millis();
+      while ((s->connected() || s->available()) && (size < 0 || (int)out.length() < size)) {
+        int n = s->read(buf, sizeof(buf));
+        if (n > 0) { out.concat((const char*)buf, n); idle = millis(); }
+        else if (millis() - idle > 20000) break;
+        else delay(2);
+      }
+    }
     h->end();
   }
   delete h;

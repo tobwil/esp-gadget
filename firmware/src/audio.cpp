@@ -42,6 +42,7 @@ uint32_t musicPlayed() { return played; }
 
 void voiceWrite(const int16_t* s, size_t n) { voice.write(s, n); }
 size_t voiceUsed() { return voice.used(); }
+size_t voiceSpace() { return voice.space(); }
 void voiceFlush() { voiceFlushReq = true; }
 
 void micStart() { mic.tail = mic.head; micOn = true; }

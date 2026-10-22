@@ -5,7 +5,9 @@
 #include "favs.h"
 #include "hw.h"
 #include "keys.h"
+#include "assist.h"
 #include "kids.h"
+#include "n8n.h"
 #include "music.h"
 #include "net.h"
 #include "radio.h"
@@ -97,6 +99,19 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
  <section><h2>Favoriten</h2><div id="favs"></div></section>
 </div>
 
+<div class="tab" id="t-ai">
+ <section><h2 id="ainame2">Assistent</h2><p class="note">Gemini 3.8 Live mit Stimme. Auf der Uhr: App öffnen, halten und sprechen. Nicht im Kindermodus.</p>
+  <label class="f" for="ainame">Name</label><input id="ainame" maxlength="20"><button class="wide" id="ainamego">Speichern</button>
+  <div class="row" style="margin-top:8px"><div class="t"><b>Google-Suche</b><small>Aktuelles, Nachrichten, Sport, Wetter</small></div><label class="sw"><input type="checkbox" id="aisearch"><span></span></label></div></section>
+ <section><h2>n8n</h2><p class="note" id="n8nst"></p>
+  <label class="f" for="n8nurl">MCP-Adresse</label><input id="n8nurl" placeholder="https://…/mcp-server/http" autocapitalize="off" autocomplete="off">
+  <label class="f" for="n8ntok">Token</label><input id="n8ntok" type="password" autocomplete="off" placeholder="unverändert lassen">
+  <button class="wide" id="n8ngo">Speichern</button></section>
+ <section><h2>Freigegeben für den Assistenten</h2><p class="note">Nur diese Workflows und Agenten darf er starten. Vor allem, was etwas verschickt oder ändert, fragt er nach.</p>
+  <div id="n8nallow"></div><button class="wide ghost" id="n8nload">Workflows und Agenten laden</button><div id="n8nall"></div>
+  <button class="wide" id="n8nsave" hidden>Freigabe speichern</button></section>
+</div>
+
 <div class="tab" id="t-dev">
  <section><h2>Name</h2><input id="nm" maxlength="16" aria-label="Name"><button class="wide" id="nmgo">Speichern</button></section>
  <section><h2>WLAN</h2><div id="wifi"></div>
@@ -110,7 +125,7 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
  <section><button class="wide ghost" id="rst">Uhr neu starten</button></section>
 </div>
 </main>
-<nav id="nav"><button data-t="home" class="sel"><i>⌚</i>Übersicht</button><button data-t="kids" class="k"><i>🧸</i>Kinder</button><button data-t="music"><i>♪</i>Musik</button><button data-t="dev"><i>⚙</i>Gerät</button></nav>
+<nav id="nav"><button data-t="home" class="sel"><i>⌚</i>Übersicht</button><button data-t="kids" class="k"><i>🧸</i>Kinder</button><button data-t="music"><i>♪</i>Musik</button><button data-t="ai"><i>✦</i>KI</button><button data-t="dev"><i>⚙</i>Gerät</button></nav>
 <div id="msg"></div>
 <div id="lock"><h1>Eltern-PIN</h1><p class="note">Diese Uhr ist geschützt.</p><input id="lpin" type="password" inputmode="numeric" autocomplete="off"><button class="wide" id="lgo">Entsperren</button></div>
 <script>
@@ -155,6 +170,11 @@ function render(){
  if(document.activeElement!==$('nm'))$('nm').value=s.name;
  $('wifi').innerHTML=s.known.map(n=>row(n,n===s.ssid?'verbunden':'',btn('Vergessen',`post("wifi/forget",{ssid:${J(n)}})`))).join('')||'<p class="note">Keine Netze gespeichert</p>';
  $('sid').placeholder=sp.clientId||'nicht gesetzt';
+ const ai=s.assist;
+ if(document.activeElement!==$('ainame'))$('ainame').value=ai.name;$('ainame2').textContent=ai.name;$('aisearch').checked=ai.search;
+ if(document.activeElement!==$('n8nurl'))$('n8nurl').value=ai.n8nUrl;
+ $('n8nst').innerHTML=ai.n8nSet?'<span class="ok">Eingerichtet</span>':'Noch nicht eingerichtet – Adresse und Token aus n8n (Einstellungen → MCP).';
+ $('n8nallow').innerHTML=ai.allowed.map(a=>row(a.name,a.kind=='agent'?'Agent':'Workflow',btn('✕',`unallow(${J(a.id)})`))).join('')||'<p class="note">Noch nichts freigegeben.</p>';
  $('gst').innerHTML=s.gemini?'<span class="ok">Schlüssel gesetzt</span>':'<span class="bad">Kein Schlüssel – Spracheingabe aus</span>';
 }
 async function load(){try{S=await api('state');render()}catch(e){if(e.message!='pin')$('stat').textContent='Uhr nicht erreichbar'}}
@@ -180,6 +200,18 @@ $('nmgo').onclick=()=>post('name',{name:val('nm')});
 $('wgo').onclick=()=>post('wifi',{ssid:val('ss'),pass:val('pw')});
 $('spgo').onclick=()=>post('keys',{spotifyId:val('sid'),spotifySecret:val('ssec')});
 $('gemgo').onclick=()=>post('keys',{gemini:val('gem')});
+$('ainamego').onclick=()=>post('assist',{name:val('ainame')});
+$('aisearch').onchange=e=>post('assist',{search:e.target.checked},true);
+$('n8ngo').onclick=()=>{post('assist',{n8nUrl:val('n8nurl'),n8nToken:val('n8ntok')});$('n8ntok').value=''};
+let n8nList=[];
+$('n8nload').onclick=async()=>{$('n8nall').innerHTML='<p class="note">Lade …</p>';
+ try{const j=await api('n8n/list');if(j.err){$('n8nall').innerHTML='<p class="note bad">'+esc(j.err)+'</p>';return}
+  n8nList=j.items||[];const on=new Set(S.assist.allowed.map(a=>a.id));
+  $('n8nall').innerHTML=n8nList.map((w,i)=>row(w.name,(w.kind=='agent'?'Agent':'Workflow')+(w.active?' · aktiv':''),`<label class="sw"><input type="checkbox" data-i="${i}" ${on.has(w.id)?'checked':''}><span></span></label>`)).join('')||'<p class="note">Nichts gefunden</p>';
+  $('n8nsave').hidden=!n8nList.length}catch(e){$('n8nall').innerHTML=''}};
+$('n8nsave').onclick=()=>{const sel=[...document.querySelectorAll('#n8nall input:checked')].map(c=>n8nList[+c.dataset.i]).map(w=>({id:w.id,name:w.name,kind:w.kind,desc:w.desc||''}));
+ post('n8n/allow',{items:sel})};
+function unallow(id){post('n8n/allow',{items:S.assist.allowed.filter(a=>a.id!=id)})}
 $('rst').onclick=()=>confirm('Uhr neu starten?')&&post('restart',{});
 load();setInterval(()=>{if(!document.hidden)load()},10000);
 </script></body></html>)HTML";
@@ -246,6 +278,14 @@ static void state() {
     a["current"] = i == cur;
   }
   d["gemini"] = voice::configured();
+  JsonObject ai = d["assist"].to<JsonObject>();
+  ai["name"] = assist::name();
+  ai["search"] = assist::search();
+  ai["n8nUrl"] = n8n::url();
+  ai["n8nSet"] = n8n::configured();  // nie den Token selbst
+  JsonDocument al;
+  deserializeJson(al, n8n::allowedJson());
+  ai["allowed"] = al;
   static music::Item fv[favs::MAX];
   addItems(d["favs"].to<JsonArray>(), fv, favs::list(fv, favs::MAX));
   const kids::Cfg& kc = kids::cfg();
@@ -367,6 +407,31 @@ void begin() {
     snprintf(c.pin, sizeof(c.pin), "%s", p);
     kids::set(c);
     msg(n ? "PIN gespeichert" : "PIN entfernt");
+  });
+  srv->on("/api/assist", HTTP_POST, []() {
+    if (!authed()) return;
+    JsonDocument d;
+    if (!body(d)) return msg("Ungültige Anfrage", 400);
+    assist::configure(d["name"] | (const char*)nullptr, d["search"].is<bool>() ? (int)d["search"].as<bool>() : -1);
+    const char* u = d["n8nUrl"] | (const char*)nullptr;
+    const char* t = d["n8nToken"] | "";
+    if (u || t[0]) n8n::set(u, t[0] ? t : nullptr);
+    msg("Gespeichert");
+  });
+  srv->on("/api/n8n/list", HTTP_GET, []() {
+    if (!authed()) return;
+    String err, list = n8n::listAll(err);
+    if (!list.length()) { JsonDocument d; d["err"] = err; return json(200, d); }
+    srv->send(200, "application/json", "{\"items\":" + list + "}");
+  });
+  srv->on("/api/n8n/allow", HTTP_POST, []() {
+    if (!authed()) return;
+    JsonDocument d;
+    if (!body(d)) return msg("Ungültige Anfrage", 400);
+    String s;
+    serializeJson(d["items"], s);
+    n8n::setAllowed(s);
+    msg("Freigabe gespeichert");
   });
   srv->on("/api/name", HTTP_POST, []() {
     if (!authed()) return;

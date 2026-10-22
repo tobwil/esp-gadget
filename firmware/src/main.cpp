@@ -24,6 +24,7 @@
 #include "webui.h"
 #include "imu.h"
 #include "kids.h"
+#include "assist.h"
 #include "ui/ui.h"
 extern const ui::Page PAGE_WEB_;
 
@@ -48,7 +49,7 @@ bool appCommand(const char* line) {
   else if (sscanf(line, "page %99s", a) == 1) {
     const ui::Page* p = !strcmp(a, "apps") ? &PAGE_APPS : !strcmp(a, "music") ? &PAGE_MUSIC : !strcmp(a, "timer") ? &PAGE_TIMER
                       : !strcmp(a, "stopwatch") ? &PAGE_STOPWATCH : !strcmp(a, "alarm") ? &PAGE_ALARM
-                      : !strcmp(a, "radio") ? &PAGE_RADIO : !strcmp(a, "settings") ? &PAGE_SETTINGS : !strcmp(a, "game") ? &PAGE_GAME : !strcmp(a, "web") ? &PAGE_WEB_ : nullptr;
+                      : !strcmp(a, "radio") ? &PAGE_RADIO : !strcmp(a, "settings") ? &PAGE_SETTINGS : !strcmp(a, "game") ? &PAGE_GAME : !strcmp(a, "web") ? &PAGE_WEB_ : !strcmp(a, "assist") ? &PAGE_ASSIST : nullptr;
     if (p) ui::push(p);
   } else if (sscanf(line, "timer %99s", a) == 1) cw::timerStart(atoi(a));
   else if (sscanf(line, "face %99s", a) == 1) { cfg.face = atoi(a); settingsSave(); ui::home(); }
@@ -61,6 +62,8 @@ bool appCommand(const char* line) {
   else if (sscanf(line, "angry %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.angry = !strcmp(a, "on"); if (k.angry) { k.on = true; music::stop(); } kids::set(k); ui::home(); }
   else if (sscanf(line, "shake %99s", a) == 1) angryTestShake = atof(a);
   else if (sscanf(line, "level %99s", a) == 1) gameTestLevel(atoi(a));
+  else if (!strcmp(line, "talk on")) assist::talk(true);  // Test: Assistent ohne Finger
+  else if (!strcmp(line, "talk off")) assist::talk(false);
   else if (sscanf(line, "sleep %99s", a) == 1) music::sleepSet(atoi(a));  // Test: Sleep-Timer in Minuten
   else if (!strncmp(line, "alarmsrc ", 9)) {
     snprintf(a, sizeof(a), "%s", line + 9);  // Test: „alarmsrc ard:set:10815223 Name“, „-“ = Ton
@@ -108,6 +111,7 @@ void setup() {
   music::begin();
   weather::begin();
   voice::begin();
+  assist::begin();
   webui::begin();
   ui::begin();
   lv_timer_handler();

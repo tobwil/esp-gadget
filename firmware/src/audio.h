@@ -25,6 +25,7 @@ uint32_t musicPlayed();     // abgespielte Abtastwerte seit dem letzten Flush
 
 // Funk-Stimme (16 kHz)
 void voiceWrite(const int16_t* s, size_t n);
+size_t voiceSpace();         // freier Platz im Sprachkanal (Samples, 16 kHz)
 size_t voiceUsed();
 void voiceFlush();
 

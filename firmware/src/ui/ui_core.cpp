@@ -5,6 +5,7 @@
 #include "../music.h"
 #include "../radio.h"
 #include "../settings.h"
+#include "../assist.h"
 #include "../kids.h"
 #include "ui.h"
 
@@ -674,11 +675,13 @@ void onButton(BtnEvent e) {
       break;
     case BOOT_HOLD:
       if (cw::ringing()) { cw::ringStop(); break; }
+      if (top() == &PAGE_ASSIST) { assist::talk(true); break; }  // auf der Assistenten-Seite: BOOT = sprechen
       if (!kids::allowed(kids::A_RADIO)) break;
       if (top() != &PAGE_RADIO) { radio::pttDown(0); pttShow(); }
       else radio::pttDown(radioTarget());
       break;
     case BOOT_RELEASE:
+      assist::talk(false);
       radio::pttUp();
       if (pttObj) { lv_obj_delete(pttObj); pttObj = nullptr; }
       break;

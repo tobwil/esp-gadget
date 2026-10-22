@@ -2,6 +2,7 @@
 // Öffnen: auf dem Zifferblatt hochwischen oder BOOT drücken. Schließen: runter- oder nach rechts wischen.
 #include <time.h>
 #include "../music.h"
+#include "../assist.h"
 #include "../kids.h"
 #include "../net.h"
 #include "ui.h"
@@ -9,8 +10,10 @@
 using namespace ui;
 
 struct App { const char* icon; const char* name; lv_color_t (*color)(); const Page* page; uint8_t kid; };
+static char assistName[24] = "KIra";  // Name der Assistentin (Weboberfläche)
 static const App APPS[] = {
     // kid: im Kindermodus nur mit diesem App-Bit (0xFF = immer, 0 = nie)
+    {"KI", assistName, C_TEXT, &PAGE_ASSIST, 0},  // nie im Kindermodus
     {I_MUSIC, "Musik", C_MUSIC, &PAGE_MUSIC, 0xFF},
     {I_RADIO, "Funk", C_RADIO, &PAGE_RADIO, kids::A_RADIO},
     {I_HOURGLASS, "Timer", C_TIMER, &PAGE_TIMER, kids::A_TIMER},
@@ -29,7 +32,9 @@ static void build(lv_obj_t* scr) {
   lv_obj_remove_flag(l, LV_OBJ_FLAG_SCROLL_ELASTIC);  // oben angekommen: runterwischen schließt
   timeL = label(l, &font_text_24, C_TEXT(), "");
   lv_obj_set_style_text_align(timeL, LV_TEXT_ALIGN_CENTER, 0);
+  snprintf(assistName, sizeof(assistName), "%s", assist::name().c_str());
   for (int i = 0; i < N; i++) {
+    if (APPS[i].page == &PAGE_ASSIST && !assist::available()) continue;
     if (kids::on() && APPS[i].kid != 0xFF && !kids::allowed((kids::App)APPS[i].kid)) continue;
     lv_color_t c = APPS[i].color();
     lv_obj_t* r = listRow(l, nullptr, c, APPS[i].name);

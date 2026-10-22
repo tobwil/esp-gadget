@@ -83,7 +83,7 @@ void fmtTime(char* out, size_t n, uint32_t ms, bool tenths);  // mm:ss(.d) bzw. 
 
 // Seiten (in den einzelnen Dateien)
 extern const ui::Page PAGE_WATCH, PAGE_APPS, PAGE_MUSIC, PAGE_BROWSE, PAGE_TIMER, PAGE_STOPWATCH, PAGE_ALARM,
-    PAGE_RADIO, PAGE_SETTINGS, PAGE_FACES, PAGE_TILES, PAGE_CONTROL, PAGE_GAME;
+    PAGE_RADIO, PAGE_SETTINGS, PAGE_FACES, PAGE_TILES, PAGE_CONTROL, PAGE_GAME, PAGE_ASSIST;
 void kidFaceBuild(lv_obj_t* scr);  // Zifferblatt im Kindermodus (ui_kidface.cpp)
 void kidFaceUpdate();
 void angryBuild(lv_obj_t* scr);    // Wutmodus: das Wut-Glas (ui_angry.cpp)

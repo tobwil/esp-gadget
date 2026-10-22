@@ -1,5 +1,6 @@
 // Musik: „Läuft gerade“ (Cover, Fortschritt am Rand, Steuerung) und die Listen der Brücke.
 #include "../music.h"
+#include "../voice.h"
 #include "../settings.h"
 #include "ui.h"
 
@@ -157,7 +158,7 @@ const Page PAGE_MUSIC = {build, update, nullptr, resume, false};
 // ================================================================== Listen der Brücke
 
 struct BrowseCtx {
-  char path[128];
+  char path[240];
   uint32_t seq;      // browseSeq() beim Anfragen
   bool waiting;
   lv_obj_t* list;
@@ -167,16 +168,103 @@ struct BrowseCtx {
   int n;
 };
 
-static char pendingPath[128];
+static char pendingPath[240];
+
+// ================================================================== Suchen (Sprache oder Tastatur)
+
+static bool searchPodcast = false;  // sonst Spotify
+static lv_obj_t *sMic, *sHalo, *sStatus, *sTitle;
+static bool sHolding = false;
+static uint32_t sDoneAt = 0;
+
+static void runSearch(const char* q) {
+  if (!q[0]) return;
+  char p[160];
+  snprintf(p, sizeof(p), searchPodcast ? "pcsearch:%s" : "search:%s", q);
+  snprintf(pendingPath, sizeof(pendingPath), "%s", p);
+  push(&PAGE_BROWSE);
+}
+
+static void searchKeyboard() {
+  keyboard(searchPodcast ? "Podcast suchen" : "Spotify durchsuchen", "", false, [](const char* q) { runSearch(q); });
+}
+
+static void searchBuild(lv_obj_t* scr) {
+  lv_color_t c = searchPodcast ? C_ALARM() : C_RADIO();
+  sTitle = title(scr, searchPodcast ? "Podcast suchen" : "Spotify durchsuchen", c);
+  sHalo = lv_obj_create(scr);
+  lv_obj_set_style_radius(sHalo, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_border_width(sHalo, 0, 0);
+  lv_obj_set_style_bg_color(sHalo, c, 0);
+  lv_obj_set_style_bg_opa(sHalo, LV_OPA_30, 0);
+  lv_obj_remove_flag(sHalo, (lv_obj_flag_t)(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
+  sMic = lv_obj_create(scr);
+  lv_obj_set_size(sMic, 170, 170);
+  lv_obj_align(sMic, LV_ALIGN_CENTER, 0, -6);
+  lv_obj_set_style_radius(sMic, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_border_width(sMic, 0, 0);
+  lv_obj_set_style_bg_color(sMic, c, 0);
+  lv_obj_set_style_bg_color(sMic, C_RED(), LV_STATE_PRESSED);
+  lv_obj_remove_flag(sMic, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE));
+  lv_obj_t* m = label(sMic, &font_icon_64, C_BG(), I_MIC);
+  lv_obj_center(m);
+  lv_obj_add_event_cb(sMic, [](lv_event_t*) { sHolding = true; voice::start(); play(3); }, LV_EVENT_PRESSED, nullptr);
+  for (lv_event_code_t code : {LV_EVENT_RELEASED, LV_EVENT_PRESS_LOST})
+    lv_obj_add_event_cb(sMic, [](lv_event_t*) { if (sHolding) { sHolding = false; voice::finish(); play(4); } }, code, nullptr);
+  sStatus = label(scr, &font_text_24, C_TEXT(), "");
+  lv_label_set_long_mode(sStatus, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(sStatus, 330);
+  lv_obj_set_style_text_align(sStatus, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_align(sStatus, LV_ALIGN_CENTER, 0, 128);
+  lv_obj_t* kb = pill(scr, I_ENTER "  Tastatur", C_SURF(), C_TEXT());
+  lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, -26);
+  lv_obj_add_event_cb(kb, [](lv_event_t*) { searchKeyboard(); }, LV_EVENT_CLICKED, nullptr);
+  if (!voice::configured()) lv_label_set_text(sStatus, "Gemini-Schlüssel fehlt – Tastatur nutzen");
+  voice::cancel();
+  sDoneAt = 0;
+}
+
+static void searchUpdate() {
+  voice::Phase p = voice::phase();
+  float lvl = p == voice::LISTENING ? voice::level() : 0;
+  int s = 170 + (int)(fminf(1.0f, lvl * 1.5f) * 100);
+  lv_obj_set_size(sHalo, s, s);
+  lv_obj_align(sHalo, LV_ALIGN_CENTER, 0, -6);
+  const char* t = "";
+  if (p == voice::IDLE) t = voice::configured() ? "Halten und sprechen" : "Gemini-Schlüssel fehlt – Tastatur nutzen";
+  else if (p == voice::LISTENING) t = "Ich höre zu …";
+  else if (p == voice::THINKING) t = "Verstehe …";
+  else t = voice::text();
+  if (strcmp(lv_label_get_text(sStatus), t)) lv_label_set_text(sStatus, t);
+  lv_obj_set_style_text_color(sStatus, p == voice::FAILED ? C_TIMER() : C_TEXT(), 0);
+  // erkannt: kurz zeigen, dann suchen
+  if (p == voice::DONE && !sDoneAt) sDoneAt = millis();
+  if (sDoneAt && millis() - sDoneAt > 700) {
+    sDoneAt = 0;
+    char q[96];
+    snprintf(q, sizeof(q), "%s", voice::text());
+    voice::cancel();
+    runSearch(q);
+  }
+}
+
+static void searchLeave() { voice::cancel(); }
+
+const Page PAGE_SEARCH = {searchBuild, searchUpdate, searchLeave, nullptr, false};
 
 void browseOpen(const char* path) {
+  if (!strcmp(path, "@voice") || !strcmp(path, "@pcsearch")) {
+    searchPodcast = path[1] == 'p';
+    push(&PAGE_SEARCH);
+    return;
+  }
   if (!strcmp(path, "@search")) {
-    keyboard("Suche in YouTube Music", "", false, [](const char* q) {
-      if (!q[0]) return;
-      char p[128];
-      snprintf(p, sizeof(p), "search:%s", q);
-      browseOpen(p);
-    });
+    searchPodcast = false;
+    searchKeyboard();
+    return;
+  }
+  if (!strcmp(path, "@spotifyhelp")) {
+    toast("Spotify-App öffnen → Lautsprecher-Symbol → diese Uhr wählen. Danach geht es auch ohne App.", 7000);
     return;
   }
   snprintf(pendingPath, sizeof(pendingPath), "%s", path);
@@ -198,15 +286,6 @@ static void itemClicked(lv_event_t* e) {
   else { music::playList(c->items, c->n, i); show(&PAGE_MUSIC); }
 }
 
-static void itemLong(lv_event_t* e) {
-  BrowseCtx* c = ctx();
-  int i = (int)(intptr_t)lv_event_get_user_data(e);
-  if (!c || i >= c->n || c->items[i].kind != music::K_TRACK) return;
-  music::playRadio(c->items[i].id);
-  toast(I_RADIO_WAVES "  Radio zu diesem Titel");
-  show(&PAGE_MUSIC);
-  lv_indev_wait_release(lv_indev_active());
-}
 
 static void fill(BrowseCtx* c) {
   char title[72], err[64];
@@ -235,14 +314,22 @@ static void fill(BrowseCtx* c) {
   for (int i = 0; i < c->n; i++) {
     const music::Item& it = c->items[i];
     char sub[80];
-    if (it.kind == music::K_TRACK && it.dur)
+    if (it.kind == music::K_TRACK && it.dur >= 3600)
+      snprintf(sub, sizeof(sub), "%s%s%d:%02d:%02d", it.sub, it.sub[0] ? " · " : "", it.dur / 3600, it.dur / 60 % 60, it.dur % 60);
+    else if (it.kind == music::K_TRACK && it.dur)
       snprintf(sub, sizeof(sub), "%s%s%d:%02d", it.sub, it.sub[0] ? " · " : "", it.dur / 60, it.dur % 60);
     else
       snprintf(sub, sizeof(sub), "%s", it.sub);
-    const char* icon = it.kind == music::K_TRACK ? I_MUSIC : !strcmp(it.id, "@search") ? I_SEARCH : I_QUEUE;
-    lv_obj_t* r = listRow(c->list, icon, it.kind == music::K_TRACK ? C_DIM() : C_MUSIC(), it.title, sub[0] ? sub : nullptr);
+    const char* icon = it.kind == music::K_TRACK ? I_MUSIC
+                       : !strncmp(it.id, "fav", 3)                               ? I_HEART
+                       : !strcmp(it.id, "@search")                              ? I_SEARCH
+                       : !strcmp(it.id, "@voice") || !strcmp(it.id, "@pcsearch") ? I_MIC
+                       : !strncmp(it.id, "pc", 2)                                ? I_RADIO_WAVES
+                       : !strcmp(it.id, "@spotifyhelp")                          ? I_INFO
+                                                                                 : I_QUEUE;
+    lv_color_t ic = it.kind == music::K_TRACK ? C_DIM() : !strncmp(it.id, "fav:", 4) ? C_BRASS() : C_MUSIC();
+    lv_obj_t* r = listRow(c->list, icon, ic, it.title, sub[0] ? sub : nullptr);
     lv_obj_add_event_cb(r, itemClicked, LV_EVENT_SHORT_CLICKED, (void*)(intptr_t)i);
-    lv_obj_add_event_cb(r, itemLong, LV_EVENT_LONG_PRESSED, (void*)(intptr_t)i);
   }
   listFit(c->list);
 }

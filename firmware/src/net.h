@@ -11,6 +11,7 @@ const char* netSsid();
 String netIp();
 int netRssi();
 int netChannel();                   // aktueller Funkkanal (für ESP-NOW)
+const char* netHost();              // mDNS-Name, z. B. „taschenfunk-e008“
 
 // Suche für den WLAN-Bildschirm
 struct ScanNet { char ssid[33]; int rssi; bool open; };

@@ -1,114 +1,92 @@
 # Taschenfunk
 
 Firmware für das **Waveshare ESP32-S3-Touch-AMOLED-1.75C** (rundes 466 × 466 AMOLED, Touch, Lautsprecher,
-zwei Mikrofone, Akku): ein YouTube-Music-Player, eine Taschenuhr, Timer, Stoppuhr, Wecker und ein Walkie-Talkie
-zwischen mehreren Geräten.
+zwei Mikrofone, Bewegungssensor, Akku). Sie macht daraus eine Uhr mit Spotify, Podcasts, Walkie-Talkie, Timer,
+Stoppuhr, Wecker, Wetter, Balance-Spiel und Kindermodus. Alles läuft auf dem Gerät selbst, ohne Rechner.
 
 ![Bildschirme](docs/screens.png)
 
-*Bildschirmfotos vom echten Gerät (`tools/remote.py`): Uhr, Apps, Musik, Einstellungen, Timer, Stoppuhr, Funk, Tastatur.*
+*Bildschirmfotos vom echten Gerät (`tools/remote.py`): Zifferblatt, Apps, Kindermodus-Zifferblatt (Frühstück,
+Gute-Nacht-Geschichte), Balance (Wiese, Weltraum), Tastatur, QR-Code zur Weboberfläche.*
 
 ```
-firmware/   PlatformIO-Projekt (Arduino-Core 3.3, LVGL 9.2)
-bridge/     YT-Music-Brücke (Python) – läuft auf einem Rechner im WLAN
-tools/      Fernsteuerung/Bildschirmfotos über USB, Schrift-Generator
+firmware/   PlatformIO-Projekt (Arduino-Core 3.3 / ESP-IDF 5.5, LVGL 9.2)
+  lib/cspot Spotify-Connect-Client (cspot + bell, GPL-3.0, mit tools/vendor_cspot.sh eingebunden)
+tools/      Fernsteuerung/Bildschirmfotos über USB, Schrift- und Zertifikat-Generatoren
 ```
 
 ## Was es kann
 
 | App | Funktion |
 |---|---|
-| **Uhr** (Startseite) | Fünf Zifferblätter, **lange drücken** zum Wechseln: **Taschenuhr** (Blattzeiger, kleine Sekunde, Komplikation für Timer/Stoppuhr/Titel) sowie vier Designs aus [FaceLab](https://github.com/tobwil/garminwatchface) – **Daylight** (echter Sonnenbogen, Himmelsfarbe, Goldene/Blaue Stunde, Mondphase, Temperatur), **Sternenhimmel** (der echte Himmel über dem Standort mit Sternbildern, Milchstraße, Sonne und Mond), **Kiesel Text** („zehn / zweiund / vierzig“) und **Glitch** (zerfällt im Takt der Musik). Bei jedem Aufwachen läuft das Intro (Ziffern schreiben sich, der Himmel dreht sich ein). |
-| **Musik** | Bibliothek der Brücke: Suchen, Entdecken (Mixe der Startseite), mit Anmeldung auch Lieblingssongs, Playlists, Verlauf. Interpreten, Alben, Playlists, Radio zu jedem Titel (Titel lange drücken). Wiedergabe mit rundem Cover und Fortschritt am Rand. **Lautstärke:** Finger am Rand entlang ziehen (im Uhrzeigersinn lauter, eine Umdrehung = 0 … 100 %; geht auch auf dem Zifferblatt, solange Musik läuft) oder Lautsprecher-Knopf bzw. Cover antippen für den großen Regler mit − / +. Die Lautstärke gleitet weich (Software-Rampe im Mischer, gehörrichtige Kurve). Läuft die Warteschlange aus, geht es mit einem Radio zum letzten Titel weiter. |
-| **Funk** | Walkie-Talkie: großen Knopf halten und sprechen. In der Nähe per **ESP-NOW** (ohne Router), im selben WLAN zusätzlich per UDP-Multicast. Empfänger wählbar (alle oder ein Gerät), „Anklopfen“ spielt beim anderen einen Ton. Die Uhrzeit wird von Nachbarn übernommen, wenn ein Gerät kein WLAN hat. |
-| **Timer** | Minuten/Sekunden wählen, Restzeit als Ring am Rand, klingelt auch aus dem Display-Aus heraus. |
-| **Stoppuhr** | Zehntelsekunden, Runden, Sekundenring. |
-| **Wecker** | Uhrzeit + an/aus, „+5 Min“ zum Schlummern; weckt das Gerät auch aus dem Tiefschlaf. |
-| **Einstellungen** | Sieben Punkte: WLAN · Helligkeit · Lautstärke · Display aus · Funk (Name, im Hintergrund hören) · Musik-Brücke · Über das Gerät (Akku, IP, Neustart, Ausschalten). |
+| **Uhr** (Startseite) | Fünf Zifferblätter, **lange drücken** zum Wechseln: **Taschenuhr** sowie vier Designs aus [FaceLab](https://github.com/tobwil/garminwatchface): **Daylight**, **Sternenhimmel**, **Kiesel Text** und **Glitch**. Akku auf jedem Zifferblatt. |
+| **Musik** | **Spotify** (Premium) direkt auf der Uhr: per Sprache oder Tastatur suchen, Alben, Playlists, Interpreten. Gleichzeitig ist die Uhr ein Spotify-Connect-Lautsprecher, die Spotify-App kann also mitsteuern. **Podcasts** über die iTunes-Suche; die Uhr merkt sich, wo man in jeder Folge war (±30/15 s springen). **Favoriten** für Alben, Playlists, Interpreten und Podcasts. **Lautstärke:** Finger am Rand entlang ziehen oder Cover antippen; sie gleitet weich. |
+| **Sprechen** | Mikrofon-Knopf halten und z. B. „Bibi und Tina Folge 1“ sagen. Gemini macht daraus die Suche. |
+| **Funk** | Walkie-Talkie: großen Knopf halten und sprechen. In der Nähe per **ESP-NOW** (ohne Router), im selben WLAN zusätzlich per UDP-Multicast. |
+| **Timer · Stoppuhr · Wecker** | Restzeit als Ring am Rand, Runden, Schlummern; der Wecker weckt auch aus dem Tiefschlaf. |
+| **Wetter** | Open-Meteo, Standort per IP. |
+| **Balance** | Uhr neigen, Kugel rollen lassen. **Ins Ziel**: eine Kugel ins goldene Loch, rote Löcher sind Fallen, mit jeder Stufe mehr. **Alle Kugeln**: drei Kugeln in drei Löcher, auf Zeit. Jede Stufe hat ein eigenes Thema (Wiese, Strand, Eis, Weltraum, Holz, Lava, Unterwasser, Zuckerwatte). Rekorde werden gespeichert. |
+| **Einstellungen** | WLAN · Helligkeit · Lautstärke · Display aus · Funk · Spotify (Konten) · **Weboberfläche** (QR-Code) · Über das Gerät. |
+| **Weboberfläche** | `http://taschenfunk-xxxx.local` bzw. die IP, fürs Handy gebaut: Name, WLAN, Spotify-Konten, Schlüssel, Favoriten und der Kindermodus. |
+
+### Kindermodus
+
+Ein- und ausschalten lässt er sich **nur über die Weboberfläche** (Reiter „Kinder“), auf Wunsch mit Eltern-PIN.
+Ist er an:
+
+- **Zifferblatt:** eine Pixel-Geschichte durch den Tag. Aufstehen, Frühstück, Kita oder Schule (am Wochenende
+  Spielen), Mittagessen, Mittagsruhe, Draußen spielen, Abendessen, Baden und Zähne putzen,
+  Gute-Nacht-Geschichte, Schlafen. Der Ring zeigt den ganzen Tag vom Aufstehen (oben) bis zur Bettzeit; was
+  vorbei ist, ist dunkler. Aufstehen und Bettzeit stellt man ein (Standard 6:30 und 20:30), der Rest richtet
+  sich danach.
+- **Musik:** nur, was die Eltern freigegeben haben (Spotify-Alben und -Playlists, Podcasts). Freigeben geht über
+  die Suche in der Weboberfläche, per Spotify-Link oder direkt aus den Favoriten. Auf der Uhr gibt es keine
+  Suche, keine Sprache, keine Favoriten.
+- **Apps:** Musik ist immer da; Funk, Timer, Stoppuhr, Balance, Wecker und Wetter einzeln erlaubt. Einstellungen
+  und Zifferblatt-Wahl sind gesperrt.
+- **Lautstärke** hat eine Obergrenze (Standard 60 %), auch wenn die Spotify-App lauter stellt.
 
 ## Bedienung
 
-Aufgebaut wie bei Pixel Watch (Wear OS) und Apple Watch: das Zifferblatt ist die Mitte, alles andere liegt
-eine Wischbewegung entfernt.
+Aufgebaut wie bei Pixel Watch und Apple Watch: das Zifferblatt ist die Mitte, alles andere liegt eine
+Wischbewegung entfernt.
 
 | Wo | Geste / Taste | Wirkung |
 |---|---|---|
-| Zifferblatt | ↑ hochwischen | App-Liste (Musik, Funk, Timer, Stoppuhr, Wecker, Wetter, Zifferblatt, Einstellungen) |
-| Zifferblatt | ↓ runterwischen | Kontrollzentrum: Lautstärke, Helligkeit, Funk-Empfang, Taschenlampe, Display aus, Einstellungen; oben Uhrzeit, Akku, WLAN |
-| Zifferblatt | ← nach links wischen | Kacheln: Musik · Wetter · Timer · Funk (seitlich blättern, mit Direktbedienung) |
+| Zifferblatt | ↑ hochwischen | App-Liste |
+| Zifferblatt | ↓ runterwischen | Kontrollzentrum: Lautstärke, Helligkeit, Funk-Empfang, Taschenlampe, Display aus, Einstellungen |
+| Zifferblatt | ← nach links wischen | Kacheln: Musik · Wetter · Timer · Funk |
 | Zifferblatt | lange drücken | Zifferblatt wählen |
 | Zifferblatt | am Rand entlang ziehen | Lautstärke (solange Musik läuft) |
-| überall | → nach rechts wischen | zurück (Kontrollzentrum auch ↑) |
-| überall | **BOOT** kurz (wie die Krone) | auf dem Zifferblatt: Apps · sonst: zurück zum Zifferblatt · Klingeln: Stopp |
-| überall | **BOOT** halten | Funk an alle (Push-to-Talk), auch bei dunklem Display |
-| überall | **PWR** kurz | Display an/aus |
-| überall | **PWR** lang (1,5 s) | Ausschalten / Neustart (6 s halten schaltet hart aus) |
+| überall | → nach rechts wischen | zurück |
+| überall | **BOOT** kurz (wie die Krone) | auf dem Zifferblatt: Apps · sonst: zurück zum Zifferblatt |
+| überall | **BOOT** halten | Funk an alle (Push-to-Talk) |
+| überall | **PWR** kurz / lang | Display an/aus · Ausschalten/Neustart |
 
-Das Display geht nach der eingestellten Zeit aus; Antippen, BOOT oder PWR wecken es. Im Akkubetrieb geht das
-Gerät 10 Minuten nach dem Display-Aus in den Tiefschlaf, wenn keine Musik, kein Timer und kein Funk läuft
-(`DEEP_SLEEP_MIN` in `firmware/include/config.h`). Am USB-Kabel schläft es nie.
+## Einrichten
 
-## 1. Musik-Brücke starten
+1. **Firmware aufspielen**
+   ```bash
+   cp firmware/include/secrets.example.h firmware/include/secrets.h   # optional vorbelegen
+   cd firmware && pio run -t upload
+   ```
+   Erkennt der Rechner das Board nicht: **BOOT** halten, kurz **PWR** drücken, BOOT loslassen, erneut hochladen.
+2. **WLAN** am Gerät: Apps → Einstellungen → WLAN.
+3. **Weboberfläche** öffnen: Einstellungen → Weboberfläche zeigt einen QR-Code. Dort lassen sich alle weiteren
+   Schlüssel eintragen. Die Uhr gibt Schlüssel nie zurück, sie lassen sich nur setzen.
+4. **Spotify:** Auf [developer.spotify.com](https://developer.spotify.com/dashboard) eine App anlegen und
+   Client-ID und Secret in die Weboberfläche eintragen. Damit funktioniert die Suche. Dann in der Spotify-App
+   (Premium) die Uhr als Lautsprecher wählen; sie merkt sich das Konto. Bis zu drei Konten sind möglich, jedes
+   koppelt sich auf diese Weise; gewechselt wird in den Einstellungen oder in der Weboberfläche.
+5. **Spracheingabe (optional):** einen Gemini-API-Schlüssel von [aistudio.google.com](https://aistudio.google.com) eintragen.
 
-YouTube Music lässt sich auf einem ESP32 nicht direkt abspielen (Stream-Signaturen, Opus/AAC). Die Brücke
-erledigt das auf einem Rechner im selben WLAN und schickt der Uhr fertigen Ton (32 kHz PCM) und runde Cover.
-
-```bash
-brew install ffmpeg            # Raspberry Pi/Debian: sudo apt install ffmpeg python3-venv
-cd bridge
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python server.py
-```
-
-Die Brücke meldet sich per mDNS (`_ytbridge._tcp`), die Uhr findet sie von selbst. Sonst unter
-Einstellungen → Musik-Brücke die Adresse eintragen (z. B. `http://192.168.178.20:8765`).
-
-**Handy als Fernbedienung:** die Adresse der Brücke im Handy-Browser öffnen – suchen, Titel antippen, die Uhr
-spielt ihn. Lautstärke, Weiter/Zurück und Radio gehen auch.
-
-**Anmeldung (optional)** für Lieblingssongs, Playlists und Verlauf:
-
-```bash
-cd bridge
-.venv/bin/ytmusicapi browser   # Anfrage-Header aus music.youtube.com einfügen (Anleitung von ytmusicapi)
-```
-
-Das legt `bridge/browser.json` an (steht in `.gitignore`). Ohne Anmeldung gehen Suche, Radio, Interpreten,
-Alben und „Entdecken“.
-
-Hinweis: Die Brücke nutzt `yt-dlp` und `ytmusicapi`, beides inoffizielle Schnittstellen. Für den privaten
-Gebrauch gedacht; wenn YouTube etwas ändert, hilft meist `.venv/bin/pip install -U yt-dlp ytmusicapi`.
-
-## 2. Firmware aufspielen
-
-```bash
-cd firmware
-pio run -t upload        # per USB-C
-pio device monitor       # Log
-```
-
-Erkennt der Rechner das Board nicht: **BOOT** halten, kurz **PWR** drücken (bzw. USB neu einstecken), BOOT
-loslassen und erneut hochladen.
-
-Danach am Gerät: Apps → Einstellungen → WLAN → Netz antippen → Passwort. Bis zu 6 Netze werden gemerkt, das
-stärkste bekannte wird automatisch gewählt.
-
-## Wetter und Standort
-
-Wetter kommt von [Open-Meteo](https://open-meteo.com) (kostenlos, ohne Schlüssel), der Standort beim ersten
-Mal per IP von ip-api.com – beides über HTTP, damit kein Speicher für TLS nötig ist. Aktualisiert wird alle
-15 Minuten. Sonne, Mond und Sterne berechnet die Uhr selbst aus Standort und Uhrzeit.
+`secrets.h` steht in `.gitignore`. Was darin steht, ist nur die Vorbelegung. Was in der Weboberfläche
+eingetragen wird, speichert die Uhr im NVS.
 
 ## Funk mit mehreren Geräten
 
-Alle Geräte mit dieser Firmware finden sich automatisch. Damit ESP-NOW funktioniert, müssen sie auf demselben
-WLAN-Kanal funken: Geräte im selben WLAN tun das ohnehin (und reden zusätzlich übers Netz), Geräte ohne WLAN
-bleiben auf Kanal 1 (`RADIO_CHANNEL`). Ein Gerät im Heim-WLAN auf Kanal 6 hört ein Gerät unterwegs auf
-Kanal 1 also nicht – dafür im Router Kanal 1 einstellen oder `RADIO_CHANNEL` anpassen.
-
-Ton: 16 kHz, IMA-ADPCM, ca. 28 ms pro Paket; Halbduplex wie ein echtes Funkgerät, am Ende ein Roger-Piep.
-Musik wird leiser, solange jemand spricht.
+Alle Geräte mit dieser Firmware finden sich automatisch. Für ESP-NOW müssen sie auf demselben WLAN-Kanal sein.
+Geräte im selben WLAN sind das ohnehin, Geräte ohne WLAN bleiben auf Kanal 1 (`RADIO_CHANNEL`).
 
 ## Testen über USB
 
@@ -116,29 +94,33 @@ Musik wird leiser, solange jemand spricht.
 ~/.platformio/penv/bin/python tools/remote.py /dev/cu.usbmodem* tap 233 233 wait 1 shot bild.png
 ```
 
-Befehle im seriellen Monitor: `tap X Y`, `hold X Y`, `swipe l|r|u|d`, `boot`, `pwr`, `ptt down` / `ptt up`,
-`shot`, `page apps|music|timer|stopwatch|alarm|radio|settings`, `home`, `browse search:Coldplay`,
-`wifi SSID PASSWORT`, `face 0…4`, `bezel GRAD`, `dump`, `bridge http://…` bzw. `bridge auto`, `toggle`, `next`, `vol 60`, `timer 10`,
-`status`, `mem`.
+Befehle im seriellen Monitor:
+
+- **Eingaben:** `tap X Y`, `hold X Y`, `swipe l|r|u|d`, `boot`, `pwr`, `shot`
+- **Seiten:** `page apps|music|timer|stopwatch|alarm|radio|settings|game|web`, `home`, `browse search:Coldplay`
+- **Musik:** `toggle`, `next`, `vol 60`
+- **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung)
+- **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status`
 
 ## Technik
 
-- **Display:** CO5300 über QSPI (Arduino_GFX 1.6.9), LVGL 9.2 mit Teil-Puffern im internen RAM, LVGL-Speicher
-  im PSRAM. Zifferblatt einmal in einen PSRAM-Puffer gerendert, die Zeiger werden pro Bild darüber gezeichnet.
-- **Schrift:** Inter (Text, Ziffern), Cormorant Garamond (Zifferblatt), Material Icons Round – erzeugt mit
-  `tools/make_fonts.py` (lv_font_conv), Umlaute und Icons in allen Textschriften.
-- **Audio:** ES8311 + ES7210 im Vollduplex an einem I2S-Bus mit 32 kHz; ein Mischer-Task auf Kern 0 mischt
-  Musik, Funk-Stimme und Klänge, nimmt das Mikrofon auf 16 kHz auf und schaltet den Verstärker nur bei Bedarf.
-- **Akku/PWR:** AXP2101 per I2C (Ladezustand, PWR kurz/lang, Ausschalten).
-- **Module:** `hw` (Display/Touch/Tasten/Akku/USB-Fernsteuerung), `audio`, `net` (WLAN, NTP), `music`
-  (Brücken-Client, Strom, Warteschlange, Fernbedienung), `radio` (ESP-NOW/UDP, ADPCM), `clockwork`
-  (Timer/Stoppuhr/Wecker), `weather`, `faces/` (Zeichen-Kontext im Garmin-Stil mit Strichschrift und Astronomie, die vier FaceLab-Designs), `ui/` (Seiten).
+- **Display:** CO5300 über QSPI (Arduino_GFX 1.6.9), LVGL 9.2 mit Bildpuffern und LVGL-Speicher im PSRAM.
+- **Audio:** ES8311 + ES7210 im Vollduplex bei 44,1 kHz. Ein Mischer-Task mischt Musik, Funk und Klänge, mit
+  Software-Lautstärke (Rampe, Begrenzer).
+- **Spotify:** [cspot](https://github.com/feelfreelinux/cspot) (Fork von philippe44) für Connect und Wiedergabe
+  (Ogg Vorbis über Tremor), dazu die Web-API für die Suche.
+- **Podcasts:** RSS-Parser im Datenstrom, MP3 über libhelix mit Resampling, Range-Anfragen zum Springen.
+- **TLS:** mbedTLS mit dem CA-Bundle aus ESP-IDF (`tools/make_crt_bundle.sh`), Speicher dafür im PSRAM.
+- **Cover:** JPEG-Decoder des Chips, rund maskiert; andere Formate über den Bild-Proxy wsrv.nl.
+- **Bewegungssensor:** QMI8658, läuft nur im Spiel.
+- **Module:**
+  - `hw`, `audio`, `net`, `radio`, `clockwork`, `weather`, `imu`
+  - `music` mit `spotify`, `podcast` und `favs`
+  - `kids`, `voice`, `keys`, `webui`
+  - `faces/` (FaceLab-Designs)
+  - `ui/` (Seiten, Kindermodus-Zifferblatt `ui_kidface.cpp`, Spiel `ui_game.cpp` + `game_theme.cpp`)
 
-## Stand
+## Lizenz
 
-Auf dem Gerät geprüft: Display, Schriften, alle Seiten, Touch-Eingaben (über USB eingespielt), Tastatur,
-WLAN-Suche, Akku-Anzeige, Timer-Klingeln, Funk-Senden ohne Absturz. Brücke am Mac geprüft: Suche,
-Interpreten, Alben, Playlists, Radio, Entdecken, Stream (bereit nach ~1,5 s), Cover.
-
-Noch offen: Musik Ende-zu-Ende auf dem Gerät (braucht WLAN), Funk mit einem zweiten Gerät, Wischrichtung
-mit dem Finger (`TOUCH_MIRROR_X/Y` in `config.h`, falls verkehrt), Akkulaufzeit.
+`firmware/lib/cspot` steht unter GPL-3.0. Wer die Firmware mit cspot weitergibt, gibt sie damit auch unter
+GPL-3.0 weiter.

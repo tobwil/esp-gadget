@@ -1,38 +1,30 @@
 #include "music.h"
-#include <ArduinoJson.h>
-#include <ESPmDNS.h>
-#include <HTTPClient.h>
-#include <WiFi.h>
+#include "art.h"
+#include "favs.h"
+#include "kids.h"
 #include "audio.h"
-#include "hw.h"
-#include "net.h"
-#include "radio.h"
-#include "settings.h"
+#include "podcast.h"
+#include "spotify.h"
 
 namespace music {
 
-static const int QMAX = 200, BROWSE_MAX = 80;
-
-struct Track {
-  char id[16];
-  char title[72];
-  char artist[56];
-  uint16_t dur;
-};
-
-static Track* queue;  // PSRAM
-static int qCount = 0, qIndex = 0;
+static const int BROWSE_MAX = 80;
 static SemaphoreHandle_t mtx;
-static State st;
+static Item* items;  // PSRAM
+static int itemCount = 0;
+static char listTitle[72] = "", listErr[64] = "";
+static volatile uint32_t seq = 0;
+static char want[240] = "";
+static volatile bool wanted = false, busy = false;
+static Source active = SRC_NONE;
+// Abfragen der Weboberfläche (eigener Puffer, damit die Liste auf der Uhr unberührt bleibt)
+static char qPath[240];
+static Item* qItems;
+static int qCount;
+static char qTitle[72], qErr[64];
+static volatile bool qWanted = false, qDone = false;
 
-static char bridge[100] = "";
-static volatile bool bridgeOk = false, bridgeDirty = true;
-
-// ------------------------------------------------------------------ Hilfen
-
-// UTF-8-sicher kopieren: nie mitten in einem Zeichen abschneiden
 static void ucopy(char* dst, size_t n, const char* src) {
-  if (!src) src = "";
   size_t len = strlen(src);
   if (len < n) { memcpy(dst, src, len + 1); return; }
   size_t cut = n - 1;
@@ -41,528 +33,206 @@ static void ucopy(char* dst, size_t n, const char* src) {
   dst[cut] = 0;
 }
 
-static String urlencode(const char* s) {
-  String o;
-  for (; *s; s++) {
-    uint8_t c = *s;
-    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~' || c == ':') o += (char)c;
-    else { char b[4]; snprintf(b, sizeof(b), "%%%02X", c); o += b; }
-  }
-  return o;
+static void addList(Item* it, int* n, const char* id, const char* title, const char* sub) {
+  Item& o = it[(*n)++];
+  o.kind = K_LIST;
+  o.dur = 0;
+  ucopy(o.id, sizeof(o.id), id);
+  ucopy(o.title, sizeof(o.title), title);
+  ucopy(o.sub, sizeof(o.sub), sub);
 }
 
-static void setMsg(const char* m) {
-  xSemaphoreTake(mtx, portMAX_DELAY);
-  ucopy(st.msg, sizeof(st.msg), m);
-  xSemaphoreGive(mtx);
+static void addListAt(Item* it, int i, const char* id, const char* title, const char* sub) {
+  int n = i;
+  addList(it, &n, id, title, sub);
 }
 
-bool bridgeKnown() { return bridgeOk; }
-const char* bridgeUrl() { return bridge; }
-void bridgeChanged() { bridgeDirty = true; bridgeOk = false; }
-
-State state() {
-  xSemaphoreTake(mtx, portMAX_DELAY);
-  State s = st;
-  xSemaphoreGive(mtx);
-  return s;
+// Art einer merkbaren Liste (Untertitel im Favoriten-Menü), "" = nicht merkbar
+static const char* favKind(const char* path) {
+  if (!strncmp(path, "sp:album:", 9)) return "Album";
+  if (!strncmp(path, "sp:playlist:", 12)) return "Playlist";
+  if (!strncmp(path, "sp:artist:", 10)) return "Interpret";
+  if (!strncmp(path, "pc:feed:", 8)) return "Podcast";
+  return "";
 }
 
-// ------------------------------------------------------------------ Cover
+static char lastTitle[72] = "";
 
-static uint16_t* artBuf[2];
-static volatile int artFront = -1;
-static volatile uint32_t artVer = 0;
-static char artWant[16] = "";
-static volatile bool artReq = false;
-
-const uint16_t* art(uint32_t* version) {
-  *version = artVer;
-  return artFront < 0 ? nullptr : artBuf[artFront];
+// Startmenü der Musik-App
+static void home(Item* it, int* n, char* title, size_t titleLen) {
+  ucopy(title, titleLen, "Musik");
+  addList(it, n, "@voice", "Sprechen", "Titel, Interpret, Album …");
+  addList(it, n, "@search", "Suchen", "Mit der Tastatur");
+  addList(it, n, "favs", "Favoriten", "Gemerkte Alben, Playlists, Podcasts");
+  addList(it, n, "pc:subs", "Podcasts", "Meine Podcasts und Suche");
+  if (!spotify::linked())
+    addList(it, n, "@spotifyhelp", "Spotify koppeln", "In der Spotify-App die Uhr als Lautsprecher wählen");
 }
 
-static void fetchArt(const char* id) {
-  HTTPClient http;
-  http.useHTTP10(true);
-  http.setTimeout(8000);
-  String url = String(bridge) + "/art/" + id + "?size=" + ART;
-  if (!http.begin(url)) return;
-  int code = http.GET();
-  const size_t need = ART * ART * 2;
-  if (code == 200 && http.getSize() == (int)need) {
-    int back = artFront == 0 ? 1 : 0;
-    WiFiClient* s = http.getStreamPtr();
-    size_t got = 0;
-    uint32_t t0 = millis();
-    while (got < need && millis() - t0 < 8000) {
-      int n = s->read((uint8_t*)artBuf[back] + got, need - got);
-      if (n > 0) got += n; else delay(5);
-    }
-    if (got == need) { artFront = back; artVer = artVer + 1; }
-  }
-  http.end();
+// Kindermodus: nur die freigegebenen Listen
+static void kidsHome(Item* it, int* n, char* title, size_t titleLen, char* err, size_t errLen) {
+  ucopy(title, titleLen, "Musik");
+  *n = kids::list(it, BROWSE_MAX);
+  if (!*n) ucopy(err, errLen, "Noch nichts freigegeben");
 }
 
-// ------------------------------------------------------------------ Listen (browse)
+// Liste holen (läuft im Arbeits-Task)
+static int fetch(const char* path, Item* tmp, char* title, size_t titleLen, char* err, size_t errLen) {
+  int n = 0;
+  if (!strncmp(path, "pc", 2)) podcast::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
+  else spotify::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
+  return n;
+}
 
-static Item* browseItems;  // PSRAM
-static int browseCount = 0;
-static char browseTitle[72] = "", browseErr[64] = "";
-static volatile uint32_t bSeq = 0;
-static char browseWant[128] = "";
-static volatile bool browseReq = false, browsing = false;
+int query(const char* path, char* title, size_t titleLen, Item* out, int max, char* err, size_t errLen) {
+  while (qWanted) delay(10);
+  ucopy(qPath, sizeof(qPath), path);
+  qDone = false;
+  qWanted = true;
+  uint32_t t0 = millis();
+  while (!qDone && millis() - t0 < 20000) delay(20);
+  if (!qDone) { ucopy(err, errLen, "Keine Antwort"); return 0; }
+  ucopy(title, titleLen, qTitle);
+  ucopy(err, errLen, qErr);
+  int n = min(max, qCount);
+  memcpy(out, qItems, n * sizeof(Item));
+  return n;
+}
 
 void browse(const char* path) {
   xSemaphoreTake(mtx, portMAX_DELAY);
-  ucopy(browseWant, sizeof(browseWant), path);
-  browseReq = true;
-  browsing = true;
+  ucopy(want, sizeof(want), path);
+  wanted = true;
+  busy = true;
   xSemaphoreGive(mtx);
 }
 
-bool browseBusy() { return browsing; }
-uint32_t browseSeq() { return bSeq; }
+bool browseBusy() { return busy; }
+uint32_t browseSeq() { return seq; }
 
 int browseCopy(char* title, size_t titleLen, Item* out, int max, char* err, size_t errLen) {
   xSemaphoreTake(mtx, portMAX_DELAY);
-  ucopy(title, titleLen, browseTitle);
-  ucopy(err, errLen, browseErr);
-  int n = min(max, browseCount);
-  memcpy(out, browseItems, n * sizeof(Item));
+  ucopy(title, titleLen, listTitle);
+  ucopy(err, errLen, listErr);
+  int n = min(max, itemCount);
+  memcpy(out, items, n * sizeof(Item));
   xSemaphoreGive(mtx);
   return n;
 }
 
-// Liest {"title": …, "items": [{kind, id, title, sub, dur}]} in die Liste
-static bool fetchList(const char* path, Item* items, int max, int* count, char* title, size_t titleLen, char* err,
-                      size_t errLen) {
-  *count = 0;
-  err[0] = 0;
-  if (!bridgeOk) { ucopy(err, errLen, "Musik-Brücke nicht gefunden"); return false; }
-  HTTPClient http;
-  http.setTimeout(20000);
-  String url = String(bridge) + "/api/browse?path=" + urlencode(path);
-  if (!http.begin(url)) { ucopy(err, errLen, "Ungültige Adresse"); return false; }
-  int code = http.GET();
-  if (code != 200) {
-    snprintf(err, errLen, code < 0 ? "Brücke nicht erreichbar" : "Brücke: Fehler %d", code);
-    http.end();
-    if (code < 0) bridgeOk = false;
-    return false;
+static void worker(void*) {
+  Item* tmp = (Item*)heap_caps_calloc(BROWSE_MAX, sizeof(Item), MALLOC_CAP_SPIRAM);
+  for (;;) {
+    if (qWanted) {
+      qTitle[0] = qErr[0] = 0;
+      qCount = fetch(qPath, qItems, qTitle, sizeof(qTitle), qErr, sizeof(qErr));
+      qWanted = false;
+      qDone = true;
+    }
+    if (!wanted) { vTaskDelay(pdMS_TO_TICKS(30)); continue; }
+    char path[240], title[72] = "", err[64] = "";
+    xSemaphoreTake(mtx, portMAX_DELAY);
+    ucopy(path, sizeof(path), want);
+    wanted = false;
+    xSemaphoreGive(mtx);
+    int n = 0;
+    bool kid = kids::on();
+    // „fav:<Liste>“: Favorit umschalten, danach die Liste selbst wieder zeigen
+    if (!kid && !strncmp(path, "fav:", 4)) {
+      favs::toggle(path + 4, lastTitle, favKind(path + 4));
+      memmove(path, path + 4, strlen(path + 4) + 1);
+    }
+    if (kid) {
+      if (!strcmp(path, "home")) kidsHome(tmp, &n, title, sizeof(title), err, sizeof(err));
+      else if (kids::released(path)) n = fetch(path, tmp, title, sizeof(title), err, sizeof(err));
+      else ucopy(err, sizeof(err), "Nicht freigegeben");
+    } else if (!strcmp(path, "home")) home(tmp, &n, title, sizeof(title));
+    else if (!strcmp(path, "favs")) {
+      ucopy(title, sizeof(title), "Favoriten");
+      n = favs::list(tmp, BROWSE_MAX);
+      if (!n) ucopy(err, sizeof(err), "Noch keine – oben in Alben, Playlists und Podcasts merken");
+    } else n = fetch(path, tmp, title, sizeof(title), err, sizeof(err));
+    // merkbare Listen: oben ein Eintrag zum Merken / Entfernen
+    if (!kid && favKind(path)[0] && n > 0 && n < BROWSE_MAX) {
+      memmove(tmp + 1, tmp, n * sizeof(Item));
+      n++;
+      char id[240];
+      snprintf(id, sizeof(id), "fav:%s", path);
+      bool f = favs::has(path);
+      addListAt(tmp, 0, id, f ? "Gemerkt" : "Als Favorit merken", f ? "Antippen = entfernen" : "Erscheint unter „Favoriten“");
+      ucopy(lastTitle, sizeof(lastTitle), title);
+    }
+    xSemaphoreTake(mtx, portMAX_DELAY);
+    if (!wanted) {  // inzwischen schon wieder etwas anderes gewünscht? dann verwerfen
+      memcpy(items, tmp, n * sizeof(Item));
+      itemCount = n;
+      ucopy(listTitle, sizeof(listTitle), title);
+      ucopy(listErr, sizeof(listErr), err);
+      busy = false;
+      seq = seq + 1;
+    }
+    xSemaphoreGive(mtx);
   }
-  String body = http.getString();
-  http.end();
-  JsonDocument doc;
-  if (deserializeJson(doc, body)) { ucopy(err, errLen, "Antwort unlesbar"); return false; }
-  if (doc["error"].is<const char*>()) { ucopy(err, errLen, doc["error"]); return false; }
-  ucopy(title, titleLen, doc["title"] | "");
-  for (JsonObject it : doc["items"].as<JsonArray>()) {
-    if (*count >= max) break;
-    Item& o = items[(*count)++];
-    o.kind = strcmp(it["kind"] | "track", "track") ? K_LIST : K_TRACK;
-    o.dur = it["dur"] | 0;
-    ucopy(o.id, sizeof(o.id), it["id"] | "");
-    ucopy(o.title, sizeof(o.title), it["title"] | "");
-    ucopy(o.sub, sizeof(o.sub), it["sub"] | "");
-  }
-  return true;
 }
 
 // ------------------------------------------------------------------ Wiedergabe
 
-enum Cmd : uint8_t { C_PLAY, C_NEXT, C_PREV, C_STOP, C_TOGGLE };
-static QueueHandle_t cmdq;
-static char radioWant[16] = "";
-static volatile bool radioReq = false, radioReplace = false;
-static volatile int remoteVol = -1;
-
-int takeRemoteVolume() { int v = remoteVol; remoteVol = -1; return v; }
-
-static void setQueue(const Item* items, int n, int start) {
-  xSemaphoreTake(mtx, portMAX_DELAY);
-  qCount = 0;
-  int idx = 0;
-  for (int i = 0; i < n && qCount < QMAX; i++) {
-    if (items[i].kind != K_TRACK) continue;
-    if (i == start) idx = qCount;
-    Track& t = queue[qCount++];
-    ucopy(t.id, sizeof(t.id), items[i].id);
-    ucopy(t.title, sizeof(t.title), items[i].title);
-    ucopy(t.artist, sizeof(t.artist), items[i].sub);
-    t.dur = items[i].dur;
-  }
-  qIndex = idx;
-  xSemaphoreGive(mtx);
-}
-
-void playList(const Item* items, int n, int start) {
-  setQueue(items, n, start);
-  if (!qCount) return;
-  Cmd c = C_PLAY;
-  xQueueSend(cmdq, &c, 0);
-}
-
-void playRadio(const char* videoId) {
-  ucopy(radioWant, sizeof(radioWant), videoId);
-  radioReplace = true;
-  radioReq = true;
-  setMsg("Radio wird geladen …");
-}
-
-static void cmd(Cmd c) { xQueueSend(cmdq, &c, 0); }
-void toggle() { cmd(C_TOGGLE); }
-void next() { cmd(C_NEXT); }
-void prev() { cmd(C_PREV); }
-void stop() { cmd(C_STOP); }
-
-static void streamTask(void*) {
-  static uint8_t buf[4096];
-  HTTPClient http;
-  WiFiClient* s = nullptr;
-  bool open = false, streamDone = false, userPaused = false, reopen = false, buffering = false;
-  int carry = -1;           // übrig gebliebenes Byte (ungerade Paketgrenze)
-  uint32_t posBase = 0, bytes = 0, pausedAt = 0, failAt = 0;
-  int retries = 0;
-  Track cur{};
-
-  auto closeStream = [&]() {
-    if (open) http.end();
-    open = false;
-    s = nullptr;
-  };
-
-  auto position = [&]() -> float { return posBase + audio::musicPlayed() / (float)audio::SR; };
-
-  auto start = [&](uint32_t at) {
-    closeStream();
-    audio::musicPause(true);
-    audio::musicFlush();
-    xSemaphoreTake(mtx, portMAX_DELAY);
-    if (qIndex < 0 || qIndex >= qCount) { xSemaphoreGive(mtx); return; }
-    cur = queue[qIndex];
-    st.active = true;
-    st.index = qIndex;
-    st.count = qCount;
-    ucopy(st.title, sizeof(st.title), cur.title);
-    ucopy(st.artist, sizeof(st.artist), cur.artist);
-    ucopy(st.id, sizeof(st.id), cur.id);
-    st.dur = cur.dur;
-    st.pos = at;
-    st.buffering = true;
-    st.playing = true;
-    st.msg[0] = 0;
-    xSemaphoreGive(mtx);
-    if (at == 0) { ucopy(artWant, sizeof(artWant), cur.id); artReq = true; retries = 0; }
-    posBase = at;
-    bytes = 0;
-    carry = -1;
-    userPaused = false;
-    reopen = false;
-    streamDone = false;
-    buffering = true;
-    http.useHTTP10(true);
-    http.setTimeout(20000);
-    http.setReuse(false);
-    String url = String(bridge) + "/stream/" + cur.id + "?start=" + at;
-    Serial.printf("Musik: %s – %s (ab %u s)\n", cur.artist, cur.title, at);
-    if (!bridgeOk || !http.begin(url)) { setMsg("Musik-Brücke nicht gefunden"); failAt = millis(); return; }
-    const char* hdrs[] = {"X-Duration"};
-    http.collectHeaders(hdrs, 1);
-    int code = http.GET();
-    if (code == 200 && !cur.dur && http.hasHeader("X-Duration")) {  // Länge fehlte in der Liste
-      cur.dur = at + http.header("X-Duration").toInt();
-      xSemaphoreTake(mtx, portMAX_DELAY);
-      st.dur = cur.dur;
-      if (qIndex < qCount) queue[qIndex].dur = cur.dur;
-      xSemaphoreGive(mtx);
+void playList(const Item* list, int n, int start) {
+  if (start < 0 || start >= n || list[start].kind != K_TRACK) return;
+  if (!strncmp(list[start].id, "spotify:", 8)) {
+    std::vector<std::string> uris;
+    int index = 0;
+    for (int i = 0; i < n; i++) {
+      if (list[i].kind != K_TRACK || strncmp(list[i].id, "spotify:", 8)) continue;
+      if (i == start) index = uris.size();
+      uris.push_back(list[i].id);
     }
-    if (code != 200) {
-      char m[48];
-      snprintf(m, sizeof(m), code < 0 ? "Brücke nicht erreichbar" : "Titel nicht abspielbar (%d)", code);
-      setMsg(m);
-      http.end();
-      failAt = millis();
-      return;
-    }
-    s = http.getStreamPtr();
-    open = true;
-  };
-
-  auto advance = [&](int dir) -> bool {
-    xSemaphoreTake(mtx, portMAX_DELAY);
-    int ni = qIndex + dir;
-    bool ok = ni >= 0 && ni < qCount;
-    if (ok) qIndex = ni;
-    xSemaphoreGive(mtx);
-    return ok;
-  };
-
-  for (;;) {
-    Cmd c;
-    bool idle = !open && !st.active;
-    while (xQueueReceive(cmdq, &c, idle ? pdMS_TO_TICKS(200) : 0) == pdTRUE) {
-      switch (c) {
-        case C_PLAY: start(0); break;
-        case C_NEXT:
-          if (advance(1)) start(0);
-          else if (cur.id[0]) { ucopy(radioWant, sizeof(radioWant), cur.id); radioReplace = false; radioReq = true; setMsg("Radio geht weiter …"); }
-          break;
-        case C_PREV:
-          if (position() > 5 || !advance(-1)) start(0);
-          else start(0);
-          break;
-        case C_STOP:
-          closeStream();
-          audio::musicPause(true);
-          audio::musicFlush();
-          xSemaphoreTake(mtx, portMAX_DELAY);
-          st.active = false;
-          st.playing = false;
-          xSemaphoreGive(mtx);
-          cur.id[0] = 0;
-          break;
-        case C_TOGGLE:
-          if (!st.active) break;
-          userPaused = !userPaused;
-          if (userPaused) { audio::musicPause(true); pausedAt = millis(); }
-          else if (reopen) start((uint32_t)position());
-          else if (!buffering) audio::musicPause(false);
-          xSemaphoreTake(mtx, portMAX_DELAY);
-          st.playing = !userPaused;
-          xSemaphoreGive(mtx);
-          break;
-      }
-    }
-
-    if (open) {
-      // Lange Pause: Verbindung schließen, beim Weiterspielen an derselben Stelle neu öffnen
-      if (userPaused && millis() - pausedAt > 25000) {
-        uint32_t at = (uint32_t)position();
-        closeStream();
-        audio::musicFlush();
-        posBase = at;
-        reopen = true;
-      } else {
-        int avail = s->available();
-        size_t space = audio::musicSpace() * 2;
-        if (avail > 0 && space >= 2048) {
-          int n = s->read(buf, min((size_t)avail, min(sizeof(buf), space - 2)));
-          if (n > 0) {
-            bytes += n;
-            uint8_t* p = buf;
-            static int16_t tmp[2048 + 1];
-            int k = 0;
-            if (carry >= 0) { tmp[k++] = (int16_t)(carry | (p[0] << 8)); p++; n--; carry = -1; }
-            for (int i = 0; i + 1 < n; i += 2) tmp[k++] = (int16_t)(p[i] | (p[i + 1] << 8));
-            if (n & 1) carry = p[n - 1];
-            audio::musicWrite(tmp, k);
-          }
-        } else if (avail <= 0 && !s->connected()) {
-          closeStream();
-          streamDone = true;
-        } else {
-          vTaskDelay(pdMS_TO_TICKS(5));
-        }
-      }
-    } else {
-      vTaskDelay(pdMS_TO_TICKS(open ? 0 : 20));
-    }
-
-    // Vorpuffern und Aussetzer abfangen
-    size_t used = audio::musicUsed();
-    if (st.active && !reopen) {
-      if (buffering && (used >= audio::SR * 3 / 4 || (streamDone && used))) {
-        buffering = false;
-        if (!userPaused) audio::musicPause(false);
-      } else if (!buffering && open && used == 0) {
-        buffering = true;
-        audio::musicPause(true);
-      }
-    }
-
-    // Titel zu Ende (oder abgebrochen)
-    if (streamDone && used == 0 && !userPaused) {
-      streamDone = false;
-      float expected = cur.dur * (float)audio::SR * 2 * 0.95f;
-      if (cur.dur && posBase == 0 && bytes < expected && bytes > 0 && retries < 2) {
-        retries++;
-        Serial.println("Musik: Strom abgebrochen, setze fort");
-        start((uint32_t)position());
-      } else if (advance(1)) {
-        start(0);
-      } else {
-        ucopy(radioWant, sizeof(radioWant), cur.id);
-        radioReplace = false;
-        radioReq = true;
-      }
-    }
-    // Fehler: nach kurzer Pause zum nächsten Titel
-    if (failAt && !open && millis() - failAt > 3000) {
-      failAt = 0;
-      if (advance(1)) start(0);
-      else { xSemaphoreTake(mtx, portMAX_DELAY); st.buffering = false; st.playing = false; xSemaphoreGive(mtx); }
-    }
-
-    xSemaphoreTake(mtx, portMAX_DELAY);
-    st.pos = position();
-    st.buffering = st.active && (buffering || reopen) && !userPaused;
-    xSemaphoreGive(mtx);
-  }
-}
-
-// ------------------------------------------------------------------ Hintergrund: Brücke suchen, Listen, Cover, Radio
-
-static void discover() {
-  if (cfg.bridge[0]) {
-    ucopy(bridge, sizeof(bridge), cfg.bridge);
-    size_t n = strlen(bridge);
-    if (n && bridge[n - 1] == '/') bridge[n - 1] = 0;
+    if (active == SRC_PODCAST) podcast::stop();
+    if (spotify::play(uris, index, uris[index])) active = SRC_SPOTIFY;
   } else {
-    int n = MDNS.queryService("ytbridge", "tcp");
-    if (n <= 0) { bridgeOk = false; return; }
-    // IPv4 aus der Antwort, sonst aus dem TXT-Eintrag „ip“, sonst den Hostnamen auflösen
-    IPAddress ip = MDNS.address(0);
-    if (ip == IPAddress() && MDNS.hasTxt(0, "ip")) ip.fromString(MDNS.txt(0, "ip"));
-    if (ip == IPAddress()) ip = MDNS.queryHost(MDNS.hostname(0));
-    if (ip == IPAddress()) { bridgeOk = false; Serial.println("Musik-Brücke: gefunden, aber ohne Adresse"); return; }
-    snprintf(bridge, sizeof(bridge), "http://%s:%u", ip.toString().c_str(), MDNS.port(0));
-  }
-  HTTPClient http;
-  http.setTimeout(4000);
-  bool ok = false;
-  if (http.begin(String(bridge) + "/api/ping")) { ok = http.GET() == 200; http.end(); }
-  bridgeOk = ok;
-  Serial.printf("Musik-Brücke: %s %s\n", bridge, ok ? "ok" : "nicht erreichbar");
-}
-
-static void workerTask(void*) {
-  static Item* tmp = (Item*)heap_caps_malloc(sizeof(Item) * BROWSE_MAX, MALLOC_CAP_SPIRAM);
-  uint32_t discAt = 0;
-  for (;;) {
-    // sofort suchen, wenn eine Liste gewünscht ist und die Brücke noch fehlt; sonst alle 8 s
-    bool want = browseReq || radioReq;
-    if (netOnline() && (bridgeDirty || (!bridgeOk && (want || millis() - discAt > 8000)))) {
-      bridgeDirty = false;
-      discAt = millis();
-      discover();
-    }
-    if (browseReq) {
-      char path[128], title[72] = "", err[64];
-      xSemaphoreTake(mtx, portMAX_DELAY);
-      ucopy(path, sizeof(path), browseWant);
-      browseReq = false;
-      xSemaphoreGive(mtx);
-      int n = 0;
-      fetchList(path, tmp, BROWSE_MAX, &n, title, sizeof(title), err, sizeof(err));
-      xSemaphoreTake(mtx, portMAX_DELAY);
-      if (!browseReq) {  // inzwischen schon wieder etwas anderes gewünscht? dann verwerfen
-        memcpy(browseItems, tmp, n * sizeof(Item));
-        browseCount = n;
-        ucopy(browseTitle, sizeof(browseTitle), title);
-        ucopy(browseErr, sizeof(browseErr), err);
-        browsing = false;
-        bSeq = bSeq + 1;
-      }
-      xSemaphoreGive(mtx);
-      continue;
-    }
-    if (radioReq) {
-      radioReq = false;
-      char path[40], title[72], err[64];
-      snprintf(path, sizeof(path), "radio:%s", radioWant);
-      int n = 0;
-      if (fetchList(path, tmp, BROWSE_MAX, &n, title, sizeof(title), err, sizeof(err)) && n) {
-        if (radioReplace) {
-          playList(tmp, n, 0);
-        } else {  // anhängen, den Starttitel selbst überspringen
-          xSemaphoreTake(mtx, portMAX_DELAY);
-          int before = qCount;
-          for (int i = 0; i < n && qCount < QMAX; i++) {
-            if (tmp[i].kind != K_TRACK || !strcmp(tmp[i].id, radioWant)) continue;
-            Track& t = queue[qCount++];
-            ucopy(t.id, sizeof(t.id), tmp[i].id);
-            ucopy(t.title, sizeof(t.title), tmp[i].title);
-            ucopy(t.artist, sizeof(t.artist), tmp[i].sub);
-            t.dur = tmp[i].dur;
-          }
-          bool added = qCount > before;
-          xSemaphoreGive(mtx);
-          if (added) next();
-        }
-      } else {
-        setMsg(err[0] ? err : "Kein Radio gefunden");
-      }
-      continue;
-    }
-    if (artReq && bridgeOk) {
-      artReq = false;
-      char id[16];
-      ucopy(id, sizeof(id), artWant);
-      fetchArt(id);
-      continue;
-    }
-    vTaskDelay(pdMS_TO_TICKS(50));
+    if (active == SRC_SPOTIFY) spotify::stop();
+    podcast::play(list[start]);
+    active = SRC_PODCAST;
   }
 }
 
-// Fernbedienung: Long-Poll bei der Brücke; die Weboberfläche schickt darüber Befehle
-static void remoteTask(void*) {
-  static Item* items = (Item*)heap_caps_malloc(sizeof(Item) * QMAX, MALLOC_CAP_SPIRAM);
-  for (;;) {
-    if (!bridgeOk || !netOnline()) { vTaskDelay(pdMS_TO_TICKS(2000)); continue; }
-    State s = state();
-    char q[300];
-    snprintf(q, sizeof(q), "/api/remote/wait?dev=%08X&name=%s&state=%s&id=%s&pos=%d&vol=%d&bat=%d", (unsigned)radio::myId(),
-             urlencode(cfg.name).c_str(), !s.active ? "stopped" : s.playing ? "playing" : "paused", s.id, (int)s.pos,
-             cfg.volume, hwBattery());
-    HTTPClient http;
-    http.setTimeout(30000);
-    if (!http.begin(String(bridge) + q)) { vTaskDelay(pdMS_TO_TICKS(5000)); continue; }
-    int code = http.GET();
-    if (code == 200) {
-      String body = http.getString();
-      http.end();
-      JsonDocument doc;
-      if (deserializeJson(doc, body)) continue;
-      const char* c = doc["cmd"] | "";
-      Serial.printf("Fernbedienung: %s\n", c);
-      if (!strcmp(c, "play")) {
-        int n = 0;
-        for (JsonObject it : doc["tracks"].as<JsonArray>()) {
-          if (n >= QMAX) break;
-          Item& o = items[n++];
-          o.kind = K_TRACK;
-          o.dur = it["dur"] | 0;
-          ucopy(o.id, sizeof(o.id), it["id"] | "");
-          ucopy(o.title, sizeof(o.title), it["title"] | "");
-          ucopy(o.sub, sizeof(o.sub), it["sub"] | "");
-        }
-        if (n) playList(items, n, doc["index"] | 0);
-      } else if (!strcmp(c, "radio")) playRadio(doc["id"] | "");
-      else if (!strcmp(c, "toggle")) toggle();
-      else if (!strcmp(c, "pause")) { if (state().playing) toggle(); }
-      else if (!strcmp(c, "resume")) { if (!state().playing) toggle(); }
-      else if (!strcmp(c, "next")) next();
-      else if (!strcmp(c, "prev")) prev();
-      else if (!strcmp(c, "stop")) stop();
-      else if (!strcmp(c, "volume")) remoteVol = constrain((int)(doc["value"] | 50), 0, 100);
-    } else {
-      http.end();
-      if (code < 0) vTaskDelay(pdMS_TO_TICKS(3000));
-    }
-  }
+static Source current() {
+  // die Spotify-App kann jederzeit übernehmen
+  if (spotify::state().active && active != SRC_PODCAST) active = SRC_SPOTIFY;
+  return active;
 }
+
+void toggle() { if (current() == SRC_SPOTIFY) spotify::toggle(); else if (active == SRC_PODCAST) podcast::toggle(); }
+void next() { if (current() == SRC_SPOTIFY) spotify::next(); else if (active == SRC_PODCAST) podcast::skip(30); }
+void prev() { if (current() == SRC_SPOTIFY) spotify::prev(); else if (active == SRC_PODCAST) podcast::skip(-15); }
+void stop() {
+  if (active == SRC_SPOTIFY) spotify::stop();
+  if (active == SRC_PODCAST) podcast::stop();
+  active = SRC_NONE;
+}
+
+State state() {
+  Source s = current();
+  if (s == SRC_SPOTIFY) return spotify::state();
+  if (s == SRC_PODCAST) return podcast::state();
+  State e{};
+  return e;
+}
+
+const uint16_t* art(uint32_t* version) { return art::image(version); }
+int takeRemoteVolume() { return spotify::takeRemoteVolume(); }
+void volumeChanged(int pct) { spotify::volumeChanged(pct); }
+void poll() { spotify::poll(); }
 
 void begin() {
   mtx = xSemaphoreCreateMutex();
-  cmdq = xQueueCreate(8, sizeof(Cmd));
-  queue = (Track*)heap_caps_calloc(QMAX, sizeof(Track), MALLOC_CAP_SPIRAM);
-  browseItems = (Item*)heap_caps_calloc(BROWSE_MAX, sizeof(Item), MALLOC_CAP_SPIRAM);
-  artBuf[0] = (uint16_t*)heap_caps_malloc(ART * ART * 2, MALLOC_CAP_SPIRAM);
-  artBuf[1] = (uint16_t*)heap_caps_malloc(ART * ART * 2, MALLOC_CAP_SPIRAM);
-  xTaskCreatePinnedToCore(streamTask, "stream", 8192, nullptr, 6, nullptr, 1);
-  xTaskCreatePinnedToCore(workerTask, "musicw", 8192, nullptr, 3, nullptr, 1);
-  xTaskCreatePinnedToCore(remoteTask, "remote", 8192, nullptr, 2, nullptr, 1);
+  items = (Item*)heap_caps_calloc(BROWSE_MAX, sizeof(Item), MALLOC_CAP_SPIRAM);
+  qItems = (Item*)heap_caps_calloc(BROWSE_MAX, sizeof(Item), MALLOC_CAP_SPIRAM);
+  art::begin();
+  favs::begin();
+  spotify::begin();
+  podcast::begin();
+  xTaskCreatePinnedToCore(worker, "browse", 12288, nullptr, 3, nullptr, 1);
 }
 
 }  // namespace music

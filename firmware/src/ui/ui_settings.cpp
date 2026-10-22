@@ -1,7 +1,8 @@
-// Einstellungen: bewusst kurz gehalten – sieben Punkte, jeder mit höchstens einer Unterseite.
+// Einstellungen: bewusst kurz gehalten – acht Punkte, jeder mit höchstens einer Unterseite.
 #include <WiFi.h>
 #include "../audio.h"
 #include "../music.h"
+#include "../spotify.h"
 #include "../net.h"
 #include "../radio.h"
 #include "../settings.h"
@@ -10,7 +11,7 @@
 
 using namespace ui;
 
-extern const ui::Page PAGE_WIFI_, PAGE_LEVEL_, PAGE_SCREEN_, PAGE_FUNK_, PAGE_BRIDGE_, PAGE_INFO_;
+extern const ui::Page PAGE_WIFI_, PAGE_LEVEL_, PAGE_SCREEN_, PAGE_FUNK_, PAGE_BRIDGE_, PAGE_WEB_, PAGE_INFO_;
 
 static void listTitle(lv_obj_t* list, const char* text, lv_color_t c) {
   lv_obj_t* t = label(list, &font_text_24, c, text);
@@ -25,7 +26,7 @@ static void fmtScreenOff(char* b, size_t n, int s) {
 
 // ================================================================== Übersicht
 
-static lv_obj_t *rWifi, *rBright, *rVol, *rScreen, *rFunk, *rBridge, *rInfo;
+static lv_obj_t *rWifi, *rBright, *rVol, *rScreen, *rFunk, *rBridge, *rWeb, *rInfo;
 static bool levelIsVolume = false;
 
 static void settingsResume() {
@@ -41,7 +42,9 @@ static void settingsResume() {
   listRowSub(rScreen, b);
   snprintf(b, sizeof(b), "%s · Empfang %s", cfg.name, cfg.radioRx ? "an" : "aus");
   listRowSub(rFunk, b);
-  listRowSub(rBridge, music::bridgeKnown() ? "Verbunden" : cfg.bridge[0] ? "Nicht erreichbar" : "Wird gesucht …");
+  listRowSub(rBridge, !spotify::configured() ? "Schlüssel fehlen" : spotify::connected() ? spotify::user()
+                      : spotify::linked() ? "Verbindet …" : "Nicht gekoppelt");
+  listRowSub(rWeb, netOnline() ? "Am Handy oder PC einrichten" : "Erst WLAN verbinden");
   int bat = hwBattery();
   if (bat >= 0) snprintf(b, sizeof(b), "Akku %d %%%s", bat, hwCharging() ? " · lädt" : "");
   else snprintf(b, sizeof(b), "Version " FW_VERSION);
@@ -58,7 +61,8 @@ static void settingsBuild(lv_obj_t* scr) {
       {&rVol, I_VOL_UP, C_MUSIC(), "Lautstärke", &PAGE_LEVEL_, true},
       {&rScreen, I_SLEEP, C_ALARM(), "Display aus", &PAGE_SCREEN_, false},
       {&rFunk, I_RADIO, C_RADIO(), "Funk", &PAGE_FUNK_, false},
-      {&rBridge, I_SERVER, C_MUSIC(), "Musik-Brücke", &PAGE_BRIDGE_, false},
+      {&rBridge, I_MUSIC, C_RADIO(), "Spotify", &PAGE_BRIDGE_, false},
+      {&rWeb, I_SERVER, C_WATCH(), "Weboberfläche", &PAGE_WEB_, false},
       {&rInfo, I_INFO, C_SET(), "Über das Gerät", &PAGE_INFO_, false},
   };
   for (auto& r : rows) {
@@ -217,7 +221,7 @@ static void levelBuild(lv_obj_t* scr) {
   lv_obj_remove_flag(lvArc, LV_OBJ_FLAG_GESTURE_BUBBLE);
   lv_obj_add_event_cb(lvArc, [](lv_event_t*) {
     int v = lv_arc_get_value(lvArc);
-    if (levelIsVolume) { cfg.volume = v; audio::setVolume(v); }
+    if (levelIsVolume) { cfg.volume = v; audio::setVolume(v); music::volumeChanged(v); }
     else { cfg.brightness = v; hwBrightness(v); }
     levelShow();
   }, LV_EVENT_VALUE_CHANGED, nullptr);
@@ -303,48 +307,56 @@ static void funkBuild(lv_obj_t* scr) {
 
 const ui::Page PAGE_FUNK_ = {funkBuild, nullptr, nullptr, nullptr, false};
 
-// ================================================================== Musik-Brücke
+// ================================================================== Spotify
 
-static lv_obj_t *bStatus;
+static lv_obj_t* spStatus;
 
-static void bridgeUpdate() {
-  char b[140];
-  if (music::bridgeKnown()) snprintf(b, sizeof(b), "Verbunden mit\n%s", music::bridgeUrl());
-  else if (!netOnline()) snprintf(b, sizeof(b), "Kein WLAN");
-  else if (cfg.bridge[0]) snprintf(b, sizeof(b), "Nicht erreichbar:\n%s", cfg.bridge);
-  else snprintf(b, sizeof(b), "Suche im WLAN …");
-  if (strcmp(lv_label_get_text(bStatus), b)) lv_label_set_text(bStatus, b);
+static void spotifyUpdate() {
+  char b[200];
+  if (!spotify::configured())
+    snprintf(b, sizeof(b), "Client-ID und Secret fehlen in include/secrets.h (eigene App im Spotify Developer Dashboard).");
+  else if (spotify::connected()) snprintf(b, sizeof(b), "Verbunden als\n%s", spotify::user());
+  else if (spotify::linked()) snprintf(b, sizeof(b), "Gekoppelt (%s), verbindet …", spotify::user());
+  else snprintf(b, sizeof(b), "Noch nicht gekoppelt.\nSpotify-App öffnen → Lautsprecher-Symbol → „%s“ wählen. Danach geht es auch ohne App.", cfg.name);
+  if (strcmp(lv_label_get_text(spStatus), b)) lv_label_set_text(spStatus, b);
 }
 
-static void bridgeBuild(lv_obj_t* scr) {
+static void spotifyBuild(lv_obj_t* scr) {
   lv_obj_t* l = roundList(scr);
-  listTitle(l, "Musik-Brücke", C_MUSIC());
-  bStatus = label(l, &font_text_20, C_TEXT(), "");
-  lv_label_set_long_mode(bStatus, LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_text_align(bStatus, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_t* r1 = listRow(l, I_SEARCH, C_MUSIC(), "Automatisch suchen", "mDNS im WLAN");
-  lv_obj_add_event_cb(r1, [](lv_event_t*) {
-    cfg.bridge[0] = 0;
-    settingsSave();
-    music::bridgeChanged();
-    toast("Suche die Brücke …");
-  }, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* r2 = listRow(l, I_SERVER, C_MUSIC(), "Adresse eingeben", "z. B. http://192.168.1.20:8765");
-  lv_obj_add_event_cb(r2, [](lv_event_t*) {
-    keyboard("Adresse der Brücke", cfg.bridge[0] ? cfg.bridge : "http://", false, [](const char* t) {
-      snprintf(cfg.bridge, sizeof(cfg.bridge), "%s", t);
-      settingsSave();
-      music::bridgeChanged();
-    });
-  }, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* h = label(l, &font_text_20, C_DIM(), "Die Brücke (bridge/server.py) läuft auf einem Rechner im WLAN und holt die Musik von YouTube Music.");
+  listTitle(l, "Spotify", C_RADIO());
+  spStatus = label(l, &font_text_20, C_TEXT(), "");
+  lv_label_set_long_mode(spStatus, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_align(spStatus, LV_TEXT_ALIGN_CENTER, 0);
+  static char names[spotify::ACCOUNTS][64];
+  int cur = -1;
+  int n = spotify::accounts(names, spotify::ACCOUNTS, &cur);
+  for (int i = 0; i < n; i++) {
+    lv_obj_t* r = listRow(l, i == cur ? I_CHECK : I_PERSON, i == cur ? C_RADIO() : C_DIM(), names[i],
+                          i == cur ? "Aktiv · lange drücken = entfernen" : "Antippen = wechseln");
+    lv_obj_add_event_cb(r, [](lv_event_t* e) {
+      int i = (int)(intptr_t)lv_event_get_user_data(e);
+      spotify::useAccount(i);
+      toast("Spotify-Konto gewechselt");
+      back();
+    }, LV_EVENT_SHORT_CLICKED, (void*)(intptr_t)i);
+    lv_obj_add_event_cb(r, [](lv_event_t* e) {
+      spotify::removeAccount((int)(intptr_t)lv_event_get_user_data(e));
+      toast("Konto entfernt");
+      lv_indev_wait_release(lv_indev_active());
+      back();
+    }, LV_EVENT_LONG_PRESSED, (void*)(intptr_t)i);
+  }
+  char b[160];
+  snprintf(b, sizeof(b), "Weiteres Konto: in dessen Spotify-App „%s“ als Lautsprecher wählen. Bis zu %d Konten.",
+           cfg.name, spotify::ACCOUNTS);
+  lv_obj_t* h = label(l, &font_text_20, C_DIM(), b);
   lv_label_set_long_mode(h, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(h, LV_TEXT_ALIGN_CENTER, 0);
-  bridgeUpdate();
+  spotifyUpdate();
   listFit(l);
 }
 
-const ui::Page PAGE_BRIDGE_ = {bridgeBuild, bridgeUpdate, nullptr, nullptr, false};
+const ui::Page PAGE_BRIDGE_ = {spotifyBuild, spotifyUpdate, nullptr, nullptr, false};
 
 // ================================================================== Über das Gerät
 
@@ -383,3 +395,34 @@ static void infoBuild(lv_obj_t* scr) {
 }
 
 const ui::Page PAGE_INFO_ = {infoBuild, infoUpdate, nullptr, nullptr, false};
+
+// ================================================================== Weboberfläche: QR-Code mit der Adresse
+
+static void webBuild(lv_obj_t* scr) {
+  title(scr, "Weboberfläche", C_WATCH());
+  if (!netOnline()) {
+    lv_obj_t* t = label(scr, &font_text_24, C_TEXT(), "Erst mit dem WLAN\nverbinden");
+    lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(t);
+    return;
+  }
+  static char url[48];
+  snprintf(url, sizeof(url), "http://%s/", netIp().c_str());  // IP statt .local: klappt auch auf Android
+  lv_obj_t* qr = lv_qrcode_create(scr);
+  lv_qrcode_set_size(qr, 200);
+  lv_qrcode_set_dark_color(qr, lv_color_black());
+  lv_qrcode_set_light_color(qr, lv_color_white());
+  lv_qrcode_update(qr, url, strlen(url));
+  lv_obj_set_style_border_color(qr, lv_color_white(), 0);
+  lv_obj_set_style_border_width(qr, 12, 0);
+  lv_obj_set_style_radius(qr, 12, 0);
+  lv_obj_align(qr, LV_ALIGN_CENTER, 0, -6);
+  lv_obj_t* a = label(scr, &font_text_20, C_TEXT(), netIp().c_str());
+  lv_obj_align(a, LV_ALIGN_BOTTOM_MID, 0, -66);
+  char b[48];
+  snprintf(b, sizeof(b), "%s.local", netHost());
+  lv_obj_t* h = label(scr, &font_text_20, C_DIM(), b);
+  lv_obj_align(h, LV_ALIGN_BOTTOM_MID, 0, -40);
+}
+
+const ui::Page PAGE_WEB_ = {webBuild, nullptr, nullptr, nullptr, false};

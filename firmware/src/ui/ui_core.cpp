@@ -5,6 +5,7 @@
 #include "../music.h"
 #include "../radio.h"
 #include "../settings.h"
+#include "../kids.h"
 #include "ui.h"
 
 namespace ui {
@@ -404,10 +405,11 @@ static void volRefresh() {
 }
 
 void volumeSet(int pct) {
-  pct = constrain(pct, 0, 100);
+  pct = kids::limitVolume(constrain(pct, 0, 100));
   if (pct == cfg.volume) return;
   cfg.volume = pct;
   audio::setVolume(pct);
+  music::volumeChanged(pct);
   volDirty = true;
   if (volObj) volRefresh();
 }
@@ -530,29 +532,40 @@ static lv_obj_t* kbBm = nullptr;
 static void (*kbDone)(const char*) = nullptr;
 static bool kbShift = false;
 
-static const char* MAP_LOWER[] = {"q", "w", "e", "r", "t", "z", "u", "i", "o", "p", "ü", "\n",
-                                  "a", "s", "d", "f", "g", "h", "j", "k", "l", "ö", "ä", "\n",
-                                  I_SHIFT, "y", "x", "c", "v", "b", "n", "m", "ß", I_BACKSPACE, "\n",
-                                  "123", ",", " ", ".", "-", ""};
-static const char* MAP_UPPER[] = {"Q", "W", "E", "R", "T", "Z", "U", "I", "O", "P", "Ü", "\n",
-                                  "A", "S", "D", "F", "G", "H", "J", "K", "L", "Ö", "Ä", "\n",
-                                  I_SHIFT, "Y", "X", "C", "V", "B", "N", "M", "ß", I_BACKSPACE, "\n",
-                                  "123", ",", " ", ".", "-", ""};
+// Große Tasten: oben 10, dann 9 Tasten pro Reihe, unten Abbrechen / Zahlen / Leerzeichen / Fertig.
+// Umlaute und Satzzeichen auf der Zahlenseite („123“; mit ⇧ davor als Großbuchstaben).
+#define KB_ROW4(k) "_", I_CLOSE, k, " ", I_CHECK, "_", ""
+static const char* MAP_LOWER[] = {"q", "w", "e", "r", "t", "z", "u", "i", "o", "p", "\n",
+                                  "a", "s", "d", "f", "g", "h", "j", "k", "l", "\n",
+                                  I_SHIFT, "y", "x", "c", "v", "b", "n", "m", I_BACKSPACE, "\n",
+                                  KB_ROW4("123")};
+static const char* MAP_UPPER[] = {"Q", "W", "E", "R", "T", "Z", "U", "I", "O", "P", "\n",
+                                  "A", "S", "D", "F", "G", "H", "J", "K", "L", "\n",
+                                  I_SHIFT, "Y", "X", "C", "V", "B", "N", "M", I_BACKSPACE, "\n",
+                                  KB_ROW4("123")};
 static const char* MAP_NUM[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "\n",
-                                "@", "#", "$", "%", "&", "*", "(", ")", "/", "=", "\n",
-                                "!", "?", ":", ";", "'", "\"", "+", "_", I_BACKSPACE, "\n",
-                                "abc", ",", " ", ".", "-", ""};
+                                "ä", "ö", "ü", "ß", "@", "&", "-", "'", ".", "\n",
+                                "!", "?", ",", ":", "/", "(", ")", "+", I_BACKSPACE, "\n",
+                                KB_ROW4("abc")};
+static const char* MAP_NUM_UP[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "\n",
+                                   "Ä", "Ö", "Ü", "ß", "@", "&", "-", "'", ".", "\n",
+                                   "!", "?", ",", ":", "/", "(", ")", "+", I_BACKSPACE, "\n",
+                                   KB_ROW4("abc")};
 #define K(w) ((lv_buttonmatrix_ctrl_t)(w))
-static const lv_buttonmatrix_ctrl_t CTRL_ALPHA[] = {K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1),     // q … ü
-                                                    K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1),     // a … ä
-                                                    K(2), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(2),        // ⇧ y … ß ⌫
-                                                    K(2), K(1), K(5), K(1), K(1)};
-static const lv_buttonmatrix_ctrl_t CTRL_NUM[] = {K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1),
-                                                  K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(2), K(2), K(1), K(5), K(1), K(1)};
+#define KH ((lv_buttonmatrix_ctrl_t)(1 | LV_BUTTONMATRIX_CTRL_HIDDEN))
+#define KB_CTRL4 KH, K(2), K(2), K(5), K(2), KH
+static const lv_buttonmatrix_ctrl_t CTRL_ALPHA[] = {K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1),  // q … p
+                                                    K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1),        // a … l
+                                                    K(3), K(2), K(2), K(2), K(2), K(2), K(2), K(2), K(3),        // ⇧ y … m ⌫
+                                                    KB_CTRL4};
+static const lv_buttonmatrix_ctrl_t CTRL_NUM[] = {K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1),
+                                                  K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1), K(1),
+                                                  K(2), K(2), K(2), K(2), K(2), K(2), K(2), K(2), K(3),
+                                                  KB_CTRL4};
 
 static void kbSetMap(const char** map) {
   lv_buttonmatrix_set_map(kbBm, map);
-  lv_buttonmatrix_set_ctrl_map(kbBm, map == MAP_NUM ? CTRL_NUM : CTRL_ALPHA);
+  lv_buttonmatrix_set_ctrl_map(kbBm, map == MAP_NUM || map == MAP_NUM_UP ? CTRL_NUM : CTRL_ALPHA);
 }
 
 static void kbClose(bool ok) {
@@ -568,9 +581,12 @@ static void kbKey(lv_event_t*) {
   const char* t = lv_buttonmatrix_get_button_text(kbBm, id);
   if (!t) return;
   play(audio::FX_TICK);
+  // Schließen erst nach dem Ereignis (die Tastatur löscht sich dabei selbst)
+  if (!strcmp(t, I_CHECK)) { lv_async_call([](void*) { kbClose(true); }, nullptr); return; }
+  if (!strcmp(t, I_CLOSE)) { lv_async_call([](void*) { kbClose(false); }, nullptr); return; }
   if (!strcmp(t, I_BACKSPACE)) lv_textarea_delete_char(kbTa);
   else if (!strcmp(t, I_SHIFT)) { kbShift = !kbShift; kbSetMap(kbShift ? MAP_UPPER : MAP_LOWER); }
-  else if (!strcmp(t, "123")) kbSetMap(MAP_NUM);
+  else if (!strcmp(t, "123")) kbSetMap(kbShift ? MAP_NUM_UP : MAP_NUM);
   else if (!strcmp(t, "abc")) { kbShift = false; kbSetMap(MAP_LOWER); }
   else {
     lv_textarea_add_text(kbTa, t);
@@ -584,14 +600,14 @@ void keyboard(const char* ttl, const char* initial, bool password, void (*done)(
   kbShift = false;
   kbObj = overlay(C_BG(), LV_OPA_COVER);
   lv_obj_t* t = label(kbObj, &font_text_20, C_DIM(), ttl);
-  lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 34);
+  lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 22);
   kbTa = lv_textarea_create(kbObj);
   lv_textarea_set_one_line(kbTa, true);
   lv_textarea_set_password_mode(kbTa, password);
   lv_textarea_set_password_show_time(kbTa, 1200);
   lv_textarea_set_text(kbTa, initial ? initial : "");
-  lv_obj_set_size(kbTa, 330, 56);
-  lv_obj_align(kbTa, LV_ALIGN_TOP_MID, 0, 66);
+  lv_obj_set_size(kbTa, 296, 54);
+  lv_obj_align(kbTa, LV_ALIGN_TOP_MID, 0, 52);
   lv_obj_set_style_text_font(kbTa, &font_text_24, 0);
   lv_obj_set_style_text_color(kbTa, C_TEXT(), 0);
   lv_obj_set_style_bg_color(kbTa, C_SURF(), 0);
@@ -606,27 +622,33 @@ void keyboard(const char* ttl, const char* initial, bool password, void (*done)(
   lv_obj_set_style_width(kbTa, 2, LV_PART_CURSOR | LV_STATE_FOCUSED);
 
   kbBm = lv_buttonmatrix_create(kbObj);
-  lv_obj_set_size(kbBm, 384, 228);
-  lv_obj_align(kbBm, LV_ALIGN_TOP_MID, 0, 136);
+  lv_obj_set_size(kbBm, 404, 290);
+  lv_obj_align(kbBm, LV_ALIGN_TOP_MID, 0, 114);
   lv_obj_set_style_bg_opa(kbBm, 0, 0);
   lv_obj_set_style_border_width(kbBm, 0, 0);
   lv_obj_set_style_pad_all(kbBm, 0, 0);
-  lv_obj_set_style_pad_gap(kbBm, 5, 0);
+  lv_obj_set_style_pad_gap(kbBm, 6, 0);
   lv_obj_set_style_bg_color(kbBm, C_SURF(), LV_PART_ITEMS);
   lv_obj_set_style_bg_color(kbBm, C_SURF2(), (lv_style_selector_t)(LV_PART_ITEMS | LV_STATE_PRESSED));
-  lv_obj_set_style_radius(kbBm, 10, LV_PART_ITEMS);
+  lv_obj_set_style_radius(kbBm, 14, LV_PART_ITEMS);
   lv_obj_set_style_shadow_width(kbBm, 0, LV_PART_ITEMS);
   lv_obj_set_style_text_font(kbBm, &font_text_24, LV_PART_ITEMS);
   lv_obj_set_style_text_color(kbBm, C_TEXT(), LV_PART_ITEMS);
   kbSetMap(MAP_LOWER);
   lv_obj_add_event_cb(kbBm, kbKey, LV_EVENT_VALUE_CHANGED, nullptr);
-
-  lv_obj_t* ok = roundButton(kbObj, I_CHECK, 64, C_RADIO(), C_BG());
-  lv_obj_align(ok, LV_ALIGN_BOTTOM_MID, 40, -26);
-  lv_obj_add_event_cb(ok, [](lv_event_t*) { kbClose(true); }, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* no = roundButton(kbObj, I_CLOSE, 64, C_SURF2(), C_TEXT());
-  lv_obj_align(no, LV_ALIGN_BOTTOM_MID, -40, -26);
-  lv_obj_add_event_cb(no, [](lv_event_t*) { kbClose(false); }, LV_EVENT_CLICKED, nullptr);
+  // „Fertig“ grün hervorheben
+  lv_obj_add_event_cb(kbBm, [](lv_event_t* e) {
+    lv_draw_task_t* dt = lv_event_get_draw_task(e);
+    lv_draw_dsc_base_t* base = (lv_draw_dsc_base_t*)lv_draw_task_get_draw_dsc(dt);
+    if (base->part != LV_PART_ITEMS) return;
+    const char* txt = lv_buttonmatrix_get_button_text(kbBm, base->id1);
+    if (!txt || strcmp(txt, I_CHECK)) return;
+    lv_draw_fill_dsc_t* f = lv_draw_task_get_fill_dsc(dt);
+    if (f) f->color = C_RADIO();
+    lv_draw_label_dsc_t* l = lv_draw_task_get_label_dsc(dt);
+    if (l) l->color = C_BG();
+  }, LV_EVENT_DRAW_TASK_ADDED, nullptr);
+  lv_obj_add_flag(kbBm, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
 }
 
 // ------------------------------------------------------------------ Tasten und Takt
@@ -644,6 +666,7 @@ void onButton(BtnEvent e) {
       break;
     case BOOT_HOLD:
       if (cw::ringing()) { cw::ringStop(); break; }
+      if (!kids::allowed(kids::A_RADIO)) break;
       if (top() != &PAGE_RADIO) { radio::pttDown(0); pttShow(); }
       else radio::pttDown(radioTarget());
       break;

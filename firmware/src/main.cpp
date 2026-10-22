@@ -7,6 +7,7 @@
 //   BOOT kurz = zurück (auf der Uhr: Musik Pause/Weiter) · BOOT halten = Funk an alle (Push-to-Talk)
 //   PWR kurz = Display an/aus · PWR lang = Ausschalten/Neustart
 #include <Arduino.h>
+#include <mbedtls/platform.h>
 #include "audio.h"
 #include "clockwork.h"
 #include "config.h"
@@ -16,7 +17,14 @@
 #include "radio.h"
 #include "settings.h"
 #include "weather.h"
+#include "spotify.h"
+#include "voice.h"
+#include "keys.h"
+#include "webui.h"
+#include "imu.h"
+#include "kids.h"
 #include "ui/ui.h"
+extern const ui::Page PAGE_WEB_;
 
 // Serielle Befehle für Tests über USB (zusätzlich zu tap/swipe/shot in hw.cpp)
 static bool perfLog = false;
@@ -29,45 +37,60 @@ bool appCommand(const char* line) {
     settingsSave();
     netConnect(a, b);
     Serial.printf("WLAN %s gespeichert\n", a);
-  } else if (sscanf(line, "bridge %99s", a) == 1) {
-    snprintf(cfg.bridge, sizeof(cfg.bridge), "%s", strcmp(a, "auto") ? a : "");
-    settingsSave();
-    music::bridgeChanged();
   } else if (sscanf(line, "browse %99[^\n]", a) == 1) {
     browseOpen(a);
   } else if (!strcmp(line, "toggle")) music::toggle();
   else if (!strcmp(line, "next")) music::next();
-  else if (sscanf(line, "vol %99s", a) == 1) { cfg.volume = atoi(a); audio::setVolume(cfg.volume); }
+  else if (sscanf(line, "vol %99s", a) == 1) { cfg.volume = atoi(a); audio::setVolume(cfg.volume); music::volumeChanged(cfg.volume); }
   else if (sscanf(line, "fx %99s", a) == 1) audio::play((audio::Fx)atoi(a));
   else if (!strcmp(line, "home")) ui::home();
   else if (sscanf(line, "page %99s", a) == 1) {
     const ui::Page* p = !strcmp(a, "apps") ? &PAGE_APPS : !strcmp(a, "music") ? &PAGE_MUSIC : !strcmp(a, "timer") ? &PAGE_TIMER
                       : !strcmp(a, "stopwatch") ? &PAGE_STOPWATCH : !strcmp(a, "alarm") ? &PAGE_ALARM
-                      : !strcmp(a, "radio") ? &PAGE_RADIO : !strcmp(a, "settings") ? &PAGE_SETTINGS : nullptr;
+                      : !strcmp(a, "radio") ? &PAGE_RADIO : !strcmp(a, "settings") ? &PAGE_SETTINGS : !strcmp(a, "game") ? &PAGE_GAME : !strcmp(a, "web") ? &PAGE_WEB_ : nullptr;
     if (p) ui::push(p);
   } else if (sscanf(line, "timer %99s", a) == 1) cw::timerStart(atoi(a));
   else if (sscanf(line, "face %99s", a) == 1) { cfg.face = atoi(a); settingsSave(); ui::home(); }
   else if (!strcmp(line, "wake")) ui::wake();
   else if (!strcmp(line, "perf")) perfLog = !perfLog;
+  else if (sscanf(line, "kids %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.on = !strcmp(a, "on"); kids::set(k); ui::home(); }
+  else if (!strcmp(line, "kb")) ui::keyboard("Spotify durchsuchen", "", false, nullptr);
+  else if (sscanf(line, "level %99s", a) == 1) gameTestLevel(atoi(a));
+  else if (sscanf(line, "kidtime %99s", a) == 1) { int h = 0, m = 0; kidFaceTestMin = sscanf(a, "%d:%d", &h, &m) == 2 ? h * 60 + m : -1; }
+  else if (!strcmp(line, "imu")) { imu::sleep(false); delay(50); float x, y; imu::gravity(x, y); Serial.printf("Neigung: x %.2f y %.2f\n", x, y); }
   else if (!strcmp(line, "status")) {
     music::State s = music::state();
-    Serial.printf("WLAN %s %s · Brücke %s %s · Musik %s %s %.0f/%u s · Akku %d%% · Heap %u\n", netOnline() ? "an" : "aus",
-                  netOnline() ? netIp().c_str() : "", music::bridgeKnown() ? "ok" : "–", music::bridgeUrl(),
-                  s.active ? (s.playing ? "spielt" : "Pause") : "aus", s.title, s.pos, s.dur, hwBattery(),
-                  heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    Serial.printf("WLAN %s %s · Spotify %s %s · Musik %s %s %.0f/%u s %s · Akku %d%% · Heap %u\n", netOnline() ? "an" : "aus",
+                  netOnline() ? netIp().c_str() : "", spotify::connected() ? "verbunden" : spotify::linked() ? "gekoppelt" : "–",
+                  spotify::user(), s.active ? (s.playing ? "spielt" : "Pause") : "aus", s.title, s.pos, s.dur, s.msg,
+                  hwBattery(), heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
   } else return false;
   return true;
 }
 
+// TLS-Puffer (je Verbindung 20–40 KB) ins PSRAM: sonst reicht der interne RAM nicht für Spotify,
+// Podcast-Stream und Cover gleichzeitig
+static void* tlsCalloc(size_t n, size_t size) {
+  void* p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  return p ? p : heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+
 void setup() {
   Serial.begin(115200);
+  mbedtls_platform_set_calloc_free(tlsCalloc, free);
   settingsLoad();
+  kids::begin();
+  cfg.volume = kids::limitVolume(cfg.volume);
+  keys::begin();
   hwBegin();
   audio::begin(cfg.volume);
+  imu::begin();
   netBegin();
   radio::begin();
   music::begin();
   weather::begin();
+  voice::begin();
+  webui::begin();
   ui::begin();
   lv_timer_handler();
   hwBrightness(cfg.brightness);
@@ -109,7 +132,10 @@ void loop() {
     power();
   }
   int v = music::takeRemoteVolume();
-  if (v >= 0) { cfg.volume = v; audio::setVolume(v); settingsSave(); }
+  if (v >= 0) v = kids::limitVolume(v);
+  if (v >= 0 && v != cfg.volume) { cfg.volume = v; audio::setVolume(v); settingsSave(); }
+  music::poll();
+  webui::poll();
 
   cw::poll();
   ui::tick();

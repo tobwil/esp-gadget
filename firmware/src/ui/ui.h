@@ -83,7 +83,11 @@ void fmtTime(char* out, size_t n, uint32_t ms, bool tenths);  // mm:ss(.d) bzw. 
 
 // Seiten (in den einzelnen Dateien)
 extern const ui::Page PAGE_WATCH, PAGE_APPS, PAGE_MUSIC, PAGE_BROWSE, PAGE_TIMER, PAGE_STOPWATCH, PAGE_ALARM,
-    PAGE_RADIO, PAGE_SETTINGS, PAGE_FACES, PAGE_TILES, PAGE_CONTROL;
+    PAGE_RADIO, PAGE_SETTINGS, PAGE_FACES, PAGE_TILES, PAGE_CONTROL, PAGE_GAME;
+void kidFaceBuild(lv_obj_t* scr);  // Zifferblatt im Kindermodus (ui_kidface.cpp)
+void kidFaceUpdate();
+extern int kidFaceTestMin;          // Testzeit für Bildschirmfotos (−1 = echte Uhrzeit)
+void gameTestLevel(int level);     // Balance: Stufe direkt zeigen (Bildschirmfotos)
 void browseOpen(const char* path);  // Musik-Liste öffnen (Pfad der Brücke)
 void tilesOpen(int idx);            // Kacheln ab Kachel idx (0 Musik, 1 Wetter, 2 Timer, 3 Funk)
 uint32_t radioTarget();             // gewählter Empfänger auf der Funk-Seite (0 = alle)

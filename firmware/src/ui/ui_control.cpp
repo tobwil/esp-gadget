@@ -1,6 +1,7 @@
 // Kontrollzentrum wie bei Wear OS / watchOS: vom Zifferblatt herunterwischen, hochwischen schließt.
 // Oben Uhrzeit, Akku und WLAN, darunter sechs Schalter.
 #include <time.h>
+#include "../kids.h"
 #include "../net.h"
 #include "../settings.h"
 #include "ui.h"
@@ -56,6 +57,7 @@ static void build(lv_obj_t* scr) {
   }, LV_EVENT_CLICKED, nullptr);
 
   rxB = roundButton(grid, I_HEARING, 92, C_SURF(), C_TEXT());
+  hide(rxB, !kids::allowed(kids::A_RADIO));
   lv_obj_add_event_cb(rxB, [](lv_event_t*) {
     cfg.radioRx = !cfg.radioRx;
     settingsSave();
@@ -84,6 +86,7 @@ static void build(lv_obj_t* scr) {
   }, LV_EVENT_CLICKED, nullptr);
 
   lv_obj_t* set = roundButton(grid, I_SETTINGS, 92, C_SURF(), C_TEXT());
+  hide(set, kids::on());  // Kindermodus: Einstellungen nur über die Weboberfläche
   lv_obj_add_event_cb(set, [](lv_event_t*) { push(&PAGE_SETTINGS); }, LV_EVENT_CLICKED, nullptr);
 
   hintL = label(scr, &font_text_20, C_DIM(), "Hochwischen zum Schließen");

@@ -8,7 +8,6 @@ struct Settings {
   uint16_t screenOff;    // Sekunden, 0 = nie
   bool radioRx;          // Funk im Hintergrund empfangen
   char name[17];         // Gerätename im Funk
-  char bridge[96];       // feste Adresse der Musik-Brücke, leer = automatisch
   // Wecker
   bool alarmOn;
   uint8_t alarmH, alarmM;

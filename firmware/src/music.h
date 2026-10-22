@@ -1,30 +1,32 @@
-// Musik über die YT-Music-Brücke (bridge/server.py):
-//   - Listen durchblättern (Bibliothek, Mixe, Suche …); die Brücke bestimmt die Menüstruktur
-//   - Titel als 32-kHz-PCM streamen, Cover als RGB565 holen
-//   - Fernbedienung: die Brücke kann Befehle schicken (Weboberfläche auf dem Handy)
+// Musik: ein Einstieg für zwei Quellen – Spotify (cspot, siehe spotify.h) und Podcasts (podcast.h).
+// Die Oberfläche blättert durch Listen (browse), startet Einträge (playList) und zeigt den Zustand.
 #pragma once
 #include <Arduino.h>
+#include <string>
+#include <vector>
 
 namespace music {
 
 enum Kind : uint8_t { K_TRACK = 0, K_LIST = 1 };
+enum Source : uint8_t { SRC_NONE = 0, SRC_SPOTIFY = 1, SRC_PODCAST = 2 };
 
 struct Item {
   uint8_t kind;
-  uint16_t dur;      // Sekunden (Titel)
-  char id[100];      // Titel: Video-ID, Liste: Pfad für browse()
+  uint16_t dur;      // Sekunden (Titel/Folge)
+  char id[232];      // Titel: „spotify:track:…“ bzw. Folgen-Adresse; Liste: Pfad für browse()
   char title[72];
   char sub[56];
 };
 
 struct State {
-  bool active;       // es gibt eine Warteschlange
+  bool active;       // es läuft etwas (oder ist pausiert)
   bool playing;      // nicht pausiert
   bool buffering;
+  Source src;
   int index, count;
   char title[72];
   char artist[56];
-  char id[16];
+  char id[64];
   uint16_t dur;
   float pos;         // Sekunden
   char msg[64];      // Fehler / Hinweis
@@ -33,25 +35,27 @@ struct State {
 static const int ART = 220;  // Cover-Kantenlänge in Pixeln
 
 void begin();
-bool bridgeKnown();
-const char* bridgeUrl();
-void bridgeChanged();        // Adresse in den Einstellungen geändert
+void poll();                 // aus der Hauptschleife
 
+// Listen: „home“, „search:…“ (Spotify), „sp:album:…“, „sp:playlist:…“, „sp:artist:…“,
+//         „pc:subs“, „pcsearch:…“, „pc:feed:…“
 void browse(const char* path);
 bool browseBusy();
 uint32_t browseSeq();        // zählt hoch, sobald ein neues Ergebnis da ist
-// Ergebnis kopieren: Titel der Liste und bis zu max Einträge
 int browseCopy(char* title, size_t titleLen, Item* out, int max, char* err, size_t errLen);
 
-void playList(const Item* items, int n, int start);  // nur Einträge vom Typ K_TRACK
-void playRadio(const char* videoId);
+// Für die Weboberfläche: Liste abrufen und auf das Ergebnis warten (blockiert bis zu 20 s,
+// ohne Kindermodus-Filter und ohne die Liste auf der Uhr zu ändern)
+int query(const char* path, char* title, size_t titleLen, Item* out, int max, char* err, size_t errLen);
+
+void playList(const Item* items, int n, int start);
 void toggle();
-void next();
-void prev();
+void next();                 // Podcast: +30 s
+void prev();                 // Podcast: −15 s
 void stop();
 State state();
-const uint16_t* art(uint32_t* version);  // RGB565, ART × ART, nullptr = keins
-
-int takeRemoteVolume();      // −1 = nichts; sonst Lautstärke von der Fernbedienung
+const uint16_t* art(uint32_t* version);
+int takeRemoteVolume();      // −1 = nichts; sonst Lautstärke aus der Spotify-App
+void volumeChanged(int pct);
 
 }  // namespace music

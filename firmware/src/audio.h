@@ -1,12 +1,12 @@
-// Audio: ES8311 (Lautsprecher) und ES7210 (Mikrofone) im Vollduplex über einen I2S-Bus mit 32 kHz.
-// Ein Mischer auf Kern 0 spielt Musik (32 kHz mono), Funk-Stimmen (16 kHz mono) und kleine Klänge.
+// Audio: ES8311 (Lautsprecher) und ES7210 (Mikrofone) im Vollduplex über einen I2S-Bus mit 44,1 kHz.
+// Ein Mischer auf Kern 0 spielt Musik (44,1 kHz mono), Funk-Stimmen (16 kHz mono) und kleine Klänge.
 // Dazu nimmt er auf Wunsch das Mikrofon auf (16 kHz mono, für den Funk).
 #pragma once
 #include <Arduino.h>
 
 namespace audio {
 
-static const int SR = 32000;
+static const int SR = 44100;  // wie Spotify und die meisten Podcasts
 
 enum Fx : uint8_t { FX_TAP, FX_OK, FX_ERROR, FX_PTT_ON, FX_PTT_OFF, FX_ROGER, FX_CHIME, FX_ALARM, FX_TICK, FX_KNOCK };
 

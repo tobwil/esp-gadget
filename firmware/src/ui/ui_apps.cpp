@@ -2,21 +2,24 @@
 // Öffnen: auf dem Zifferblatt hochwischen oder BOOT drücken. Schließen: runter- oder nach rechts wischen.
 #include <time.h>
 #include "../music.h"
+#include "../kids.h"
 #include "../net.h"
 #include "ui.h"
 
 using namespace ui;
 
-struct App { const char* icon; const char* name; lv_color_t (*color)(); const Page* page; };
+struct App { const char* icon; const char* name; lv_color_t (*color)(); const Page* page; uint8_t kid; };
 static const App APPS[] = {
-    {I_MUSIC, "Musik", C_MUSIC, &PAGE_MUSIC},
-    {I_RADIO, "Funk", C_RADIO, &PAGE_RADIO},
-    {I_HOURGLASS, "Timer", C_TIMER, &PAGE_TIMER},
-    {I_STOPWATCH, "Stoppuhr", C_WATCH, &PAGE_STOPWATCH},
-    {I_ALARM, "Wecker", C_ALARM, &PAGE_ALARM},
-    {I_SUN, "Wetter", C_TIMER, &PAGE_TILES},
-    {I_WATCH, "Zifferblatt", C_BRASS, &PAGE_FACES},
-    {I_SETTINGS, "Einstellungen", C_SET, &PAGE_SETTINGS},
+    // kid: im Kindermodus nur mit diesem App-Bit (0xFF = immer, 0 = nie)
+    {I_MUSIC, "Musik", C_MUSIC, &PAGE_MUSIC, 0xFF},
+    {I_RADIO, "Funk", C_RADIO, &PAGE_RADIO, kids::A_RADIO},
+    {I_HOURGLASS, "Timer", C_TIMER, &PAGE_TIMER, kids::A_TIMER},
+    {I_STOPWATCH, "Stoppuhr", C_WATCH, &PAGE_STOPWATCH, kids::A_STOPWATCH},
+    {I_ALARM, "Wecker", C_ALARM, &PAGE_ALARM, kids::A_ALARM},
+    {I_SUN, "Wetter", C_TIMER, &PAGE_TILES, kids::A_WEATHER},
+    {I_BOLT, "Balance", C_BRASS, &PAGE_GAME, kids::A_GAME},
+    {I_WATCH, "Zifferblatt", C_BRASS, &PAGE_FACES, 0},
+    {I_SETTINGS, "Einstellungen", C_SET, &PAGE_SETTINGS, 0},
 };
 static const int N = sizeof(APPS) / sizeof(APPS[0]);
 static lv_obj_t* timeL;
@@ -27,6 +30,7 @@ static void build(lv_obj_t* scr) {
   timeL = label(l, &font_text_24, C_TEXT(), "");
   lv_obj_set_style_text_align(timeL, LV_TEXT_ALIGN_CENTER, 0);
   for (int i = 0; i < N; i++) {
+    if (kids::on() && APPS[i].kid != 0xFF && !kids::allowed((kids::App)APPS[i].kid)) continue;
     lv_color_t c = APPS[i].color();
     lv_obj_t* r = listRow(l, nullptr, c, APPS[i].name);
     lv_obj_set_height(r, 76);

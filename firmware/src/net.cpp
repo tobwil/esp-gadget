@@ -16,6 +16,16 @@ static WifiState wst = W_IDLE;
 static uint32_t wAt = 0;
 static bool wasOnline = false, manual = false, ntpStarted = false, mdnsStarted = false;
 
+const char* netHost() {
+  static char host[24];
+  if (!host[0]) {
+    uint8_t m[6];
+    WiFi.macAddress(m);
+    snprintf(host, sizeof(host), "taschenfunk-%02x%02x", m[4], m[5]);
+  }
+  return host;
+}
+
 bool netOnline() { return WiFi.status() == WL_CONNECTED; }
 const char* netSsid() { return rtcSsid; }
 String netIp() { return WiFi.localIP().toString(); }
@@ -105,11 +115,7 @@ void netPoll() {
       memcpy(rtcBssid, WiFi.BSSID(), 6);
       rtcChannel = WiFi.channel();
       if (!ntpStarted) { configTzTime(TIMEZONE, "pool.ntp.org", "time.cloudflare.com"); ntpStarted = true; }
-      if (!mdnsStarted) {
-        char host[24];
-        snprintf(host, sizeof(host), "taschenfunk-%04x", (uint16_t)(ESP.getEfuseMac() >> 32));
-        mdnsStarted = MDNS.begin(host);
-      }
+      if (!mdnsStarted) mdnsStarted = MDNS.begin(netHost());
       Serial.printf("WLAN: verbunden mit %s, IP %s, Kanal %d\n", rtcSsid, netIp().c_str(), (int)rtcChannel);
     }
     return;

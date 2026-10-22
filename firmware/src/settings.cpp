@@ -47,7 +47,6 @@ void settingsLoad() {
   cfg.radioRx = prefs.getBool("radiorx", true);
   prefs.getString("name", cfg.name, sizeof(cfg.name));
   if (!cfg.name[0]) snprintf(cfg.name, sizeof(cfg.name), "%s", defName);
-  if (!prefs.getString("bridge", cfg.bridge, sizeof(cfg.bridge))) snprintf(cfg.bridge, sizeof(cfg.bridge), "%s", BRIDGE_URL);
   cfg.alarmOn = prefs.getBool("alon", false);
   cfg.alarmH = prefs.getUChar("alh", 7);
   cfg.alarmM = prefs.getUChar("alm", 0);
@@ -75,7 +74,6 @@ void settingsSave() {
   prefs.putUShort("scroff", cfg.screenOff);
   prefs.putBool("radiorx", cfg.radioRx);
   prefs.putString("name", cfg.name);
-  prefs.putString("bridge", cfg.bridge);
   prefs.putBool("alon", cfg.alarmOn);
   prefs.putUChar("alh", cfg.alarmH);
   prefs.putUChar("alm", cfg.alarmM);

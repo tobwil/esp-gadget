@@ -146,7 +146,10 @@ static void task(void*) {
   static int16_t out[BLOCK * 2], in[BLOCK * 2];
   float duck = 1;
   uint32_t quietSince = millis();
-  int16_t vPrev = 0;
+  int16_t vPrev = 0, vCur = 0;
+  float vPhase = 1;  // Stimme: Lage zwischen vPrev und vCur
+  float mAcc = 0, mPhase = 0;  // Mikrofon: Mittelwert bis zum nächsten 16-kHz-Wert
+  int mN = 0;
   float hpX = 0, hpY = 0;  // Hochpass für das Mikrofon
   for (;;) {
     Voice nv;
@@ -168,9 +171,11 @@ static void task(void*) {
       duck += ((voiceOn ? 0.15f : 1.0f) - duck) * 0.002f;
       float s = 0;
       if (musicOn && music.used()) { s += music.pop() / 32768.0f * 0.85f * duck; played = played + 1; }
-      if (voice.used()) {  // 16 → 32 kHz: Mittelwert dazwischen einschieben
-        if (n & 1) { int16_t v = voice.pop(); s += (v + vPrev) / 65536.0f; vPrev = v; }
-        else s += vPrev / 32768.0f;
+      if (voice.used() || vPhase < 1) {  // 16 → 44,1 kHz: linear zwischen zwei Werten
+        vPhase += 16000.0f / SR;
+        if (vPhase >= 1 && voice.used()) { vPhase -= 1; vPrev = vCur; vCur = voice.pop(); }
+        else if (vPhase >= 1) { vPhase = 1; vPrev = vCur = 0; }
+        s += (vPrev + (vCur - vPrev) * fminf(vPhase, 1.0f)) / 32768.0f;
       }
       if (fxOn) s += synth();
       // Lautstärke gleitet zum Ziel (≈ 30 ms), dann weich begrenzen (tanh-Näherung) statt hart zu clippen
@@ -195,17 +200,25 @@ static void task(void*) {
     if (micOk && i2s_channel_read(rx, in, sizeof(in), &done, pdMS_TO_TICKS(20)) == ESP_OK && done) {
       int frames = done / 4;
       float msum = 0;
-      for (int n = 0; n + 1 < frames; n += 2) {
-        // Kanal wählen, 32 → 16 kHz (Mittelwert aus zwei), Gleichanteil entfernen
-        float a = in[2 * n + MIC_CHANNEL] / 32768.0f, b = in[2 * (n + 1) + MIC_CHANNEL] / 32768.0f;
-        float x = (a + b) * 0.5f * MIC_GAIN;
+      int outN = 0;
+      for (int n = 0; n < frames; n++) {
+        // Kanal wählen, 44,1 → 16 kHz (Mittelwert über die Eingangswerte je Ausgangswert), Gleichanteil entfernen
+        mAcc += in[2 * n + MIC_CHANNEL] / 32768.0f;
+        mN++;
+        mPhase += 16000.0f / SR;
+        if (mPhase < 1) continue;
+        mPhase -= 1;
+        float x = mAcc / mN * MIC_GAIN;
+        mAcc = 0;
+        mN = 0;
         hpY = 0.995f * (hpY + x - hpX);
         hpX = x;
         float y = constrain(hpY, -1.0f, 1.0f);
         msum += y * y;
+        outN++;
         if (micOn) { int16_t v = (int16_t)(y * 32767); mic.write(&v, 1); }
       }
-      micLvl = micLvl * 0.6f + min(1.0f, sqrtf(msum / (frames / 2)) * 6) * 0.4f;
+      if (outN) micLvl = micLvl * 0.6f + min(1.0f, sqrtf(msum / outN) * 6) * 0.4f;
     }
   }
 }
@@ -327,7 +340,7 @@ bool begin(int volume) {
   micOk = es7210Begin();
   setVolume(volume);
 
-  music.cap = SR * 4;  // 4 s Musik
+  music.cap = SR * 6;  // 6 s Musik (Puffer gegen Funklöcher)
   music.buf = (int16_t*)heap_caps_malloc(music.cap * 2, MALLOC_CAP_SPIRAM);
   voice.cap = 16000 * 3;
   voice.buf = (int16_t*)heap_caps_malloc(voice.cap * 2, MALLOC_CAP_SPIRAM);

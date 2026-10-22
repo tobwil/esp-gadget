@@ -8,9 +8,8 @@
 // Zeitzone Deutschland (inkl. Sommerzeit)
 #define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 
-// Musik-Brücke (bridge/server.py). Leer = automatisch im WLAN suchen (mDNS „_ytbridge._tcp“).
-// Beispiel: "http://192.168.1.20:8765"
-#define BRIDGE_URL ""
+// Spracheingabe: Gemini-Modell (Schlüssel in include/secrets.h)
+#define GEMINI_MODEL "gemini-flash-lite-latest"
 
 // Display aus nach so vielen Sekunden ohne Bedienung (am Gerät änderbar)
 #define SCREEN_TIMEOUT_S 30
@@ -36,4 +35,8 @@
 #define TOUCH_MIRROR_X 1
 #define TOUCH_MIRROR_Y 1
 
-#define FW_VERSION "0.1.0"
+// Balance-Spiel: Richtung der Neigung. Rollt die Kugel verkehrt herum, das Vorzeichen umdrehen.
+#define IMU_SIGN_X 1
+#define IMU_SIGN_Y 1
+
+#define FW_VERSION "0.2.0"

@@ -3,6 +3,7 @@
 #include <math.h>
 #include <time.h>
 #include "../clockwork.h"
+#include "../kids.h"
 #include "../music.h"
 #include "../net.h"
 #include "../audio.h"
@@ -370,7 +371,11 @@ static void buildFace(lv_obj_t* scr, int f) {
   fillData(f);
 }
 
+static bool kidShown = false;
+
 static void build(lv_obj_t* scr) {
+  kidShown = kids::on();
+  if (kidShown) { faceObj = nullptr; kidFaceBuild(scr); return; }
   int f = cfg.face < NFACES ? cfg.face : 0;
   shown = f;
   wakeAt = millis();
@@ -382,12 +387,13 @@ static void build(lv_obj_t* scr) {
 
 static void update() {
   int f = cfg.face < NFACES ? cfg.face : 0;
-  if (f != shown) {  // anderes Zifferblatt gewählt
+  if (kids::on() != kidShown || (!kidShown && f != shown)) {  // anderes Zifferblatt bzw. Kindermodus gewechselt
     lv_obj_t* scr = topScreen();
     lv_obj_clean(scr);
     build(scr);
     return;
   }
+  if (kidShown) { kidFaceUpdate(); return; }
   if (f == 0) { updatePocket(); return; }
   // Intro flüssig, danach so oft wie das Design es braucht
   uint32_t now = millis();
@@ -409,6 +415,7 @@ static void update() {
 
 // Aufwachen: Intro neu abspielen (wie beim Handgelenk-Heben)
 static void resume() {
+  if (kidShown) return;
   wakeAt = millis();
   wakeN++;
   if (cacheCanvas) { cached = false; lv_obj_add_flag(cacheCanvas, LV_OBJ_FLAG_HIDDEN); }

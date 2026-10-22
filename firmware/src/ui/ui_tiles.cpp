@@ -4,6 +4,7 @@
 #include <math.h>
 #include "../audio.h"
 #include "../clockwork.h"
+#include "../kids.h"
 #include "../music.h"
 #include "../radio.h"
 #include "../settings.h"
@@ -286,9 +287,17 @@ static void updateRadio() {
   lv_obj_align(fHalo, LV_ALIGN_CENTER, 0, 10);
 }
 
+// Kindermodus: nicht erlaubte Kacheln werden ausgeblendet (fallen aus dem Blättern heraus)
+static bool shownTile(int i) {
+  return i == 0 || kids::allowed(i == 1 ? kids::A_WEATHER : i == 2 ? kids::A_TIMER : kids::A_RADIO);
+}
+
 static void scrolled(lv_event_t*) {
   int k = (lv_obj_get_scroll_x(pager) + W / 2) / W;
-  for (int i = 0; i < NT; i++) lv_obj_set_style_bg_opa(dots[i], i == k ? LV_OPA_COVER : LV_OPA_30, 0);
+  for (int i = 0, pos = 0; i < NT; i++) {
+    if (!shownTile(i)) continue;
+    lv_obj_set_style_bg_opa(dots[i], pos++ == k ? LV_OPA_COVER : LV_OPA_30, 0);
+  }
 }
 
 static void build(lv_obj_t* scr) {
@@ -306,18 +315,25 @@ static void build(lv_obj_t* scr) {
   buildWeather(tile(pager));
   buildTimer(tile(pager));
   buildRadio(tile(pager));
+  int shownN = 0;
+  for (int i = 0; i < NT; i++) shownN += shownTile(i);
+  for (int i = 0; i < NT; i++) hide(lv_obj_get_child(pager, i), !shownTile(i));
   // Seitenpunkte unten
-  for (int i = 0; i < NT; i++) {
+  for (int i = 0, pos = 0; i < NT; i++) {
     dots[i] = lv_obj_create(scr);
     lv_obj_set_size(dots[i], 8, 8);
     lv_obj_set_style_radius(dots[i], 4, 0);
     lv_obj_set_style_border_width(dots[i], 0, 0);
     lv_obj_set_style_bg_color(dots[i], C_TEXT(), 0);
-    lv_obj_align(dots[i], LV_ALIGN_BOTTOM_MID, (i - (NT - 1) / 2.0f) * 16, -14);
+    lv_obj_align(dots[i], LV_ALIGN_BOTTOM_MID, (pos - (shownN - 1) / 2.0f) * 16, -14);
     lv_obj_remove_flag(dots[i], LV_OBJ_FLAG_CLICKABLE);
+    hide(dots[i], !shownTile(i) || shownN < 2);
+    pos += shownTile(i);
   }
   lv_obj_update_layout(pager);
-  lv_obj_scroll_to_x(pager, tilesStart * W, LV_ANIM_OFF);
+  int startPos = 0;
+  for (int i = 0; i < tilesStart && i < NT; i++) startPos += shownTile(i);
+  lv_obj_scroll_to_x(pager, (shownTile(tilesStart) ? startPos : 0) * W, LV_ANIM_OFF);
   tilesStart = 0;
   scrolled(nullptr);
   updateMusic();

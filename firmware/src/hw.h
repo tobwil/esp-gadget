@@ -16,7 +16,8 @@ void hwBegin();
 void hwLoop();                 // Tasten, Akku, serielle Befehle
 BtnEvent hwButton();           // nächstes Tasten-Ereignis (oder BTN_NONE)
 
-void hwBrightness(uint8_t pct);
+void hwBrightness(uint8_t pct, bool ignoreCap = false);  // ignoreCap: Taschenlampe
+void hwBrightnessCap(uint8_t pct);  // Obergrenze (Sparmodus, Schlafenszeit); 100 = keine
 void hwScreen(bool on);        // Display an/aus (Touch weckt es wieder)
 bool hwScreenOn();
 void hwActivity();             // Bedienung: Zeit bis zum Abschalten neu starten
@@ -24,6 +25,7 @@ uint32_t hwIdleMs();           // ms seit der letzten Bedienung
 bool hwWakeRequested();        // Touch bei dunklem Display
 
 int hwBattery();               // %, −1 = kein Akku
+int hwBatteryMv();             // Akkuspannung in mV, 0 = unbekannt
 bool hwUsb();
 bool hwCharging();
 void hwPowerOff();

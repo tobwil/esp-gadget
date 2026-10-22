@@ -2,6 +2,7 @@
 // Oben Uhrzeit, Akku und WLAN, darunter sechs Schalter.
 #include <time.h>
 #include "../kids.h"
+#include "../power.h"
 #include "../net.h"
 #include "../settings.h"
 #include "ui.h"
@@ -76,7 +77,7 @@ static void build(lv_obj_t* scr) {
     lv_obj_set_style_border_width(torch, 0, 0);
     lv_obj_set_style_radius(torch, 0, 0);
     lv_obj_add_event_cb(torch, [](lv_event_t*) { torchOff(); }, LV_EVENT_CLICKED, nullptr);
-    hwBrightness(100);
+    hwBrightness(100, true);  // Taschenlampe: volle Helligkeit, auch im Sparmodus
   }, LV_EVENT_CLICKED, nullptr);
 
   lv_obj_t* off = roundButton(grid, I_SCREEN_OFF, 92, C_SURF(), C_TEXT());
@@ -106,7 +107,8 @@ static void update() {
   char batS[24];
   if (bat >= 0) snprintf(batS, sizeof(batS), "%s %d %%", hwCharging() ? I_CHARGING : I_BATTERY, bat);
   else snprintf(batS, sizeof(batS), I_BOLT " USB");
-  snprintf(b, sizeof(b), "%s   %s %s", batS, netOnline() ? I_WIFI : I_WIFI_OFF, netOnline() ? netSsid() : "aus");
+  snprintf(b, sizeof(b), "%s%s   %s %s", batS, pwr::saving() ? " · Sparen" : "", netOnline() ? I_WIFI : I_WIFI_OFF,
+           netOnline() ? netSsid() : "aus");
   if (strcmp(lv_label_get_text(statL), b)) lv_label_set_text(statL, b);
 }
 

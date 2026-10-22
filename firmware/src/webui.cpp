@@ -9,6 +9,7 @@
 #include "assist.h"
 #include "kids.h"
 #include "n8n.h"
+#include "power.h"
 #include "music.h"
 #include "net.h"
 #include "radio.h"
@@ -69,6 +70,9 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 <main>
 <div class="tab sel" id="t-home">
  <section><h2>Uhr</h2><div class="kv" id="info"></div></section>
+ <section><h2>Akku</h2><div class="kv" id="batkv"></div><svg id="batchart" viewBox="0 0 360 90" style="width:100%;height:90px;margin-top:10px"></svg>
+  <label class="f" for="pmode">Sparmodus</label><select id="pmode"><option value="1">Automatisch ab 20 %</option><option value="2">Immer an</option><option value="0">Aus</option></select>
+  <p class="note">Sparmodus: Display höchstens 40 % und nach 10 s aus, kein Funk im Hintergrund, ohne Musik schläft das WLAN.</p></section>
  <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small id="kidsum"></small></div><label class="sw"><input type="checkbox" id="kon2"><span></span></label></div>
   <div class="row"><div class="t"><b>Wutmodus</b><small>Nur das Wut-Glas</small></div><label class="sw"><input type="checkbox" id="kangry2"><span></span></label></div></section>
 </div>
@@ -82,6 +86,10 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
   <div class="seg" id="kplace"><button data-v="0">Kita</button><button data-v="1">Schule</button></div>
   <div class="row" style="margin-top:6px"><div class="t"><b>Mittagsruhe</b><small>12:45 bis 14:00</small></div><label class="sw"><input type="checkbox" id="knap"><span></span></label></div>
  </section>
+ <section class="kidc"><h2>Schlafenszeit</h2>
+  <div class="row"><div class="t"><b>Nachts sperren</b><small>Ab der Bettzeit bis zum Aufstehen: keine Apps, kein Funk, gedimmt</small></div><label class="sw"><input type="checkbox" id="knight"><span></span></label></div>
+  <label class="f" for="kstory">Einschlafmusik nach der Bettzeit</label>
+  <select id="kstory"><option value="0">keine</option><option value="15">15 Minuten</option><option value="30">30 Minuten</option><option value="45">45 Minuten</option><option value="60">60 Minuten</option></select></section>
  <section class="kidc"><h2>Lautstärke</h2><div class="row"><div class="t"><b>Höchstens <span id="kvv"></span> %</b></div></div><input type="range" id="kv" min="10" max="100" step="5"></section>
  <section class="kidc"><h2>Erlaubte Apps</h2><p class="note">Musik ist immer dabei. Einstellungen und Zifferblätter sind gesperrt.</p><div id="kapps"></div></section>
  <section class="kidc"><h2>Freigegeben</h2><div id="krel"></div></section>
@@ -162,7 +170,7 @@ function render(){
  $('kidsum').textContent=k.on?`An · ${k.released.length} Freigaben · bis ${k.maxVol} %`:'Aus';
  if(document.activeElement!==$('kw'))$('kw').value=hm(k.wake);if(document.activeElement!==$('kb'))$('kb').value=hm(k.bed);
  [...$('kplace').children].forEach(b=>b.classList.toggle('sel',+b.dataset.v==+k.school));
- $('knap').checked=k.nap;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
+ $('knap').checked=k.nap;$('knight').checked=k.nightLock;if(document.activeElement!==$('kstory'))$('kstory').value=k.storyMin;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
  $('kapps').innerHTML=APPS.map(([b,n,d])=>row(n,d,`<label class="sw"><input type="checkbox" ${k.apps&b?'checked':''} onchange="kids({apps:this.checked?S.kids.apps|${b}:S.kids.apps&~${b}})"><span></span></label>`)).join('');
  $('krel').innerHTML=k.released.map(r=>row(r.title,r.sub,btn('Entfernen',`rel(${J(r)},false)`))).join('')||'<p class="note">Noch nichts – unten suchen oder einen Favoriten freigeben.</p>';
  $('pinst').innerHTML=k.pin?'<span class="ok">PIN ist gesetzt</span> – die Weboberfläche fragt danach.':'Keine PIN – jeder im WLAN kann die Uhr einstellen.';
@@ -175,6 +183,15 @@ function render(){
  $('n8nst').innerHTML=ai.n8nSet?'<span class="ok">Eingerichtet</span>':'Noch nicht eingerichtet – Adresse und Token aus n8n (Einstellungen → MCP).';
  $('n8nallow').innerHTML=ai.allowed.map(a=>row(a.name,a.kind=='agent'?'Agent':'Workflow',btn('✕',`unallow(${J(a.id)})`))).join('')||'<p class="note">Noch nichts freigegeben.</p>';
  if($('t-ai').classList.contains('sel'))loadModels();
+ const pw=s.power;
+ $('batkv').innerHTML=`<span>Stand</span><span>${s.battery<0?'kein Akku':s.battery+' %'}${pw.mv?' · '+(pw.mv/1000).toFixed(2)+' V':''}${s.charging?' · lädt':''}</span>
+  <span>Restlaufzeit</span><span>${pw.remainMin>=0?Math.floor(pw.remainMin/60)+' h '+pw.remainMin%60+' min':'wird gemessen …'}</span>
+  <span>Verbrauch</span><span>${pw.drain>0?pw.drain.toFixed(1)+' %/h':'–'}</span><span>Sparmodus</span><span>${pw.saving?'an':'aus'}</span>`;
+ if(document.activeElement!==$('pmode'))$('pmode').value=pw.mode;
+ const h=pw.history;if(h.length>1){const mx=Math.max(...h.map(p=>p[0]))||1;
+  const pts=h.map(p=>`${(360-p[0]/mx*360).toFixed(1)},${(86-p[1]*0.82).toFixed(1)}`).join(' ');
+  $('batchart').innerHTML=`<polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2"/><text x="0" y="10" font-size="10" fill="var(--dim)">-${mx} min</text><text x="330" y="10" font-size="10" fill="var(--dim)">jetzt</text>`}
+ else $('batchart').innerHTML='<text x="0" y="50" font-size="12" fill="var(--dim)">Verlauf: alle 2 Minuten ein Messpunkt</text>';
  $('fwst').textContent=`Version ${s.version} · ${s.board} · gebaut ${s.built}`;
  $('gst').innerHTML=s.gemini?'<span class="ok">Schlüssel gesetzt</span>':'<span class="bad">Kein Schlüssel – Spracheingabe aus</span>';
 }
@@ -190,6 +207,7 @@ $('kangry').onchange=$('kangry2').onchange=e=>{kids(e.target.checked?{angry:true
 $('kw').onchange=()=>kids({wake:mins($('kw').value)});$('kb').onchange=()=>kids({bed:mins($('kb').value)});
 $('kplace').onclick=e=>{if(e.target.dataset.v)kids({school:e.target.dataset.v=='1'})};
 $('knap').onchange=e=>kids({nap:e.target.checked});
+$('knight').onchange=e=>kids({nightLock:e.target.checked});$('kstory').onchange=e=>kids({storyMin:+e.target.value});
 $('kv').oninput=e=>$('kvv').textContent=e.target.value;$('kv').onchange=e=>kids({maxVol:+e.target.value});
 $('ssrc').onclick=e=>{if(!e.target.dataset.v)return;src=e.target.dataset.v;[...$('ssrc').children].forEach(b=>b.classList.toggle('sel',b==e.target));if(val('sq'))search()};
 $('sgo').onclick=search;$('sq').onkeydown=e=>{if(e.key=='Enter')search()};
@@ -219,6 +237,7 @@ $('n8nload').onclick=async()=>{$('n8nall').innerHTML='<p class="note">Lade …</
 $('n8nsave').onclick=()=>{const sel=[...document.querySelectorAll('#n8nall input:checked')].map(c=>n8nList[+c.dataset.i]).map(w=>({id:w.id,name:w.name,kind:w.kind,desc:w.desc||''}));
  post('n8n/allow',{items:sel})};
 function unallow(id){post('n8n/allow',{items:S.assist.allowed.filter(a=>a.id!=id)})}
+$('pmode').onchange=e=>post('power',{mode:+e.target.value});
 $('fwgo').onclick=()=>{const f=$('fwfile').files[0];if(!f)return toast('Erst eine Datei wählen');
  const fd=new FormData();fd.append('file',f,f.name);const x=new XMLHttpRequest();x.open('POST','/api/update');x.setRequestHeader('X-Pin',pin);
  x.upload.onprogress=e=>{if(e.lengthComputable)$('fwprog').textContent='Übertrage … '+Math.round(e.loaded*100/e.total)+' %'};
@@ -343,6 +362,15 @@ static void state() {
   JsonArray k = d["known"].to<JsonArray>();
   for (int i = 0; i < knownCount; i++) k.add(known[i].ssid);
   d["gemini"] = voice::configured();
+  JsonObject pw = d["power"].to<JsonObject>();
+  pw["mode"] = (int)pwr::mode();
+  pw["saving"] = pwr::saving();
+  pw["mv"] = hwBatteryMv();
+  pw["remainMin"] = pwr::remainingMin();
+  pw["drain"] = pwr::drainPerHour();
+  JsonDocument hd;
+  deserializeJson(hd, pwr::historyJson());
+  pw["history"] = hd;
   JsonObject ai = d["assist"].to<JsonObject>();
   ai["name"] = assist::name();
   ai["search"] = assist::search();
@@ -365,6 +393,9 @@ static void state() {
   ko["apps"] = kc.apps;
   ko["school"] = kc.school;
   ko["nap"] = kc.nap;
+  ko["nightLock"] = kc.nightLock;
+  ko["storyMin"] = kc.storyMin;
+  ko["night"] = kids::night();
   ko["pin"] = kc.pin[0] != 0;  // nie die PIN selbst
   ko["angry"] = kc.angry;
   ko["angryToday"] = kids::angryToday();
@@ -386,6 +417,8 @@ static void setKids() {
   c.apps = d["apps"] | c.apps;
   c.school = d["school"] | c.school;
   c.nap = d["nap"] | c.nap;
+  c.nightLock = d["nightLock"] | c.nightLock;
+  c.storyMin = d["storyMin"] | c.storyMin;
   c.angry = d["angry"] | c.angry;
   kids::set(c);
   if (kids::angry() && !wasAngry) music::stop();  // im Wutmodus läuft nichts anderes
@@ -455,6 +488,13 @@ void begin() {
     const char* u = d["n8nUrl"] | (const char*)nullptr;
     const char* t = d["n8nToken"] | "";
     if (u || t[0]) n8n::set(u, t[0] ? t : nullptr);
+    msg("Gespeichert");
+  });
+  srv->on("/api/power", HTTP_POST, []() {
+    if (!authed()) return;
+    JsonDocument d;
+    if (!body(d)) return msg("Ungültige Anfrage", 400);
+    pwr::setMode((pwr::Mode)(d["mode"] | 1));
     msg("Gespeichert");
   });
   srv->on("/api/models", HTTP_GET, []() {

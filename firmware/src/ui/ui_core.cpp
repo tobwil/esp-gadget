@@ -36,7 +36,7 @@ static void gestureCb(lv_event_t*) {
   if (p->watchFace) {
     if (d == LV_DIR_TOP) push(&PAGE_APPS);
     else if (d == LV_DIR_BOTTOM) push(&PAGE_CONTROL);
-    else if (d == LV_DIR_LEFT) push(&PAGE_TILES);
+    else if (d == LV_DIR_LEFT && !kids::night()) push(&PAGE_TILES);
     else return;
   } else if (d == LV_DIR_RIGHT || (p->enter == ENTER_BOTTOM && d == LV_DIR_BOTTOM) ||
              (p->enter == ENTER_TOP && d == LV_DIR_TOP)) {
@@ -676,7 +676,7 @@ void onButton(BtnEvent e) {
     case BOOT_HOLD:
       if (cw::ringing()) { cw::ringStop(); break; }
       if (top() == &PAGE_ASSIST) { assist::talk(true); break; }  // auf der Assistenten-Seite: BOOT = sprechen
-      if (!kids::allowed(kids::A_RADIO)) break;
+      if (!kids::allowed(kids::A_RADIO) || kids::night()) break;
       if (top() != &PAGE_RADIO) { radio::pttDown(0); pttShow(); }
       else radio::pttDown(radioTarget());
       break;

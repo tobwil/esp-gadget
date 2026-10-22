@@ -153,7 +153,12 @@ static void worker(void*) {
       favs::toggle(path + 4, lastTitle, favKind(path + 4));
       memmove(path, path + 4, strlen(path + 4) + 1);
     }
-    if (kid) {
+    if (kid && kids::musicLocked()) {
+      char e[64];
+      snprintf(e, sizeof(e), "Schlafenszeit – Musik gibt es morgen ab %d:%02d", kids::cfg().wake / 60, kids::cfg().wake % 60);
+      ucopy(title, sizeof(title), "Gute Nacht");
+      ucopy(err, sizeof(err), e);
+    } else if (kid) {
       if (!strcmp(path, "home")) kidsHome(tmp, &n, title, sizeof(title), err, sizeof(err));
       else if (kids::released(path)) n = fetch(path, tmp, title, sizeof(title), err, sizeof(err));
       else ucopy(err, sizeof(err), "Nicht freigegeben");
@@ -206,6 +211,7 @@ static void playStation(int i) {
 
 void playList(const Item* list, int n, int start) {
   if (start < 0 || start >= n || list[start].kind != K_TRACK) return;
+  if (kids::musicLocked()) return;  // Schlafenszeit
   const char* id = list[start].id;
   if (!strncmp(id, "radio:", 6)) {
     stations.clear();

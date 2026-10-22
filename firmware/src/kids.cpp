@@ -2,6 +2,8 @@
 #include <Preferences.h>
 #include <time.h>
 #include "favs.h"
+#include "hw.h"
+#include "settings.h"
 
 namespace kids {
 
@@ -20,12 +22,35 @@ void begin() {
   c.nap = p.getBool("nap", true);
   p.getString("pin", c.pin, sizeof(c.pin));
   c.angry = p.getBool("angry", false);
+  c.nightLock = p.getBool("night", true);
+  c.storyMin = p.getUChar("story", 30);
   p.end();
   store.begin();
 }
 
 const Cfg& cfg() { return c; }
 bool on() { return c.on; }
+
+// Minuten seit der Bettzeit, −1 = nicht Nacht
+static int nightMinutes() {
+  if (!c.on || !c.nightLock || time(nullptr) < 1700000000) return -1;
+  time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+  int m = t.tm_hour * 60 + t.tm_min;
+  bool isNight = c.bed > c.wake ? (m >= c.bed || m < c.wake) : (m >= c.bed && m < c.wake);
+  if (!isNight) return -1;
+  return (m - c.bed + 1440) % 1440;
+}
+
+bool night() { return nightMinutes() >= 0; }
+bool musicLocked() { int n = nightMinutes(); return n >= 0 && n >= c.storyMin; }
+int storyLeftS() {
+  int n = nightMinutes();
+  if (n < 0 || n >= c.storyMin) return 0;
+  time_t now = time(nullptr);
+  return (c.storyMin - n) * 60 - now % 60;
+}
 bool angry() { return c.on && c.angry; }
 
 static int doneToday = 0, doneDay = -1;
@@ -67,6 +92,8 @@ void set(const Cfg& n) {
   p.putBool("nap", c.nap);
   p.putString("pin", c.pin);
   p.putBool("angry", c.angry);
+  p.putBool("night", c.nightLock);
+  p.putUChar("story", c.storyMin);
   p.end();
 }
 
@@ -110,6 +137,17 @@ const char* actName(Act a, bool weekend) {
     case STORY: return "Gute-Nacht-Geschichte";
     default: return "";
   }
+}
+
+// Nachts: Musik nach der Einschlafzeit sanft beenden, Display gedimmt
+void poll() {
+  static bool wasNight = false, wasLocked = false;
+  bool n = night(), l = musicLocked();
+  if (n && !wasNight && music::state().active) music::sleepSet(max(1, storyLeftS() / 60));  // Einschlafzeit läuft
+  if (l && !wasLocked && music::state().active) music::sleepSet(1);                        // Zeit um: ausblenden
+  (void)0;  // Helligkeit: power.cpp (Obergrenze nachts und im Sparmodus)
+  wasNight = n;
+  wasLocked = l;
 }
 
 }  // namespace kids

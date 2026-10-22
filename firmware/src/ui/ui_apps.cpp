@@ -36,6 +36,7 @@ static void build(lv_obj_t* scr) {
   for (int i = 0; i < N; i++) {
     if (APPS[i].page == &PAGE_ASSIST && !assist::available()) continue;
     if (kids::on() && APPS[i].kid != 0xFF && !kids::allowed((kids::App)APPS[i].kid)) continue;
+    if (kids::night() && (APPS[i].page != &PAGE_MUSIC || kids::musicLocked())) continue;  // Schlafenszeit
     lv_color_t c = APPS[i].color();
     lv_obj_t* r = listRow(l, nullptr, c, APPS[i].name);
     lv_obj_set_height(r, 76);
@@ -57,6 +58,12 @@ static void build(lv_obj_t* scr) {
       else if (APPS[k].page == &PAGE_TILES) tilesOpen(1);  // Wetter
       else push(APPS[k].page);
     }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+  }
+  if (kids::night()) {
+    char b[64];
+    snprintf(b, sizeof(b), I_SLEEP "  Gute Nacht!\nBis morgen um %d:%02d", kids::cfg().wake / 60, kids::cfg().wake % 60);
+    lv_obj_t* g = label(l, &font_text_24, C_ALARM(), b);
+    lv_obj_set_style_text_align(g, LV_TEXT_ALIGN_CENTER, 0);
   }
   listFit(l);
 }

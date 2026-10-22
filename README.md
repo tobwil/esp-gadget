@@ -108,6 +108,12 @@ Ein- und ausgeschaltet wird **nur über die Weboberfläche** (Reiter „Kinder�
 
 ![Kindermodus](docs/screens/kindermodus.png)
 
+### Schlafenszeit
+
+Ab der Bettzeit bis zum Aufstehen ist die Uhr gesperrt: keine Apps, kein Funk, keine Kacheln, das Display
+gedimmt. Was beim Zubettgehen läuft, darf noch eine Einschlafzeit lang weiterlaufen (Standard 30 Minuten,
+in der Weboberfläche 0 – 60) und wird dann sanft ausgeblendet. Der Wecker funktioniert weiter.
+
 ### Wutmodus
 
 ![Wut-Glas](docs/screens/wutglas.png)
@@ -123,7 +129,7 @@ Die Weboberfläche zeigt, wie oft heute die Wut rausgeschüttelt wurde.
 ![Weboberfläche](docs/screens/weboberflaeche.png)
 
 `http://taschenfunk-xxxx.local` oder die IP (QR-Code unter Einstellungen → Weboberfläche). Fürs Handy gebaut,
-hell und dunkel. Reiter: Übersicht · Kinder · Musik · KI · Gerät; direkt verlinkbar (`#kinder`, `#ki` …).
+hell und dunkel. Reiter: Übersicht (mit Akku) · Kinder · Musik · KI (Modelle, n8n) · Gerät (WLAN, Schlüssel, Firmware); direkt verlinkbar (`#kinder`, `#ki` …).
 Schlüssel und Tokens werden nur gesetzt, nie ausgelesen.
 
 ## Einrichten
@@ -145,6 +151,26 @@ Schlüssel und Tokens werden nur gesetzt, nie ausgelesen.
 
 `secrets.h` steht in `.gitignore`. Was darin steht, ist nur die Vorbelegung. Was in der Weboberfläche
 eingetragen wird, speichert die Uhr im NVS.
+
+## Akku und Sparmodus
+
+Die Weboberfläche zeigt Stand, Spannung, Verbrauch (%/h), eine geschätzte Restlaufzeit und den Verlauf der
+letzten sechs Stunden (alle 2 Minuten ein Messpunkt). Bei 10 % gibt es eine Warnung, bei 3 % schaltet die Uhr
+geordnet aus.
+
+**Sparmodus** (automatisch ab 20 %, oder immer): Display höchstens 40 % hell und nach 10 s aus, Zifferblätter
+nur noch einmal pro Sekunde, kein Funk im Hintergrund, ohne laufende Musik WLAN im Stromsparbetrieb und
+Prozessor auf 80 MHz, Tiefschlaf schon nach 3 statt 10 Minuten.
+
+## Updates per WLAN
+
+Weboberfläche → Gerät → Firmware: `firmware.bin` auswählen und „Aktualisieren“. Oder vom Rechner:
+
+```bash
+sh tools/ota.sh taschenfunk-e008.local amoled-175c   # baut und schickt die Firmware
+```
+
+Die Uhr prüft, ob die Datei für ihr Board gebaut ist (rund/eckig), und lehnt sonst ab.
 
 ## WLAN
 

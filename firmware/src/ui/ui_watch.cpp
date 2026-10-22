@@ -4,6 +4,7 @@
 #include <time.h>
 #include "../clockwork.h"
 #include "../kids.h"
+#include "../power.h"
 #include "../music.h"
 #include "../net.h"
 #include "../audio.h"
@@ -239,7 +240,7 @@ static void updatePocket() {
     lastSec = s;
     lv_obj_invalidate(hands);  // Stunden- und Minutenzeiger wandern mit
     updateTexts();
-  } else if (timeValid()) {
+  } else if (timeValid() && !pwr::saving()) {  // im Sparmodus springt die kleine Sekunde
     lv_area_t a = {CX - SUB_R, SUB_Y - SUB_R, CX + SUB_R, SUB_Y + SUB_R};
     lv_obj_invalidate_area(hands, &a);  // kleine Sekunde läuft flüssig
   }
@@ -408,6 +409,7 @@ static void update() {
   }
   int fps = FACES[f]->fps;
   if (FACES[f] == &fc::FACE_GLITCH && !music::state().playing) fps = 3;  // ohne Musik ruhig
+  if (pwr::saving()) fps = 1;  // Sparmodus: einmal pro Sekunde
   uint32_t every = intro ? 0 : 1000 / fps;
   if (now - lastDraw >= every) {
     lastDraw = now;

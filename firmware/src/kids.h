@@ -19,6 +19,8 @@ struct Cfg {
   bool nap;              // Mittagsruhe
   char pin[9];           // Eltern-PIN für die Weboberfläche ("" = keine)
   bool angry;            // Wutmodus: auf der Uhr gibt es nur noch das Wut-Glas
+  bool nightLock;        // Schlafenszeit: ab der Bettzeit bis zum Aufstehen gesperrt
+  uint8_t storyMin;      // so lange darf nach der Bettzeit noch Musik/Hörspiel laufen
 };
 
 void begin();
@@ -27,6 +29,13 @@ void set(const Cfg& c);  // speichert; ein Wechsel des Modus führt zurück zum 
 bool on();
 bool allowed(App a);     // außerhalb des Kindermodus immer true
 bool angry();            // Wutmodus aktiv (nur zusammen mit dem Kindermodus)
+
+// Schlafenszeit (Kindermodus): von der Bettzeit bis zum Aufstehen. Die ersten storyMin Minuten darf
+// noch etwas zum Einschlafen laufen, danach ist Musik gesperrt.
+bool night();
+bool musicLocked();      // nachts nach der Einschlafzeit
+int storyLeftS();        // Sekunden Einschlafzeit, die noch übrig sind (0 = keine)
+void poll();             // aus der Hauptschleife (Musik zur Einschlafzeit ausblenden, Helligkeit)
 
 // Wutmodus: wie oft heute die Wut rausgeschüttelt wurde (nur im Speicher, für die Eltern)
 void angryDone();

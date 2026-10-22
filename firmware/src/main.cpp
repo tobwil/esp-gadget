@@ -24,6 +24,7 @@
 #include "webui.h"
 #include "imu.h"
 #include "kids.h"
+#include "power.h"
 #include "assist.h"
 #include "ui/ui.h"
 extern const ui::Page PAGE_WEB_;
@@ -116,6 +117,7 @@ void setup() {
   weather::begin();
   voice::begin();
   assist::begin();
+  pwr::begin();
   webui::begin();
   ui::begin();
   lv_timer_handler();
@@ -150,11 +152,12 @@ static void radioAlarm() {
 
 static void power() {
   // Display aus nach der eingestellten Zeit ohne Bedienung
-  if (hwScreenOn() && cfg.screenOff && hwIdleMs() > cfg.screenOff * 1000UL && !cw::ringing() && !radio::transmitting())
+  uint32_t off = pwr::screenOffS();
+  if (hwScreenOn() && off && hwIdleMs() > off * 1000UL && !cw::ringing() && !radio::transmitting())
     hwScreen(false);
   // Tiefschlaf im Akkubetrieb, wenn nichts mehr läuft
-  if (!hwScreenOn() && DEEP_SLEEP_MIN && !hwUsb() && hwBattery() >= 0 &&
-      hwIdleMs() > (cfg.screenOff + DEEP_SLEEP_MIN * 60UL) * 1000UL && !music::state().active && !cw::busy() &&
+  if (!hwScreenOn() && pwr::deepSleepMin() && !hwUsb() && hwBattery() >= 0 &&
+      hwIdleMs() > (off + pwr::deepSleepMin() * 60UL) * 1000UL && !music::state().active && !cw::busy() &&
       !radio::transmitting() && !radio::receiving() && !kids::angry()) {
     audio::shutdown();
     hwDeepSleep(cw::alarmInS());
@@ -195,6 +198,8 @@ void loop() {
     power();
   }
   music::poll();
+  kids::poll();
+  pwr::poll();
   webui::poll();
 
   cw::poll();

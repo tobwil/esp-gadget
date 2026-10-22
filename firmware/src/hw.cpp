@@ -44,6 +44,8 @@ static void pmuBegin() {
   pmuOk = r >= 0;
   if (!pmuOk) { Serial.println("AXP2101: nicht gefunden"); return; }
   if (!(r & 0x08)) pmuWrite(0x18, r | 0x08);  // Akkustands-Messung an
+  int a = pmuRead(0x30);
+  if (a >= 0 && !(a & 0x01)) pmuWrite(0x30, a | 0x01);  // Spannungsmessung des Akkus (ADC) an
   int e = pmuRead(0x41);
   pmuWrite(0x41, (e < 0 ? 0 : e) | 0x0C);     // IRQ-Status für PWR kurz/lang freigeben
   pmuWrite(0x49, 0xFF);                       // alte Meldungen löschen
@@ -53,7 +55,7 @@ static void pmuBegin() {
   Serial.println("AXP2101: ok");
 }
 
-static int pmuPct = -1;
+static int pmuPct = -1, pmuMv = 0;
 static bool pmuUsb = false, pmuChg = false;
 static uint32_t pmuAt = 0;
 
@@ -64,6 +66,8 @@ static void pmuUpdate() {
   pmuUsb = s0 >= 0 && (s0 & 0x20);
   pmuChg = s1 >= 0 && ((s1 >> 5) & 3) == 1;
   int pct = s0 >= 0 && (s0 & 0x08) && p >= 0 && p <= 100 ? p : -1;
+  int h = pmuRead(0x34), l = pmuRead(0x35);
+  if (h >= 0 && l >= 0) pmuMv = ((h & 0x3F) << 8) | l;
   // Beim Laden meldet der AXP2101 den Akku manchmal kurz als fehlend: letzten Wert 30 s halten
   static uint32_t validAt = 0;
   if (pct >= 0) { pmuPct = pct; validAt = millis(); }
@@ -72,6 +76,7 @@ static void pmuUpdate() {
 
 // Werte werden nur in hwLoop() (Hauptaufgabe) gelesen, damit sich keine I2C-Zugriffe überschneiden
 int hwBattery() { return pmuPct; }
+int hwBatteryMv() { return pmuMv; }
 bool hwUsb() { return pmuUsb; }
 bool hwCharging() { return pmuChg; }
 
@@ -124,9 +129,20 @@ static void pollBoot() {
 
 // ------------------------------------------------------------------ Display
 
-void hwBrightness(uint8_t pct) {
+static uint8_t brightCap = 100;
+static bool brightRaw = false;
+
+void hwBrightness(uint8_t pct, bool ignoreCap) {
   brightPct = pct;
-  if (screenOn) gfx->setBrightness(max(8, pct * 255 / 100));
+  brightRaw = ignoreCap;
+  uint8_t p = ignoreCap ? pct : min(pct, brightCap);
+  if (screenOn) gfx->setBrightness(max(8, p * 255 / 100));
+}
+
+void hwBrightnessCap(uint8_t pct) {
+  if (pct == brightCap) return;
+  brightCap = pct;
+  hwBrightness(brightPct, brightRaw);
 }
 
 void hwScreen(bool on) {
@@ -135,7 +151,7 @@ void hwScreen(bool on) {
   if (on) {
     gfx->displayOn();
     lv_obj_invalidate(lv_screen_active());
-    hwBrightness(brightPct);
+    hwBrightness(brightPct, brightRaw);
     hwActivity();
   } else {
     gfx->setBrightness(0);

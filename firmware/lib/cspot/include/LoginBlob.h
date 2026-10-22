@@ -23,6 +23,9 @@ class LoginBlob {
                                            const std::string& deviceId);
 
  public:
+  // privater DH-Schlüssel der Zeroconf-Kopplung (zum Speichern bzw. Wiederherstellen)
+  std::vector<uint8_t> dhKey() { return crypto->privateKey; }
+  void setDhKey(const std::vector<uint8_t>& k) { crypto->dhInitWith(k); }
   LoginBlob(std::string name);
   std::vector<uint8_t> authData;
   std::string username = "";

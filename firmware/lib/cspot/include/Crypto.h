@@ -57,6 +57,7 @@ class CryptoMbedTLS {
   std::vector<uint8_t> publicKey;
   std::vector<uint8_t> privateKey;
   void dhInit();
+  void dhInitWith(const std::vector<uint8_t>& priv);  // gespeicherten Schlüssel nutzen
   std::vector<uint8_t> dhCalculateShared(const std::vector<uint8_t>& remoteKey);
 
   // PBKDF2

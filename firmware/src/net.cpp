@@ -16,6 +16,8 @@ static WifiState wst = W_IDLE;
 static uint32_t wAt = 0;
 static bool wasOnline = false, manual = false, ntpStarted = false, mdnsStarted = false;
 
+bool netMdnsReady() { return mdnsStarted; }
+
 const char* netHost() {
   static char host[24];
   if (!host[0]) {

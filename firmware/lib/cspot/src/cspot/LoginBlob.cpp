@@ -1,6 +1,7 @@
 #include "LoginBlob.h"
 
 #include <stdio.h>           // for sprintf
+#include <stdexcept>         // for runtime_error
 #include <initializer_list>  // for initializer_list
 
 #include "BellLogger.h"                  // for AbstractLogger
@@ -31,6 +32,7 @@ LoginBlob::LoginBlob(std::string name) {
 std::vector<uint8_t> LoginBlob::decodeBlob(
     const std::vector<uint8_t>& blob, const std::vector<uint8_t>& sharedKey) {
   // 0:16 - iv; 17:-20 - blob; -20:0 - checksum
+  if (blob.size() < 16 + 20 + 1) throw std::runtime_error("zeroconf blob too short");
   auto iv = std::vector<uint8_t>(blob.begin(), blob.begin() + 16);
   auto encrypted = std::vector<uint8_t>(blob.begin() + 16, blob.end() - 20);
   auto checksum = std::vector<uint8_t>(blob.end() - 20, blob.end());
@@ -57,6 +59,7 @@ std::vector<uint8_t> LoginBlob::decodeBlob(
   // Check checksum
   if (mac != checksum) {
     CSPOT_LOG(error, "Mac doesn't match!");
+    throw std::runtime_error("zeroconf mac mismatch");
   }
 
   encryptionKey =
@@ -67,6 +70,7 @@ std::vector<uint8_t> LoginBlob::decodeBlob(
 }
 
 uint32_t LoginBlob::readBlobInt(const std::vector<uint8_t>& data) {
+  if (blobSkipPosition + 2 > data.size()) throw std::runtime_error("zeroconf login data truncated");
   auto lo = data[blobSkipPosition];
   if ((int)(lo & 0x80) == 0) {
     this->blobSkipPosition += 1;
@@ -100,6 +104,7 @@ std::vector<uint8_t> LoginBlob::decodeBlobSecondary(
   crypto->aesECBdecrypt(key, blobData);
 
   auto l = blobData.size();
+  if (l < 32) throw std::runtime_error("zeroconf login data too short");
 
   for (int i = 0; i < l - 16; i++) {
     blobData[l - i - 1] ^= blobData[l - i - 17];
@@ -123,6 +128,7 @@ void LoginBlob::loadZeroconf(const std::vector<uint8_t>& blob,
   this->authType = readBlobInt(loginData);
   blobSkipPosition += 1;
   auto authSize = readBlobInt(loginData);
+  if (blobSkipPosition + authSize > loginData.size()) throw std::runtime_error("zeroconf auth data truncated");
   this->username = username;
   this->authData =
       std::vector<uint8_t>(loginData.begin() + blobSkipPosition,

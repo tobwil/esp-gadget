@@ -85,6 +85,9 @@ s = s.replace(key, "      // Stop the current track, if any\n      trackPlayer->
 open(p, "w").write(s)
 PY
 
+# Zeroconf: DH-Schlüssel speicherbar, Fehler als Ausnahme statt Absturz
+python3 "$ROOT/tools/patch_cspot_zeroconf.py" "$DST"
+
 # cJSON-Variante meldet sonst „deviceType“ als Gerätetyp – die Spotify-App erwartet SPEAKER
 sed -i.bak 's/"deviceType", "deviceType"/"deviceType", "SPEAKER"/' "$DST/src/cspot/LoginBlob.cpp" && rm "$DST/src/cspot/LoginBlob.cpp.bak"
 

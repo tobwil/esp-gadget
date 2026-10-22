@@ -105,7 +105,7 @@ static void task(void*) {
 
 void begin() {
   rec = (int16_t*)heap_caps_malloc(RATE * MAX_S * 2, MALLOC_CAP_SPIRAM);
-  xTaskCreatePinnedToCore(task, "voice", 8192, nullptr, 3, nullptr, 1);
+  xTaskCreatePinnedToCore(task, "voice", 12288, nullptr, 3, nullptr, 1);  // HTTPS zu Gemini braucht Stack
 }
 
 }  // namespace voice

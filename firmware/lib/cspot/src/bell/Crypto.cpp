@@ -237,3 +237,24 @@ std::vector<uint8_t> CryptoMbedTLS::generateVectorWithRandomData(
 
   return randomVector;
 }
+
+// Gespeicherten privaten DH-Schlüssel übernehmen und den öffentlichen daraus berechnen
+void CryptoMbedTLS::dhInitWith(const std::vector<uint8_t>& priv) {
+  if (priv.size() != DH_KEY_SIZE) return dhInit();
+  privateKey = priv;
+  mbedtls_mpi prime, generator, res, privKey;
+  mbedtls_mpi_init(&prime);
+  mbedtls_mpi_init(&generator);
+  mbedtls_mpi_init(&privKey);
+  mbedtls_mpi_init(&res);
+  mbedtls_mpi_read_binary(&prime, DHPrime, sizeof(DHPrime));
+  mbedtls_mpi_read_binary(&generator, DHGenerator, sizeof(DHGenerator));
+  mbedtls_mpi_read_binary(&privKey, privateKey.data(), DH_KEY_SIZE);
+  mbedtls_mpi_exp_mod(&res, &generator, &privKey, &prime, NULL);
+  publicKey = std::vector<uint8_t>(DH_KEY_SIZE);
+  mbedtls_mpi_write_binary(&res, publicKey.data(), DH_KEY_SIZE);
+  mbedtls_mpi_free(&prime);
+  mbedtls_mpi_free(&generator);
+  mbedtls_mpi_free(&privKey);
+  mbedtls_mpi_free(&res);
+}

@@ -319,7 +319,14 @@ static void zcAdd() {
   std::map<std::string, std::string> q;
   for (int i = 0; i < zc->args(); i++) q[zc->argName(i).c_str()] = zc->arg(i).c_str();
   if (q.count("action") && q["action"] == "getInfo") { zcInfo(); return; }
-  blob->loadZeroconfQuery(q);
+  try {
+    blob->loadZeroconfQuery(q);
+  } catch (const std::exception& e) {
+    // meist ein veralteter Schlüssel in der App: Fehler melden, die App fragt dann neu nach
+    Serial.printf("Spotify: Kopplung fehlgeschlagen (%s)\n", e.what());
+    zc->send(200, "application/json", "{\"status\":105,\"spotifyError\":1,\"statusString\":\"ERROR-LOGIN-FAILED\"}");
+    return;
+  }
   fromZeroconf = true;
   haveBlob = true;
   if (isConnected) relogin = true;  // neues Konto aus der App: umschalten
@@ -336,7 +343,7 @@ void poll() {
     zc->begin();
   }
   // erst wenn mDNS läuft (startet in netPoll), sonst geht die Anmeldung still verloren
-  if (!mdnsDone && MDNS.addService("spotify-connect", "tcp", ZC_PORT)) {
+  if (!mdnsDone && netMdnsReady() && MDNS.addService("spotify-connect", "tcp", ZC_PORT)) {
     MDNS.addServiceTxt("spotify-connect", "tcp", "VERSION", "1.0");
     MDNS.addServiceTxt("spotify-connect", "tcp", "CPath", "/spotify_info");
     MDNS.addServiceTxt("spotify-connect", "tcp", "Stack", "SP");
@@ -363,6 +370,15 @@ void begin() {
     Serial.printf("Spotify: Zertifikate nicht lesbar (%s), HTTPS ohne Prüfung\n", e.what());
   }
   blob = std::make_shared<cspot::LoginBlob>(cfg.name);
+  // Schlüssel der Kopplung über Neustarts behalten: die Spotify-App merkt sich den öffentlichen Teil
+  {
+    Preferences p;
+    p.begin("spot", false);
+    std::vector<uint8_t> k(96);
+    if (p.getBytesLength("dh") == k.size() && p.getBytes("dh", k.data(), k.size()) == k.size()) blob->setDhKey(k);
+    else { k = blob->dhKey(); p.putBytes("dh", k.data(), k.size()); }
+    p.end();
+  }
   loadAccounts();
   if (accCur >= 0) {
     blob->loadJson(accs[accCur].cred.c_str());

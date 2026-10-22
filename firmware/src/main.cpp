@@ -56,6 +56,8 @@ bool appCommand(const char* line) {
   else if (!strcmp(line, "perf")) perfLog = !perfLog;
   else if (sscanf(line, "kids %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.on = !strcmp(a, "on"); kids::set(k); ui::home(); }
   else if (!strcmp(line, "kb")) ui::keyboard("Spotify durchsuchen", "", false, nullptr);
+  else if (!strcmp(line, "voice start")) voice::start();  // Test: Spracheingabe ohne Finger
+  else if (!strcmp(line, "voice stop")) voice::finish();
   else if (sscanf(line, "angry %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.angry = !strcmp(a, "on"); if (k.angry) { k.on = true; music::stop(); } kids::set(k); ui::home(); }
   else if (sscanf(line, "shake %99s", a) == 1) angryTestShake = atof(a);
   else if (sscanf(line, "level %99s", a) == 1) gameTestLevel(atoi(a));

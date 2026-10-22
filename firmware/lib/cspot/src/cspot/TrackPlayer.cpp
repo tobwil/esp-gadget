@@ -1,5 +1,7 @@
 #include "TrackPlayer.h"
 
+std::atomic<int> cspotLoadFailures{0};  // Fehlschläge in Folge (Taschenfunk)
+
 #include <mutex>        // for mutex, scoped_lock
 #include <string>       // for string
 #include <type_traits>  // for remove_extent_t
@@ -163,6 +165,7 @@ void TrackPlayer::runTask() {
 
       if (track->state != QueuedTrack::State::READY) {
         CSPOT_LOG(error, "Track failed to load, skipping it");
+        cspotLoadFailures++;
         track->abandonned = true;
         this->eofCallback();
         continue;
@@ -170,6 +173,7 @@ void TrackPlayer::runTask() {
     }
 
     CSPOT_LOG(info, "Got track ID=%s", track->identifier.c_str());
+    cspotLoadFailures = 0;
 
     currentSongPlaying = true;
 

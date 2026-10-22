@@ -24,6 +24,8 @@
 extern const uint8_t bellBundleStart[] asm("_binary_x509_crt_bundle_bell_start");
 extern const uint8_t bellBundleEnd[] asm("_binary_x509_crt_bundle_bell_end");
 
+extern std::atomic<int> cspotLoadFailures;  // Titel, die in Folge nicht geladen werden konnten (cspot-Patch)
+
 namespace spotify {
 
 static const int ZC_PORT = 8080;
@@ -355,6 +357,18 @@ void poll() {
     mdnsDone = true;
   }
   zc->handleClient();
+  // Spotify gibt keinen Audio-Schlüssel heraus (bei vielen neueren Konten für inoffizielle Geräte):
+  // nicht im Sekundentakt durch die ganze Warteschlange springen, sondern anhalten und es sagen
+  static uint32_t failSince = 0;
+  if (!cspotLoadFailures) failSince = 0;
+  else if (!failSince) failSince = millis();
+  if (handler && failSince && (cspotLoadFailures >= 3 || millis() - failSince > 10000)) {
+    cspotLoadFailures = 0;
+    failSince = 0;
+    if (auto hp = handler) hp->setPause(true);
+    setMsg("Spotify verweigert den Ton");
+    Serial.println("Spotify: Audio-Schlüssel mehrfach verweigert, angehalten");
+  }
   if (accDirty) {
     accDirty = false;
     xSemaphoreTake(mtx, portMAX_DELAY);

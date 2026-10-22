@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Zeroconf-Kopplung von cspot robuster machen (wird von vendor_cspot.sh aufgerufen).
+"""cspot robuster machen: Zeroconf-Kopplung und Ladefehler (wird von vendor_cspot.sh aufgerufen).
 
 1. Der DH-Schlüssel für die Kopplung lässt sich von außen setzen und auslesen. Die Uhr speichert ihn,
    sonst ist er nach jedem Neustart neu – die Spotify-App verschlüsselt aber mit dem öffentlichen
    Schlüssel, den sie sich vorher gemerkt hat, und die Uhr kann die Zugangsdaten nicht lesen.
 2. Passt die Prüfsumme nicht oder sind die Daten zu kurz, gibt es eine Ausnahme statt eines Absturzes
    (vorher wurde mit unlesbaren Daten weitergerechnet und über das Pufferende hinaus gelesen).
+3. Ein Zähler für Titel, die nicht laden (verweigerter Audio-Schlüssel), damit die Uhr anhalten kann.
 
     python3 tools/patch_cspot_zeroconf.py firmware/lib/cspot
 """
@@ -93,4 +94,18 @@ patch("src/cspot/LoginBlob.cpp",
       '''  auto authSize = readBlobInt(loginData);
   if (blobSkipPosition + authSize > loginData.size()) throw std::runtime_error("zeroconf auth data truncated");
   this->username = username;''')
+# 3. Zähler für Titel, die nicht laden (z. B. verweigerter Audio-Schlüssel). Sonst springt cspot im
+#    Sekundentakt durch die ganze Warteschlange; die Uhr hält bei mehreren Fehlschlägen in Folge an.
+patch("src/cspot/TrackPlayer.cpp", '#include "TrackPlayer.h"\n',
+      '#include "TrackPlayer.h"\n\nstd::atomic<int> cspotLoadFailures{0};  // Fehlschläge in Folge (Taschenfunk)\n')
+patch("src/cspot/TrackPlayer.cpp",
+      """        CSPOT_LOG(error, "Track failed to load, skipping it");
+        track->abandonned = true;""",
+      """        CSPOT_LOG(error, "Track failed to load, skipping it");
+        cspotLoadFailures++;
+        track->abandonned = true;""")
+patch("src/cspot/TrackPlayer.cpp",
+      """    CSPOT_LOG(info, "Got track ID=%s", track->identifier.c_str());""",
+      """    CSPOT_LOG(info, "Got track ID=%s", track->identifier.c_str());
+    cspotLoadFailures = 0;""")
 print("cspot: Zeroconf-Patch angewendet")

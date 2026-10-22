@@ -12,6 +12,7 @@
 #include "audio.h"
 #include "clockwork.h"
 #include "config.h"
+#include "pins.h"
 #include "hw.h"
 #include "music.h"
 #include "net.h"
@@ -26,6 +27,10 @@
 #include "assist.h"
 #include "ui/ui.h"
 extern const ui::Page PAGE_WEB_;
+
+// Kennung des Boards in der Firmware: Updates per WLAN prüfen sie (webui.cpp)
+extern const char TF_BOARD_TAG[];
+const char TF_BOARD_TAG[] = "TFBOARD=" BOARD_NAME ";";
 
 // Serielle Befehle für Tests über USB (zusätzlich zu tap/swipe/shot in hw.cpp)
 static bool perfLog = false;

@@ -1,5 +1,6 @@
 #include "webui.h"
 #include <ArduinoJson.h>
+#include <Update.h>
 #include <WebServer.h>
 #include "config.h"
 #include "favs.h"
@@ -14,6 +15,8 @@
 #include "settings.h"
 #include "ui/ui.h"
 #include "voice.h"
+
+extern const char TF_BOARD_TAG[];  // main.cpp
 
 namespace webui {
 
@@ -114,6 +117,9 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
   <label class="f" for="pw">Passwort</label><input id="pw" type="password" placeholder="leer = offenes Netz">
   <button class="wide" id="wgo">Hinzufügen und verbinden</button></section>
  <section><h2>Spracheingabe</h2><p id="gst" class="note"></p><label class="f" for="gem">Gemini-API-Schlüssel</label><input id="gem" type="password" autocomplete="off" placeholder="unverändert lassen"><button class="wide" id="gemgo">Speichern</button></section>
+ <section><h2>Firmware</h2><p class="note" id="fwst"></p>
+  <label class="f" for="fwfile">Neue Firmware (firmware.bin aus dem Build)</label><input id="fwfile" type="file" accept=".bin">
+  <button class="wide" id="fwgo">Aktualisieren</button><p class="note" id="fwprog"></p></section>
  <section><button class="wide ghost" id="rst">Uhr neu starten</button></section>
 </div>
 </main>
@@ -163,6 +169,7 @@ function render(){
  if(document.activeElement!==$('n8nurl'))$('n8nurl').value=ai.n8nUrl;
  $('n8nst').innerHTML=ai.n8nSet?'<span class="ok">Eingerichtet</span>':'Noch nicht eingerichtet – Adresse und Token aus n8n (Einstellungen → MCP).';
  $('n8nallow').innerHTML=ai.allowed.map(a=>row(a.name,a.kind=='agent'?'Agent':'Workflow',btn('✕',`unallow(${J(a.id)})`))).join('')||'<p class="note">Noch nichts freigegeben.</p>';
+ $('fwst').textContent=`Version ${s.version} · ${s.board} · gebaut ${s.built}`;
  $('gst').innerHTML=s.gemini?'<span class="ok">Schlüssel gesetzt</span>':'<span class="bad">Kein Schlüssel – Spracheingabe aus</span>';
 }
 async function load(){try{S=await api('state');render()}catch(e){if(e.message!='pin')$('stat').textContent='Uhr nicht erreichbar'}}
@@ -198,6 +205,11 @@ $('n8nload').onclick=async()=>{$('n8nall').innerHTML='<p class="note">Lade …</
 $('n8nsave').onclick=()=>{const sel=[...document.querySelectorAll('#n8nall input:checked')].map(c=>n8nList[+c.dataset.i]).map(w=>({id:w.id,name:w.name,kind:w.kind,desc:w.desc||''}));
  post('n8n/allow',{items:sel})};
 function unallow(id){post('n8n/allow',{items:S.assist.allowed.filter(a=>a.id!=id)})}
+$('fwgo').onclick=()=>{const f=$('fwfile').files[0];if(!f)return toast('Erst eine Datei wählen');
+ const fd=new FormData();fd.append('file',f,f.name);const x=new XMLHttpRequest();x.open('POST','/api/update');x.setRequestHeader('X-Pin',pin);
+ x.upload.onprogress=e=>{if(e.lengthComputable)$('fwprog').textContent='Übertrage … '+Math.round(e.loaded*100/e.total)+' %'};
+ x.onload=()=>{let m='';try{m=JSON.parse(x.responseText).msg}catch(e){}$('fwprog').textContent=m||('Fehler '+x.status);if(x.status==200)setTimeout(load,15000)};
+ x.onerror=()=>{$('fwprog').textContent='Verbindung abgebrochen'};x.send(fd)};
 $('rst').onclick=()=>confirm('Uhr neu starten?')&&post('restart',{});
 // Reiter direkt öffnen: …/#kinder, #musik, #ki, #geraet
 const HASH={kinder:'kids',musik:'music',ki:'ai',geraet:'dev'};
@@ -221,12 +233,73 @@ static void msg(const char* m, int code = 200) {
 static bool body(JsonDocument& d) { return !deserializeJson(d, srv->arg("plain")); }
 
 // Eltern-PIN: ist eine gesetzt, braucht jede Anfrage an /api/ den Kopf „X-Pin“
-static bool authed() {
+static bool pinOk() {
   const char* pin = kids::cfg().pin;
-  if (!pin[0] || srv->header("X-Pin") == pin) return true;
+  return !pin[0] || srv->header("X-Pin") == pin;
+}
+
+static bool authed() {
+  if (pinOk()) return true;
   delay(600);  // Raten bremsen
   msg("PIN nötig", 401);
   return false;
+}
+
+// ------------------------------------------------------------------ Update per WLAN
+// Die hochgeladene Firmware muss die Kennung dieses Boards enthalten (TF_BOARD_TAG, siehe main.cpp) –
+// so landet die Firmware der runden Uhr nicht versehentlich auf der eckigen und umgekehrt.
+static String otaErr;
+static bool otaTag = false;
+static char otaTail[48];
+static size_t otaTailLen = 0;
+
+static void otaScan(const uint8_t* p, size_t n) {
+  size_t tl = strlen(TF_BOARD_TAG);
+  if (otaTag || !n) return;
+  // über die Grenze zweier Stücke hinweg: Ende des letzten + Anfang des neuen
+  uint8_t join[96];
+  size_t k = min(n, tl - 1);
+  memcpy(join, otaTail, otaTailLen);
+  memcpy(join + otaTailLen, p, k);
+  if (memmem(join, otaTailLen + k, TF_BOARD_TAG, tl) || memmem(p, n, TF_BOARD_TAG, tl)) { otaTag = true; return; }
+  otaTailLen = min(n, tl - 1);
+  memcpy(otaTail, p + n - otaTailLen, otaTailLen);
+}
+
+static void otaUpload() {
+  HTTPUpload& u = srv->upload();
+  if (u.status == UPLOAD_FILE_START) {
+    otaErr = "";
+    otaTag = false;
+    otaTailLen = 0;
+    if (!pinOk()) { otaErr = "PIN nötig"; return; }
+    Serial.printf("Update: %s wird empfangen\n", u.filename.c_str());
+    music::stop();
+    assist::close();
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) otaErr = Update.errorString();
+  } else if (u.status == UPLOAD_FILE_WRITE) {
+    if (otaErr.length()) return;
+    otaScan(u.buf, u.currentSize);
+    if (Update.write(u.buf, u.currentSize) != u.currentSize) otaErr = Update.errorString();
+  } else if (u.status == UPLOAD_FILE_END) {
+    if (otaErr.length()) { Update.abort(); return; }
+    if (!otaTag) { Update.abort(); otaErr = "Diese Firmware ist für ein anderes Board"; return; }
+    if (!Update.end(true)) otaErr = Update.errorString();
+  } else if (u.status == UPLOAD_FILE_ABORTED) {
+    Update.abort();
+    otaErr = "Übertragung abgebrochen";
+  }
+}
+
+static void otaDone() {
+  if (otaErr.length()) {
+    Serial.printf("Update: abgelehnt (%s)\n", otaErr.c_str());
+    return msg(otaErr.c_str(), otaErr == "PIN nötig" ? 401 : 400);
+  }
+  Serial.println("Update: installiert, starte neu");
+  msg("Update installiert – die Uhr startet neu");
+  delay(600);
+  ESP.restart();
 }
 
 static void addItems(JsonArray a, const music::Item* it, int n) {
@@ -245,6 +318,8 @@ static void state() {
   d["host"] = netHost();
   d["ip"] = netIp();
   d["version"] = FW_VERSION;
+  d["board"] = TF_BOARD_TAG + 8;  // „TFBOARD=…;“ → Boardname
+  d["built"] = __DATE__ " " __TIME__;
   d["battery"] = hwBattery();
   d["charging"] = hwCharging();
   d["ssid"] = netOnline() ? netSsid() : "";
@@ -331,6 +406,7 @@ void begin() {
   srv->collectHeaders(hdrs, 1);
   srv->on("/", HTTP_GET, []() { srv->send_P(200, "text/html; charset=utf-8", PAGE); });
   srv->on("/api/state", HTTP_GET, state);
+  srv->on("/api/update", HTTP_POST, otaDone, otaUpload);
   srv->on("/api/search", HTTP_GET, search);
   srv->on("/api/kids", HTTP_POST, setKids);
   srv->on("/api/kids/release", HTTP_POST, []() {

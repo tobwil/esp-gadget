@@ -45,4 +45,4 @@
 #define IMU_SIGN_X 1
 #define IMU_SIGN_Y 1
 
-#define FW_VERSION "0.2.0"
+#define FW_VERSION "0.3.0"

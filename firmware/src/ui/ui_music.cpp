@@ -203,14 +203,12 @@ static char pendingPath[240];
 
 // ================================================================== Suchen (Sprache oder Tastatur)
 
-// Suche für vier Quellen: Sprache oder Tastatur
-enum SearchMode { S_SPOTIFY, S_PODCAST, S_RADIO, S_ARD };
-static int searchMode = S_SPOTIFY;
-static const char* const S_TITLE[] = {"Spotify durchsuchen", "Podcast suchen", "Sender suchen", "Audiothek durchsuchen"};
-static const char* const S_PREFIX[] = {"search:", "pcsearch:", "rlsearch:", "ardsearch:"};
-static lv_color_t sColor() {
-  return searchMode == S_PODCAST ? C_ALARM() : searchMode == S_RADIO ? C_WATCH() : searchMode == S_ARD ? C_TIMER() : C_RADIO();
-}
+// Suche für drei Quellen: Sprache oder Tastatur
+enum SearchMode { S_PODCAST, S_RADIO, S_ARD };
+static int searchMode = S_RADIO;
+static const char* const S_TITLE[] = {"Podcast suchen", "Sender suchen", "Audiothek durchsuchen"};
+static const char* const S_PREFIX[] = {"pcsearch:", "rlsearch:", "ardsearch:"};
+static lv_color_t sColor() { return searchMode == S_PODCAST ? C_ALARM() : searchMode == S_RADIO ? C_WATCH() : C_TIMER(); }
 static lv_obj_t *sMic, *sHalo, *sStatus, *sTitle;
 static bool sHolding = false;
 static uint32_t sDoneAt = 0;
@@ -291,18 +289,9 @@ static void searchLeave() { voice::cancel(); }
 const Page PAGE_SEARCH = {searchBuild, searchUpdate, searchLeave, nullptr, false};
 
 void browseOpen(const char* path) {
-  if (!strcmp(path, "@voice") || !strcmp(path, "@pcsearch") || !strcmp(path, "@radiosearch") || !strcmp(path, "@ardsearch")) {
-    searchMode = path[1] == 'p' ? S_PODCAST : path[1] == 'r' ? S_RADIO : path[1] == 'a' ? S_ARD : S_SPOTIFY;
+  if (!strcmp(path, "@pcsearch") || !strcmp(path, "@radiosearch") || !strcmp(path, "@ardsearch")) {
+    searchMode = path[1] == 'p' ? S_PODCAST : path[1] == 'r' ? S_RADIO : S_ARD;
     push(&PAGE_SEARCH);
-    return;
-  }
-  if (!strcmp(path, "@search")) {
-    searchMode = S_SPOTIFY;
-    searchKeyboard();
-    return;
-  }
-  if (!strcmp(path, "@spotifyhelp")) {
-    toast("Spotify-App öffnen → Lautsprecher-Symbol → diese Uhr wählen. Danach geht es auch ohne App.", 7000);
     return;
   }
   snprintf(pendingPath, sizeof(pendingPath), "%s", path);
@@ -362,13 +351,10 @@ static void fill(BrowseCtx* c) {
     const char* icon = station                                                    ? I_RADIO
                        : it.kind == music::K_TRACK                                ? I_MUSIC
                        : !strncmp(it.id, "fav", 3)                               ? I_HEART
-                       : !strcmp(it.id, "@search")                              ? I_SEARCH
-                       : !strncmp(it.id, "@voice", 6) || strstr(it.id, "search") ? I_MIC
+                       : strstr(it.id, "search")                                 ? I_MIC
                        : !strncmp(it.id, "pc", 2)                                ? I_RADIO_WAVES
                        : !strncmp(it.id, "rl", 2)                                ? I_RADIO
                        : !strncmp(it.id, "ard", 3)                               ? I_LIBRARY
-                       : !strcmp(it.id, "sp:home")                               ? I_MUSIC
-                       : !strcmp(it.id, "@spotifyhelp")                          ? I_INFO
                                                                                  : I_QUEUE;
     lv_color_t ic = it.kind == music::K_TRACK ? C_DIM() : !strncmp(it.id, "fav:", 4) ? C_BRASS() : C_MUSIC();
     lv_obj_t* r = listRow(c->list, icon, ic, it.title, sub[0] ? sub : nullptr);

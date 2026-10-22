@@ -18,7 +18,6 @@
 #include "radio.h"
 #include "settings.h"
 #include "weather.h"
-#include "spotify.h"
 #include "voice.h"
 #include "keys.h"
 #include "webui.h"
@@ -56,7 +55,7 @@ bool appCommand(const char* line) {
   else if (!strcmp(line, "wake")) ui::wake();
   else if (!strcmp(line, "perf")) perfLog = !perfLog;
   else if (sscanf(line, "kids %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.on = !strcmp(a, "on"); kids::set(k); ui::home(); }
-  else if (!strcmp(line, "kb")) ui::keyboard("Spotify durchsuchen", "", false, nullptr);
+  else if (!strcmp(line, "kb")) ui::keyboard("Sender suchen", "", false, nullptr);
   else if (!strcmp(line, "voice start")) voice::start();  // Test: Spracheingabe ohne Finger
   else if (!strcmp(line, "voice stop")) voice::finish();
   else if (sscanf(line, "angry %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.angry = !strcmp(a, "on"); if (k.angry) { k.on = true; music::stop(); } kids::set(k); ui::home(); }
@@ -82,16 +81,15 @@ bool appCommand(const char* line) {
   else if (!strcmp(line, "imu")) { imu::sleep(false); delay(50); float x, y; imu::gravity(x, y); Serial.printf("Neigung: x %.2f y %.2f\n", x, y); }
   else if (!strcmp(line, "status")) {
     music::State s = music::state();
-    Serial.printf("WLAN %s %s · Spotify %s %s · Musik %s %s %.0f/%u s %s · Akku %d%% · Heap %u\n", netOnline() ? "an" : "aus",
-                  netOnline() ? netIp().c_str() : "", spotify::connected() ? "verbunden" : spotify::linked() ? "gekoppelt" : "–",
-                  spotify::user(), s.active ? (s.playing ? "spielt" : "Pause") : "aus", s.title, s.pos, s.dur, s.msg,
+    Serial.printf("WLAN %s %s · Musik %s %s %.0f/%u s %s · Akku %d%% · Heap %u\n", netOnline() ? "an" : "aus",
+                  netOnline() ? netIp().c_str() : "", s.active ? (s.playing ? "spielt" : "Pause") : "aus", s.title, s.pos, s.dur, s.msg,
                   hwBattery(), heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
   } else return false;
   return true;
 }
 
-// TLS-Puffer (je Verbindung 20–40 KB) ins PSRAM: sonst reicht der interne RAM nicht für Spotify,
-// Podcast-Stream und Cover gleichzeitig
+// TLS-Puffer (je Verbindung 20–40 KB) ins PSRAM: sonst reicht der interne RAM nicht für Stream, Cover,
+// Gemini und n8n gleichzeitig
 static void* tlsCalloc(size_t n, size_t size) {
   void* p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   return p ? p : heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -191,9 +189,6 @@ void loop() {
     netPoll();
     power();
   }
-  int v = music::takeRemoteVolume();
-  if (v >= 0) v = kids::limitVolume(v);
-  if (v >= 0 && v != cfg.volume) { cfg.volume = v; audio::setVolume(v); settingsSave(); }
   music::poll();
   webui::poll();
 

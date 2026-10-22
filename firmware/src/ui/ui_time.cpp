@@ -222,7 +222,7 @@ static void alarmBuild(lv_obj_t* scr) {
   aSrc = pill(scr, "", C_SURF(), C_TEXT());
   lv_obj_set_width(aSrc, 270);
   lv_label_set_long_mode(lv_obj_get_child(aSrc, 0), LV_LABEL_LONG_DOT);
-  lv_obj_set_width(lv_obj_get_child(aSrc, 0), 240);
+  lv_obj_set_size(lv_obj_get_child(aSrc, 0), 240, lv_font_get_line_height(&font_text_20));
   lv_obj_set_style_text_align(lv_obj_get_child(aSrc, 0), LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(aSrc, LV_ALIGN_CENTER, 0, 96);
   lv_obj_add_event_cb(aSrc, [](lv_event_t*) { play(0); push(&PAGE_ALARMSRC); }, LV_EVENT_CLICKED, nullptr);

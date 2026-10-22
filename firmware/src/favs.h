@@ -1,4 +1,4 @@
-// Gemerkte Listen (Spotify-Alben, -Playlists, -Interpreten, Podcasts, Audiothek-Sendungen) und Radiosender,
+// Gemerkte Podcasts, Audiothek-Sendungen und Radiosender,
 // im Gerät gespeichert.
 // Dieselbe Ablage dient auch für die Freigaben im Kindermodus (kids.h).
 #pragma once

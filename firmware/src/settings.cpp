@@ -67,6 +67,10 @@ void settingsLoad() {
   }
   prefs.end();
   if (strlen(WIFI_SSID) && knownIndex(WIFI_SSID) < 0) knownAdd(WIFI_SSID, WIFI_PASSWORD);
+  // Spotify gibt es nicht mehr: alte Zugangsdaten und Schlüssel aus dem Gerätespeicher entfernen
+  Preferences old;
+  if (old.begin("spot", false)) { old.clear(); old.end(); }
+  if (old.begin("keys", false)) { old.remove("spid"); old.remove("spsec"); old.end(); }
 }
 
 void settingsSave() {

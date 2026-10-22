@@ -7,7 +7,6 @@
 #include "podcast.h"
 #include "ard.h"
 #include "webradio.h"
-#include "spotify.h"
 
 namespace music {
 
@@ -56,9 +55,6 @@ static void addListAt(Item* it, int i, const char* id, const char* title, const 
 
 // Art einer merkbaren Liste (Untertitel im Favoriten-Menü), "" = nicht merkbar
 static const char* favKind(const char* path) {
-  if (!strncmp(path, "sp:album:", 9)) return "Album";
-  if (!strncmp(path, "sp:playlist:", 12)) return "Playlist";
-  if (!strncmp(path, "sp:artist:", 10)) return "Interpret";
   if (!strncmp(path, "pc:feed:", 8)) return "Podcast";
   if (!strncmp(path, "ard:set:", 8)) return "Audiothek";
   return "";
@@ -72,16 +68,7 @@ static void home(Item* it, int* n, char* title, size_t titleLen) {
   addList(it, n, "rl:home", "Radio", "Sender aus aller Welt");
   addList(it, n, "ard:home", "ARD Audiothek", "Hörspiele, Wissen, Kinder …");
   addList(it, n, "pc:subs", "Podcasts", "Meine Podcasts und Suche");
-  addList(it, n, "favs", "Favoriten", "Gemerkte Sender, Sendungen, Listen");
-  addList(it, n, "sp:home", "Spotify", spotify::linked() ? "Suchen und abspielen" : "Noch nicht gekoppelt");
-}
-
-static void spotifyHome(Item* it, int* n, char* title, size_t titleLen) {
-  ucopy(title, titleLen, "Spotify");
-  addList(it, n, "@voice", "Sprechen", "Titel, Interpret, Album …");
-  addList(it, n, "@search", "Suchen", "Mit der Tastatur");
-  if (!spotify::linked())
-    addList(it, n, "@spotifyhelp", "Spotify koppeln", "In der Spotify-App die Uhr als Lautsprecher wählen");
+  addList(it, n, "favs", "Favoriten", "Gemerkte Sender, Sendungen, Podcasts");
 }
 
 // Kindermodus: nur die freigegebenen Listen
@@ -97,7 +84,7 @@ static int fetch(const char* path, Item* tmp, char* title, size_t titleLen, char
   if (!strncmp(path, "rl", 2)) wradio::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
   else if (!strncmp(path, "ard", 3)) ard::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
   else if (!strncmp(path, "pc", 2)) podcast::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
-  else spotify::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
+  else ucopy(err, errLen, "Unbekannte Liste");
   return n;
 }
 
@@ -171,7 +158,6 @@ static void worker(void*) {
       else if (kids::released(path)) n = fetch(path, tmp, title, sizeof(title), err, sizeof(err));
       else ucopy(err, sizeof(err), "Nicht freigegeben");
     } else if (!strcmp(path, "home")) home(tmp, &n, title, sizeof(title));
-    else if (!strcmp(path, "sp:home")) spotifyHome(tmp, &n, title, sizeof(title));
     else if (!strcmp(path, "favs")) {
       ucopy(title, sizeof(title), "Favoriten");
       n = favs::list(tmp, BROWSE_MAX);
@@ -217,19 +203,6 @@ static void playStation(int i) {
 void playList(const Item* list, int n, int start) {
   if (start < 0 || start >= n || list[start].kind != K_TRACK) return;
   const char* id = list[start].id;
-  if (!strncmp(id, "spotify:", 8)) {
-    std::vector<std::string> uris;
-    int index = 0;
-    for (int i = 0; i < n; i++) {
-      if (list[i].kind != K_TRACK || strncmp(list[i].id, "spotify:", 8)) continue;
-      if (i == start) index = uris.size();
-      uris.push_back(list[i].id);
-    }
-    if (active == SRC_PODCAST || active == SRC_RADIO) podcast::stop();
-    if (spotify::play(uris, index, uris[index])) active = SRC_SPOTIFY;
-    return;
-  }
-  if (active == SRC_SPOTIFY) spotify::stop();
   if (!strncmp(id, "radio:", 6)) {
     stations.clear();
     int index = 0;
@@ -251,49 +224,28 @@ void playList(const Item* list, int n, int start) {
   }
 }
 
-static Source current() {
-  // die Spotify-App kann jederzeit übernehmen
-  if (spotify::state().active && active != SRC_PODCAST && active != SRC_RADIO) active = SRC_SPOTIFY;
-  return active;
-}
-
-void toggle() {
-  Source s = current();
-  if (s == SRC_SPOTIFY) spotify::toggle();
-  else if (s == SRC_PODCAST || s == SRC_RADIO) podcast::toggle();
-}
+void toggle() { if (active != SRC_NONE) podcast::toggle(); }
 void next() {  // Podcast: +30 s, Radio: nächster Sender
-  Source s = current();
-  if (s == SRC_SPOTIFY) spotify::next();
-  else if (s == SRC_RADIO) playStation(stationIdx + 1);
-  else if (s == SRC_PODCAST) podcast::skip(30);
+  if (active == SRC_RADIO) playStation(stationIdx + 1);
+  else if (active == SRC_PODCAST) podcast::skip(30);
 }
 void prev() {
-  Source s = current();
-  if (s == SRC_SPOTIFY) spotify::prev();
-  else if (s == SRC_RADIO) playStation(stationIdx - 1);
-  else if (s == SRC_PODCAST) podcast::skip(-15);
+  if (active == SRC_RADIO) playStation(stationIdx - 1);
+  else if (active == SRC_PODCAST) podcast::skip(-15);
 }
 void stop() {
-  if (active == SRC_SPOTIFY) spotify::stop();
-  if (active == SRC_PODCAST || active == SRC_RADIO) podcast::stop();
+  if (active != SRC_NONE) podcast::stop();
   active = SRC_NONE;
 }
 
 State state() {
-  Source s = current();
-  if (s == SRC_SPOTIFY) return spotify::state();
-  if (s == SRC_PODCAST || s == SRC_RADIO) return podcast::state();
+  if (active != SRC_NONE) return podcast::state();
   State e{};
   return e;
 }
 
 const uint16_t* art(uint32_t* version) { return art::image(version); }
-int takeRemoteVolume() { return spotify::takeRemoteVolume(); }
-void volumeChanged(int pct) {
-  fadeInAt = 0;  // von Hand lauter/leiser: Einblenden beenden
-  spotify::volumeChanged(pct);
-}
+void volumeChanged(int) { fadeInAt = 0; }  // von Hand lauter/leiser: Einblenden beenden
 // Lautstärke-Verläufe: Einblenden beim Wecken, Ausblenden beim Sleep-Timer
 static int lastFadeVol = -1;
 
@@ -327,7 +279,6 @@ void sleepSet(int minutes) {
 int sleepLeftS() { return sleepEnd ? max(0L, (long)(sleepEnd - millis()) / 1000) : 0; }
 
 void poll() {
-  spotify::poll();
   uint32_t now = millis();
   if (fadeInAt) {  // 45 s von leise auf die eingestellte Lautstärke
     float k = (now - fadeInAt) / 45000.0f;
@@ -353,7 +304,6 @@ void begin() {
   qItems = (Item*)heap_caps_calloc(BROWSE_MAX, sizeof(Item), MALLOC_CAP_SPIRAM);
   art::begin();
   favs::begin();
-  spotify::begin();
   podcast::begin();
   xTaskCreatePinnedToCore(worker, "browse", 12288, nullptr, 3, nullptr, 1);
 }

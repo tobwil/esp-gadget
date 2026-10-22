@@ -1,8 +1,7 @@
-// Einstellungen: bewusst kurz gehalten – acht Punkte, jeder mit höchstens einer Unterseite.
+// Einstellungen: bewusst kurz gehalten – sieben Punkte, jeder mit höchstens einer Unterseite.
 #include <WiFi.h>
 #include "../audio.h"
 #include "../music.h"
-#include "../spotify.h"
 #include "../net.h"
 #include "../radio.h"
 #include "../settings.h"
@@ -11,7 +10,7 @@
 
 using namespace ui;
 
-extern const ui::Page PAGE_WIFI_, PAGE_LEVEL_, PAGE_SCREEN_, PAGE_FUNK_, PAGE_BRIDGE_, PAGE_WEB_, PAGE_INFO_;
+extern const ui::Page PAGE_WIFI_, PAGE_LEVEL_, PAGE_SCREEN_, PAGE_FUNK_, PAGE_WEB_, PAGE_INFO_;
 
 static void listTitle(lv_obj_t* list, const char* text, lv_color_t c) {
   lv_obj_t* t = label(list, &font_text_24, c, text);
@@ -26,7 +25,7 @@ static void fmtScreenOff(char* b, size_t n, int s) {
 
 // ================================================================== Übersicht
 
-static lv_obj_t *rWifi, *rBright, *rVol, *rScreen, *rFunk, *rBridge, *rWeb, *rInfo;
+static lv_obj_t *rWifi, *rBright, *rVol, *rScreen, *rFunk, *rWeb, *rInfo;
 static bool levelIsVolume = false;
 
 static void settingsResume() {
@@ -42,8 +41,6 @@ static void settingsResume() {
   listRowSub(rScreen, b);
   snprintf(b, sizeof(b), "%s · Empfang %s", cfg.name, cfg.radioRx ? "an" : "aus");
   listRowSub(rFunk, b);
-  listRowSub(rBridge, !spotify::configured() ? "Schlüssel fehlen" : spotify::connected() ? spotify::user()
-                      : spotify::linked() ? "Verbindet …" : "Nicht gekoppelt");
   listRowSub(rWeb, netOnline() ? "Am Handy oder PC einrichten" : "Erst WLAN verbinden");
   int bat = hwBattery();
   if (bat >= 0) snprintf(b, sizeof(b), "Akku %d %%%s", bat, hwCharging() ? " · lädt" : "");
@@ -61,7 +58,6 @@ static void settingsBuild(lv_obj_t* scr) {
       {&rVol, I_VOL_UP, C_MUSIC(), "Lautstärke", &PAGE_LEVEL_, true},
       {&rScreen, I_SLEEP, C_ALARM(), "Display aus", &PAGE_SCREEN_, false},
       {&rFunk, I_RADIO, C_RADIO(), "Funk", &PAGE_FUNK_, false},
-      {&rBridge, I_MUSIC, C_RADIO(), "Spotify", &PAGE_BRIDGE_, false},
       {&rWeb, I_SERVER, C_WATCH(), "Weboberfläche", &PAGE_WEB_, false},
       {&rInfo, I_INFO, C_SET(), "Über das Gerät", &PAGE_INFO_, false},
   };
@@ -306,57 +302,6 @@ static void funkBuild(lv_obj_t* scr) {
 }
 
 const ui::Page PAGE_FUNK_ = {funkBuild, nullptr, nullptr, nullptr, false};
-
-// ================================================================== Spotify
-
-static lv_obj_t* spStatus;
-
-static void spotifyUpdate() {
-  char b[200];
-  if (!spotify::configured())
-    snprintf(b, sizeof(b), "Client-ID und Secret fehlen in include/secrets.h (eigene App im Spotify Developer Dashboard).");
-  else if (spotify::connected()) snprintf(b, sizeof(b), "Verbunden als\n%s", spotify::user());
-  else if (spotify::linked()) snprintf(b, sizeof(b), "Gekoppelt (%s), verbindet …", spotify::user());
-  else snprintf(b, sizeof(b), "Noch nicht gekoppelt.\nSpotify-App öffnen → Lautsprecher-Symbol → „%s“ wählen. Danach geht es auch ohne App.", cfg.name);
-  if (strcmp(lv_label_get_text(spStatus), b)) lv_label_set_text(spStatus, b);
-}
-
-static void spotifyBuild(lv_obj_t* scr) {
-  lv_obj_t* l = roundList(scr);
-  listTitle(l, "Spotify", C_RADIO());
-  spStatus = label(l, &font_text_20, C_TEXT(), "");
-  lv_label_set_long_mode(spStatus, LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_text_align(spStatus, LV_TEXT_ALIGN_CENTER, 0);
-  static char names[spotify::ACCOUNTS][64];
-  int cur = -1;
-  int n = spotify::accounts(names, spotify::ACCOUNTS, &cur);
-  for (int i = 0; i < n; i++) {
-    lv_obj_t* r = listRow(l, i == cur ? I_CHECK : I_PERSON, i == cur ? C_RADIO() : C_DIM(), names[i],
-                          i == cur ? "Aktiv · lange drücken = entfernen" : "Antippen = wechseln");
-    lv_obj_add_event_cb(r, [](lv_event_t* e) {
-      int i = (int)(intptr_t)lv_event_get_user_data(e);
-      spotify::useAccount(i);
-      toast("Spotify-Konto gewechselt");
-      back();
-    }, LV_EVENT_SHORT_CLICKED, (void*)(intptr_t)i);
-    lv_obj_add_event_cb(r, [](lv_event_t* e) {
-      spotify::removeAccount((int)(intptr_t)lv_event_get_user_data(e));
-      toast("Konto entfernt");
-      lv_indev_wait_release(lv_indev_active());
-      back();
-    }, LV_EVENT_LONG_PRESSED, (void*)(intptr_t)i);
-  }
-  char b[160];
-  snprintf(b, sizeof(b), "Weiteres Konto: in dessen Spotify-App „%s“ als Lautsprecher wählen. Bis zu %d Konten.",
-           cfg.name, spotify::ACCOUNTS);
-  lv_obj_t* h = label(l, &font_text_20, C_DIM(), b);
-  lv_label_set_long_mode(h, LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_text_align(h, LV_TEXT_ALIGN_CENTER, 0);
-  spotifyUpdate();
-  listFit(l);
-}
-
-const ui::Page PAGE_BRIDGE_ = {spotifyBuild, spotifyUpdate, nullptr, nullptr, false};
 
 // ================================================================== Über das Gerät
 

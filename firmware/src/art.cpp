@@ -78,9 +78,9 @@ static void task(void*) {
     wanted = false;
     xSemaphoreGive(mtx);
     if (!url[0]) { front = -1; ver = ver + 1; continue; }
-    // Spotify liefert JPEG in passender Größe; andere Bilder (PNG, riesige Podcast-Cover) über den freien
-    // Bild-Proxy wsrv.nl als kleines JPEG holen
-    bool direct = strstr(url, "i.scdn.co") || strstr(url, "mzstatic.com");
+    // iTunes liefert JPEG in passender Größe; andere Bilder (PNG, riesige Podcast-Cover, Senderlogos) über den
+    // freien Bild-Proxy wsrv.nl als kleines JPEG holen
+    bool direct = strstr(url, "mzstatic.com");
     String src = direct ? String(url) : String("https://wsrv.nl/?w=300&h=300&fit=cover&output=jpg&url=") + web::urlencode(url);
     String jpg;
     int code = web::get(src, jpg, nullptr, 1024 * 1024);

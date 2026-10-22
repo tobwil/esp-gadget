@@ -12,7 +12,6 @@
 #include "net.h"
 #include "radio.h"
 #include "settings.h"
-#include "spotify.h"
 #include "ui/ui.h"
 #include "voice.h"
 
@@ -83,19 +82,15 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
  <section class="kidc"><h2>Lautstärke</h2><div class="row"><div class="t"><b>Höchstens <span id="kvv"></span> %</b></div></div><input type="range" id="kv" min="10" max="100" step="5"></section>
  <section class="kidc"><h2>Erlaubte Apps</h2><p class="note">Musik ist immer dabei. Einstellungen und Zifferblätter sind gesperrt.</p><div id="kapps"></div></section>
  <section class="kidc"><h2>Freigegeben</h2><div id="krel"></div></section>
- <section class="kidc"><h2>Freigeben</h2><p class="note">Radiosender, Audiothek-Sendungen, Podcasts oder Spotify-Listen.</p>
-  <div class="seg" id="ssrc"><button data-v="radio" class="sel">Radio</button><button data-v="ard">Audiothek</button><button data-v="podcast">Podcasts</button><button data-v="spotify">Spotify</button></div>
+ <section class="kidc"><h2>Freigeben</h2><p class="note">Radiosender, Audiothek-Sendungen oder Podcasts.</p>
+  <div class="seg" id="ssrc"><button data-v="radio" class="sel">Radio</button><button data-v="ard">Audiothek</button><button data-v="podcast">Podcasts</button></div>
   <label class="f" for="sq">Suche</label><input id="sq" type="search" placeholder="z. B. Radio Teddy, Ohrenbär, Figarino" enterkeyhint="search">
   <button class="wide kid" id="sgo">Suchen</button><div id="sres"></div>
-  <label class="f" for="slink">… oder Spotify-Link einfügen (Playlist oder Album)</label><input id="slink" placeholder="https://open.spotify.com/playlist/…">
-  <button class="wide ghost" id="slinkgo">Link freigeben</button>
-  <p class="note">Eigene Playlists müssen in Spotify öffentlich sein, damit die Uhr sie lesen kann.</p>
  </section>
  <section class="kidc"><h2>Eltern-PIN</h2><p class="note" id="pinst"></p><label class="f" for="kpin">Neue PIN (4–8 Ziffern, leer = keine)</label><input id="kpin" inputmode="numeric" maxlength="8" autocomplete="off"><button class="wide ghost" id="kpingo">PIN speichern</button></section>
 </div>
 
 <div class="tab" id="t-music">
- <section><h2>Spotify</h2><p id="spst" class="note"></p><div id="acc"></div><p class="note">Weiteres Konto: in dessen Spotify-App die Uhr als Lautsprecher wählen.</p></section>
  <section><h2>Favoriten</h2><div id="favs"></div></section>
 </div>
 
@@ -118,9 +113,6 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
   <label class="f" for="ss">Netz hinzufügen</label><input id="ss" placeholder="Name (SSID)" autocapitalize="off">
   <label class="f" for="pw">Passwort</label><input id="pw" type="password" placeholder="leer = offenes Netz">
   <button class="wide" id="wgo">Hinzufügen und verbinden</button></section>
- <section><h2>Spotify-Schlüssel</h2><label class="f" for="sid">Client-ID (developer.spotify.com)</label><input id="sid" autocomplete="off" autocapitalize="off">
-  <label class="f" for="ssec">Client-Secret</label><input id="ssec" type="password" autocomplete="off" placeholder="unverändert lassen">
-  <button class="wide" id="spgo">Speichern</button></section>
  <section><h2>Spracheingabe</h2><p id="gst" class="note"></p><label class="f" for="gem">Gemini-API-Schlüssel</label><input id="gem" type="password" autocomplete="off" placeholder="unverändert lassen"><button class="wide" id="gemgo">Speichern</button></section>
  <section><button class="wide ghost" id="rst">Uhr neu starten</button></section>
 </div>
@@ -152,7 +144,7 @@ function render(){
  $('name').textContent=s.name;$('kidb').hidden=!k.on;
  $('stat').textContent=`${s.battery<0?'USB':s.battery+' %'}${s.charging?' ⚡':''} · ${s.ssid||'offline'} · ${s.host}.local`;
  $('info').innerHTML=`<span>Akku</span><span>${s.battery<0?'kein Akku':s.battery+' %'}${s.charging?' · lädt':''}</span><span>WLAN</span><span>${esc(s.ssid||'–')}${s.rssi?' ('+s.rssi+' dBm)':''}</span>
-  <span>Adresse</span><span>${esc(s.ip)}</span><span>Spotify</span><span>${s.spotify.connected?esc(s.spotify.user):'nicht verbunden'}</span><span>Funk-Nachbarn</span><span>${s.peers}</span><span>Version</span><span>${esc(s.version)}</span>`;
+  <span>Adresse</span><span>${esc(s.ip)}</span><span>Funk-Nachbarn</span><span>${s.peers}</span><span>Version</span><span>${esc(s.version)}</span>`;
  $('kon').checked=$('kon2').checked=k.on;$('kangry').checked=$('kangry2').checked=k.angry&&k.on;
  $('angst').textContent=(k.angryToday?`Heute ${k.angryToday}× Wut rausgeschüttelt`:'Heute noch nicht benutzt')+(k.angryLast?' · zuletzt '+new Date(k.angryLast*1000).toLocaleTimeString('de',{hour:'2-digit',minute:'2-digit'}):'');
  $('kidb').textContent=k.angry&&k.on?'Wutmodus':'Kindermodus';
@@ -163,13 +155,9 @@ function render(){
  $('kapps').innerHTML=APPS.map(([b,n,d])=>row(n,d,`<label class="sw"><input type="checkbox" ${k.apps&b?'checked':''} onchange="kids({apps:this.checked?S.kids.apps|${b}:S.kids.apps&~${b}})"><span></span></label>`)).join('');
  $('krel').innerHTML=k.released.map(r=>row(r.title,r.sub,btn('Entfernen',`rel(${J(r)},false)`))).join('')||'<p class="note">Noch nichts – unten suchen oder einen Favoriten freigeben.</p>';
  $('pinst').innerHTML=k.pin?'<span class="ok">PIN ist gesetzt</span> – die Weboberfläche fragt danach.':'Keine PIN – jeder im WLAN kann die Uhr einstellen.';
- const sp=s.spotify;
- $('spst').innerHTML=!sp.configured?'<span class="bad">Client-ID und Secret fehlen (Reiter „Gerät“).</span>':sp.connected?`<span class="ok">Verbunden als ${esc(sp.user)}</span>`:sp.accounts.length?'Verbindet …':'Noch nicht gekoppelt: in der Spotify-App die Uhr als Lautsprecher wählen.';
- $('acc').innerHTML=sp.accounts.map((a,i)=>row(a.name,a.current?'aktiv':'',(a.current?'':btn('Wechseln',`post("spotify/use",{i:${i}})`))+btn('✕',`confirm("Konto entfernen?")&&post("spotify/remove",{i:${i}})`))).join('');
  $('favs').innerHTML=s.favs.map(f=>row(f.title,f.sub,relBtn(f)+btn('✕',`post("fav/remove",{path:${J(f.path)}})`))).join('')||'<p class="note">Noch keine – auf der Uhr in Alben, Playlists und Podcasts merken.</p>';
  if(document.activeElement!==$('nm'))$('nm').value=s.name;
  $('wifi').innerHTML=s.known.map(n=>row(n,n===s.ssid?'verbunden':'',btn('Vergessen',`post("wifi/forget",{ssid:${J(n)}})`))).join('')||'<p class="note">Keine Netze gespeichert</p>';
- $('sid').placeholder=sp.clientId||'nicht gesetzt';
  const ai=s.assist;
  if(document.activeElement!==$('ainame'))$('ainame').value=ai.name;$('ainame2').textContent=ai.name;$('aisearch').checked=ai.search;
  if(document.activeElement!==$('n8nurl'))$('n8nurl').value=ai.n8nUrl;
@@ -192,13 +180,11 @@ $('knap').onchange=e=>kids({nap:e.target.checked});
 $('kv').oninput=e=>$('kvv').textContent=e.target.value;$('kv').onchange=e=>kids({maxVol:+e.target.value});
 $('ssrc').onclick=e=>{if(!e.target.dataset.v)return;src=e.target.dataset.v;[...$('ssrc').children].forEach(b=>b.classList.toggle('sel',b==e.target));if(val('sq'))search()};
 $('sgo').onclick=search;$('sq').onkeydown=e=>{if(e.key=='Enter')search()};
-$('slinkgo').onclick=()=>{const u=val('slink');if(u)post('kids/link',{url:u}).then(()=>$('slink').value='')};
 $('kpingo').onclick=()=>{const p=val('kpin');if(p&&!/^\d{4,8}$/.test(p))return toast('4–8 Ziffern');
  api('kids/pin',{pin:p}).then(j=>{pin=p;try{localStorage.setItem('pin',p)}catch(e){}$('kpin').value='';toast(j.msg);load()})};
 $('lgo').onclick=()=>{pin=val('lpin');try{localStorage.setItem('pin',pin)}catch(e){}load()};
 $('nmgo').onclick=()=>post('name',{name:val('nm')});
 $('wgo').onclick=()=>post('wifi',{ssid:val('ss'),pass:val('pw')});
-$('spgo').onclick=()=>post('keys',{spotifyId:val('sid'),spotifySecret:val('ssec')});
 $('gemgo').onclick=()=>post('keys',{gemini:val('gem')});
 $('ainamego').onclick=()=>post('assist',{name:val('ainame')});
 $('aisearch').onchange=e=>post('assist',{search:e.target.checked},true);
@@ -213,6 +199,10 @@ $('n8nsave').onclick=()=>{const sel=[...document.querySelectorAll('#n8nall input
  post('n8n/allow',{items:sel})};
 function unallow(id){post('n8n/allow',{items:S.assist.allowed.filter(a=>a.id!=id)})}
 $('rst').onclick=()=>confirm('Uhr neu starten?')&&post('restart',{});
+// Reiter direkt öffnen: …/#kinder, #musik, #ki, #geraet
+const HASH={kinder:'kids',musik:'music',ki:'ai',geraet:'dev'};
+function fromHash(){const t=HASH[location.hash.slice(1)];const b=t&&document.querySelector(`nav button[data-t=${t}]`);if(b)b.click()}
+window.addEventListener('hashchange',fromHash);fromHash();
 load();setInterval(()=>{if(!document.hidden)load()},10000);
 </script></body></html>)HTML";
 
@@ -263,20 +253,6 @@ static void state() {
   d["peers"] = radio::peers(ps, 12);
   JsonArray k = d["known"].to<JsonArray>();
   for (int i = 0; i < knownCount; i++) k.add(known[i].ssid);
-  JsonObject sp = d["spotify"].to<JsonObject>();
-  sp["configured"] = spotify::configured();
-  sp["connected"] = spotify::connected();
-  sp["user"] = spotify::user();
-  String id = keys::spotifyId();  // nur gekürzt anzeigen
-  sp["clientId"] = id.length() > 8 ? id.substring(0, 4) + "…" + id.substring(id.length() - 4) : id;
-  static char names[spotify::ACCOUNTS][64];
-  int cur = -1, n = spotify::accounts(names, spotify::ACCOUNTS, &cur);
-  JsonArray acc = sp["accounts"].to<JsonArray>();
-  for (int i = 0; i < n; i++) {
-    JsonObject a = acc.add<JsonObject>();
-    a["name"] = names[i];
-    a["current"] = i == cur;
-  }
   d["gemini"] = voice::configured();
   JsonObject ai = d["assist"].to<JsonObject>();
   ai["name"] = assist::name();
@@ -332,52 +308,22 @@ static void search() {
   static music::Item* it = nullptr;
   if (!it) it = (music::Item*)heap_caps_calloc(40, sizeof(music::Item), MALLOC_CAP_SPIRAM);
   String q = srv->arg("q"), src = srv->arg("src");
-  String path = (src == "podcast" ? "pcsearch:" : src == "radio" ? "rlsearch:" : src == "ard" ? "ardsearch:" : "search:") + q;
+  String path = (src == "podcast" ? "pcsearch:" : src == "ard" ? "ardsearch:" : "rlsearch:") + q;
   char title[72], err[64];
   int n = music::query(path.c_str(), title, sizeof(title), it, 40, err, sizeof(err));
   JsonDocument d;
   JsonArray a = d["items"].to<JsonArray>();
   for (int i = 0; i < n; i++) {
     const char* id = it[i].id;
-    // freigeben lassen sich Listen (Alben, Playlists, Podcasts, Audiothek-Sendungen) und Radiosender
+    // freigeben lassen sich Podcasts, Audiothek-Sendungen und Radiosender
     bool station = !strncmp(id, "radio:", 6);
-    if (it[i].kind != music::K_LIST && !station) continue;
-    if (!station && strncmp(id, "sp:album:", 9) && strncmp(id, "sp:playlist:", 12) && strncmp(id, "pc:feed:", 8) &&
-        strncmp(id, "ard:set:", 8))
-      continue;
+    if (!station && strncmp(id, "pc:feed:", 8) && strncmp(id, "ard:set:", 8)) continue;
     addItems(a, &it[i], 1);
   }
   if (err[0]) d["err"] = err;
   json(200, d);
 }
 
-// Spotify-Link (open.spotify.com/playlist/… oder /album/…) freigeben
-static void link() {
-  if (!authed()) return;
-  JsonDocument d;
-  String url = body(d) ? String(d["url"] | "") : "";
-  const char* kinds[] = {"playlist", "album"};
-  String path;
-  for (const char* k : kinds) {
-    int i = url.indexOf(String("/") + k + "/");
-    if (i < 0) i = url.indexOf(String(":") + k + ":");
-    if (i < 0) continue;
-    String id = url.substring(i + strlen(k) + 2);
-    int e = 0;
-    while (e < (int)id.length() && isalnum((unsigned char)id[e])) e++;
-    id = id.substring(0, e);
-    if (id.length() > 10) path = String("sp:") + k + ":" + id;
-    break;
-  }
-  if (!path.length()) return msg("Kein Spotify-Playlist- oder Album-Link", 400);
-  static music::Item* it = nullptr;
-  if (!it) it = (music::Item*)heap_caps_calloc(40, sizeof(music::Item), MALLOC_CAP_SPIRAM);
-  char title[72] = "", err[64] = "";
-  int n = music::query(path.c_str(), title, sizeof(title), it, 40, err, sizeof(err));
-  if (!n || !title[0]) return msg(err[0] ? err : "Nicht gefunden – ist die Playlist öffentlich?", 400);
-  kids::release(path.c_str(), title, path.startsWith("sp:album:") ? "Album" : "Playlist", true);
-  msg("Freigegeben");
-}
 
 void begin() {
   srv = new WebServer(80);
@@ -387,7 +333,6 @@ void begin() {
   srv->on("/api/state", HTTP_GET, state);
   srv->on("/api/search", HTTP_GET, search);
   srv->on("/api/kids", HTTP_POST, setKids);
-  srv->on("/api/kids/link", HTTP_POST, link);
   srv->on("/api/kids/release", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
@@ -441,7 +386,7 @@ void begin() {
     snprintf(cfg.name, sizeof(cfg.name), "%s", n);
     settingsSave();
     radio::nameChanged();
-    msg("Name gespeichert (Spotify übernimmt ihn nach dem Neustart)");
+    msg("Name gespeichert");
   });
   srv->on("/api/wifi", HTTP_POST, []() {
     if (!authed()) return;
@@ -462,24 +407,9 @@ void begin() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d)) return msg("Ungültige Anfrage", 400);
-    const char* id = d["spotifyId"] | "";
-    const char* sec = d["spotifySecret"] | "";
     const char* g = d["gemini"] | "";
-    keys::set(id[0] ? id : nullptr, sec[0] ? sec : nullptr, g[0] ? g : nullptr);
-    if (id[0] || sec[0]) spotify::keysChanged();
+    if (g[0]) keys::set(g);
     msg("Schlüssel gespeichert");
-  });
-  srv->on("/api/spotify/use", HTTP_POST, []() {
-    if (!authed()) return;
-    JsonDocument d;
-    if (body(d)) spotify::useAccount(d["i"] | -1);
-    msg("Konto gewechselt");
-  });
-  srv->on("/api/spotify/remove", HTTP_POST, []() {
-    if (!authed()) return;
-    JsonDocument d;
-    if (body(d)) spotify::removeAccount(d["i"] | -1);
-    msg("Konto entfernt");
   });
   srv->on("/api/fav/remove", HTTP_POST, []() {
     if (!authed()) return;

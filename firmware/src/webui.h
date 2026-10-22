@@ -1,5 +1,5 @@
 // Weboberfläche zum Einrichten vom PC oder Handy aus: http://<netHost()>.local bzw. die IP der Uhr.
-// Gerätename, WLAN, Spotify-Konten und -Schlüssel, Gemini-Schlüssel, Favoriten, Infos.
+// Gerätename, WLAN, Kindermodus, KI (Gemini, n8n), Favoriten, Infos.
 // Schlüssel werden nie ausgelesen, nur gesetzt. Nur im eigenen WLAN erreichbar.
 #pragma once
 

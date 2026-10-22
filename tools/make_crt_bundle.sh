@@ -1,7 +1,6 @@
 #!/bin/sh
-# Erzeugt die Stamm-Zertifikate für HTTPS (Spotify, Podcasts, Cover, Gemini):
-#   firmware/x509_crt_bundle       neues Format (ESP-IDF 5.5, für den Arduino-Core)
-#   firmware/x509_crt_bundle_bell  altes Format (für cspot/bell)
+# Erzeugt die Stamm-Zertifikate für HTTPS (Radio, Audiothek, Podcasts, Cover, Gemini, n8n):
+#   firmware/x509_crt_bundle   Format von ESP-IDF 5.5 (für den Arduino-Core)
 # Quelle: die Zertifikatsliste von ESP-IDF (enthält auch Wurzeln wie „GlobalSign Root CA“, die certifi nicht mehr hat).
 #   sh tools/make_crt_bundle.sh
 set -e
@@ -15,6 +14,4 @@ curl -sfL -o "$TMP/cacert.pem" "$BASE/cacrt_all.pem"
 curl -sfL -o "$TMP/gen_crt_bundle.py" "$BASE/gen_crt_bundle.py"
 (cd "$TMP" && "$TMP/venv/bin/python" gen_crt_bundle.py -i cacert.pem)
 cp "$TMP/x509_crt_bundle" "$ROOT/firmware/x509_crt_bundle"
-mkdir "$TMP/old" && (cd "$TMP/old" && "$TMP/venv/bin/python" ~/.platformio/packages/framework-arduinoespressif32/tools/gen_crt_bundle.py -i ../cacert.pem)
-cp "$TMP/old/x509_crt_bundle" "$ROOT/firmware/x509_crt_bundle_bell"
-echo "firmware/x509_crt_bundle und x509_crt_bundle_bell aktualisiert"
+echo "firmware/x509_crt_bundle aktualisiert"

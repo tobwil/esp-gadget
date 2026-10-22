@@ -1,4 +1,4 @@
-// HTTP(S) für Spotify-Web-API, Podcasts, Cover und Gemini. Zertifikate werden mit dem eingebetteten
+// HTTP(S) für Radio, Audiothek, Podcasts, Cover, Gemini und n8n. Zertifikate werden mit dem eingebetteten
 // Bundle (firmware/x509_crt_bundle) geprüft. Weiterleitungen werden verfolgt, auch von http nach https.
 #pragma once
 #include <Arduino.h>

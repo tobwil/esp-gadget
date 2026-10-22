@@ -1,4 +1,5 @@
-// Musik: ein Einstieg für zwei Quellen – Spotify (cspot, siehe spotify.h) und Podcasts (podcast.h).
+// Musik: ein Einstieg für Radio (webradio.h), ARD Audiothek (ard.h) und Podcasts (podcast.h); gespielt wird
+// alles über den MP3-Spieler in podcast.h.
 // Die Oberfläche blättert durch Listen (browse), startet Einträge (playList) und zeigt den Zustand.
 #pragma once
 #include <Arduino.h>
@@ -8,12 +9,12 @@
 namespace music {
 
 enum Kind : uint8_t { K_TRACK = 0, K_LIST = 1 };
-enum Source : uint8_t { SRC_NONE = 0, SRC_SPOTIFY = 1, SRC_PODCAST = 2, SRC_RADIO = 3 };  // PODCAST auch für die Audiothek
+enum Source : uint8_t { SRC_NONE = 0, SRC_PODCAST = 2, SRC_RADIO = 3 };  // PODCAST auch für die Audiothek
 
 struct Item {
   uint8_t kind;
   uint16_t dur;      // Sekunden (Titel/Folge)
-  char id[232];      // Titel: „spotify:track:…“ bzw. Folgen-Adresse; Liste: Pfad für browse()
+  char id[232];      // Titel: Folgen-Adresse, „ard:a:…“ oder „radio:…“; Liste: Pfad für browse()
   char title[72];
   char sub[56];
 };
@@ -37,8 +38,7 @@ static const int ART = 220;  // Cover-Kantenlänge in Pixeln
 void begin();
 void poll();                 // aus der Hauptschleife
 
-// Listen: „home“, „sp:home“, „search:…“ (Spotify), „sp:album:…“, „sp:playlist:…“, „sp:artist:…“,
-//         „pc:subs“, „pcsearch:…“, „pc:feed:…“ (Podcasts), „rl:…“, „rlsearch:…“ (Radio, webradio.h),
+// Listen: „home“, „favs“, „pc:subs“, „pcsearch:…“, „pc:feed:…“ (Podcasts), „rl:…“, „rlsearch:…“ (Radio, webradio.h),
 //         „ard:…“, „ardsearch:…“ (ARD Audiothek, ard.h)
 void browse(const char* path);
 bool browseBusy();
@@ -56,7 +56,6 @@ void prev();                 // Podcast: −15 s, Radio: voriger Sender
 void stop();
 State state();
 const uint16_t* art(uint32_t* version);
-int takeRemoteVolume();      // −1 = nichts; sonst Lautstärke aus der Spotify-App
 
 // Radiowecker: Sender ("radio:<Adresse>") oder neueste Folge einer Audiothek-Sendung ("ard:set:<id>") spielen,
 // leise beginnend und über 45 s lauter werdend

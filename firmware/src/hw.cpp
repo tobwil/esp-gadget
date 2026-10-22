@@ -1,0 +1,370 @@
+#include "hw.h"
+#include <Arduino_GFX_Library.h>
+#include <TouchDrvCSTXXX.hpp>
+#include <Wire.h>
+#include <functional>
+#include <driver/rtc_io.h>
+#include <esp_sleep.h>
+#include "config.h"
+#include "pins.h"
+
+static Arduino_DataBus* bus = new Arduino_ESP32QSPI(LCD_CS, LCD_SCLK, LCD_SDIO0, LCD_SDIO1, LCD_SDIO2, LCD_SDIO3);
+static Arduino_CO5300* gfx = new Arduino_CO5300(bus, LCD_RESET, 0, LCD_W, LCD_H, 6, 0, 0, 0);
+static TouchDrvCST92xx touch;
+static bool touchOk = false;
+static lv_display_t* disp;
+static lv_indev_t* indev;
+
+static bool screenOn = true;
+static uint8_t brightPct = 80;
+static uint32_t lastActivity = 0;
+static volatile bool wakeReq = false;
+
+// ------------------------------------------------------------------ AXP2101
+
+static bool pmuOk = false;
+
+static int pmuRead(uint8_t reg) {
+  Wire.beginTransmission(0x34);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return -1;
+  if (Wire.requestFrom((uint8_t)0x34, (uint8_t)1) != 1) return -1;
+  return Wire.read();
+}
+
+static void pmuWrite(uint8_t reg, uint8_t val) {
+  Wire.beginTransmission(0x34);
+  Wire.write(reg);
+  Wire.write(val);
+  Wire.endTransmission();
+}
+
+static void pmuBegin() {
+  int r = pmuRead(0x18);
+  pmuOk = r >= 0;
+  if (!pmuOk) { Serial.println("AXP2101: nicht gefunden"); return; }
+  if (!(r & 0x08)) pmuWrite(0x18, r | 0x08);  // Akkustands-Messung an
+  int e = pmuRead(0x41);
+  pmuWrite(0x41, (e < 0 ? 0 : e) | 0x0C);     // IRQ-Status für PWR kurz/lang freigeben
+  pmuWrite(0x49, 0xFF);                       // alte Meldungen löschen
+  // PWR lang = 1,5 s (IRQ), Ausschalten erst nach 6 s Halten
+  int k = pmuRead(0x27);
+  if (k >= 0) pmuWrite(0x27, (k & 0xF0) | 0x01 | (0x01 << 2));
+  Serial.println("AXP2101: ok");
+}
+
+static int pmuPct = -1;
+static bool pmuUsb = false, pmuChg = false;
+static uint32_t pmuAt = 0;
+
+static void pmuUpdate() {
+  if (!pmuOk || (pmuAt && millis() - pmuAt < 2000)) return;
+  pmuAt = millis();
+  int s0 = pmuRead(0x00), s1 = pmuRead(0x01), p = pmuRead(0xA4);
+  pmuUsb = s0 >= 0 && (s0 & 0x20);
+  pmuChg = s1 >= 0 && ((s1 >> 5) & 3) == 1;
+  int pct = s0 >= 0 && (s0 & 0x08) && p >= 0 && p <= 100 ? p : -1;
+  // Beim Laden meldet der AXP2101 den Akku manchmal kurz als fehlend: letzten Wert 30 s halten
+  static uint32_t validAt = 0;
+  if (pct >= 0) { pmuPct = pct; validAt = millis(); }
+  else if (millis() - validAt > 30000) pmuPct = -1;
+}
+
+// Werte werden nur in hwLoop() (Hauptaufgabe) gelesen, damit sich keine I2C-Zugriffe überschneiden
+int hwBattery() { return pmuPct; }
+bool hwUsb() { return pmuUsb; }
+bool hwCharging() { return pmuChg; }
+
+void hwPowerOff() {
+  gfx->displayOff();
+  int r = pmuRead(0x10);
+  pmuWrite(0x10, (r < 0 ? 0 : r) | 0x01);
+}
+
+// 0 = nichts, 1 = kurz, 2 = lang
+static int pwrKey() {
+  static uint32_t at = 0;
+  if (!pmuOk || millis() - at < 80) return 0;
+  at = millis();
+  int st = pmuRead(0x49);
+  if (st <= 0) return 0;
+  pmuWrite(0x49, st & 0x0F);
+  if (st & 0x08) return 1;
+  if (st & 0x04) return 2;
+  return 0;
+}
+
+// ------------------------------------------------------------------ Tasten
+
+static BtnEvent queue[8];
+static uint8_t qHead = 0, qTail = 0;
+
+static void push(BtnEvent e) {
+  if ((uint8_t)(qHead - qTail) < sizeof(queue)) queue[qHead++ % sizeof(queue)] = e;
+}
+
+BtnEvent hwButton() {
+  if (qTail == qHead) return BTN_NONE;
+  return queue[qTail++ % sizeof(queue)];
+}
+
+static void pollBoot() {
+  static bool down = false, held = false;
+  static uint32_t at = 0;
+  bool pressed = digitalRead(BTN_BOOT) == LOW;
+  uint32_t now = millis();
+  if (pressed && !down) { down = true; held = false; at = now; }
+  else if (pressed && down && !held && now - at > 350) { held = true; push(BOOT_HOLD); }
+  else if (!pressed && down) {
+    down = false;
+    if (now - at < 25) return;  // Prellen
+    push(held ? BOOT_RELEASE : BOOT_SHORT);
+  }
+}
+
+// ------------------------------------------------------------------ Display
+
+void hwBrightness(uint8_t pct) {
+  brightPct = pct;
+  if (screenOn) gfx->setBrightness(max(8, pct * 255 / 100));
+}
+
+void hwScreen(bool on) {
+  if (on == screenOn) return;
+  screenOn = on;
+  if (on) {
+    gfx->displayOn();
+    lv_obj_invalidate(lv_screen_active());
+    hwBrightness(brightPct);
+    hwActivity();
+  } else {
+    gfx->setBrightness(0);
+    gfx->displayOff();
+  }
+}
+
+bool hwScreenOn() { return screenOn; }
+void hwActivity() { lastActivity = millis(); }
+uint32_t hwIdleMs() { return millis() - lastActivity; }
+bool hwWakeRequested() { bool w = wakeReq; wakeReq = false; return w; }
+
+static void flushCb(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
+  if (screenOn) gfx->draw16bitRGBBitmap(a->x1, a->y1, (uint16_t*)px, lv_area_get_width(a), lv_area_get_height(a));
+  lv_display_flush_ready(d);
+}
+
+// Der CO5300 braucht Fenster mit gerader Startspalte/-zeile und gerader Breite/Höhe
+static void roundCb(lv_event_t* e) {
+  lv_area_t* a = (lv_area_t*)lv_event_get_param(e);
+  a->x1 &= ~1;
+  a->y1 &= ~1;
+  a->x2 |= 1;
+  a->y2 |= 1;
+}
+
+// ------------------------------------------------------------------ Touch (+ eingespielte Gesten über USB)
+
+struct Fake { int16_t x, y; bool down; };
+static Fake fake[48];
+static uint8_t fHead = 0, fTail = 0;
+
+static void fakePush(int x, int y, bool down) {
+  if ((uint8_t)(fHead - fTail) < sizeof(fake) / sizeof(fake[0])) fake[fHead++ % 48] = {(int16_t)x, (int16_t)y, down};
+}
+
+static void touchRead(lv_indev_t*, lv_indev_data_t* data) {
+  static int16_t lx = 0, ly = 0;
+  static bool swallow = false;
+  if (fTail != fHead) {
+    Fake f = fake[fTail++ % 48];
+    data->point.x = f.x;
+    data->point.y = f.y;
+    data->state = f.down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    if (!screenOn && f.down) { wakeReq = true; data->state = LV_INDEV_STATE_RELEASED; }
+    hwActivity();
+    return;
+  }
+  int16_t x[2], y[2];
+  bool pressed = touchOk && touch.getPoint(x, y, 1) > 0;
+  if (pressed) { lx = x[0]; ly = y[0]; }
+  // Bei dunklem Display weckt die Berührung nur und wird nicht an die Oberfläche weitergegeben
+  if (!screenOn && pressed) { wakeReq = true; swallow = true; }
+  if (swallow && !pressed) swallow = false;
+  data->point.x = lx;
+  data->point.y = ly;
+  data->state = pressed && !swallow ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+  if (pressed) hwActivity();
+}
+
+// ------------------------------------------------------------------ Bildschirmfoto und Fernsteuerung
+
+static void sendShot() {
+  lv_draw_buf_t* snap = lv_snapshot_take(lv_screen_active(), LV_COLOR_FORMAT_RGB565);
+  if (!snap) { Serial.println("shot: kein Speicher"); return; }
+  // Oberste Ebene (Hinweise, Klingeln) mit einzeichnen
+  lv_obj_t* top = lv_layer_top();
+  if (lv_obj_get_child_count(top)) {
+    lv_draw_buf_t* t = lv_snapshot_take(top, LV_COLOR_FORMAT_ARGB8888);
+    if (t) {
+      for (int y = 0; y < LCD_H; y++) {
+        uint16_t* d = (uint16_t*)(snap->data + y * snap->header.stride);
+        const uint8_t* s = t->data + y * t->header.stride;
+        for (int x = 0; x < LCD_W; x++) {
+          uint8_t b = s[4 * x], g = s[4 * x + 1], r = s[4 * x + 2], a = s[4 * x + 3];
+          if (!a) continue;
+          uint16_t o = d[x];
+          int orr = (o >> 11) << 3, og = ((o >> 5) & 63) << 2, ob = (o & 31) << 3;
+          orr = (r * a + orr * (255 - a)) / 255;
+          og = (g * a + og * (255 - a)) / 255;
+          ob = (b * a + ob * (255 - a)) / 255;
+          d[x] = ((orr >> 3) << 11) | ((og >> 2) << 5) | (ob >> 3);
+        }
+      }
+      lv_draw_buf_destroy(t);
+    }
+  }
+  Serial.printf("\nFB%d\n", LCD_W);
+  for (int y = 0; y < LCD_H; y++) Serial.write(snap->data + y * snap->header.stride, LCD_W * 2);
+  Serial.flush();
+  lv_draw_buf_destroy(snap);
+}
+
+// Weitere Befehle (WLAN, Brücke, Musik …) verarbeitet main.cpp über diesen Haken
+extern bool appCommand(const char* line);
+
+static void handleLine(char* line) {
+  int x, y;
+  char d;
+  if (sscanf(line, "tap %d %d", &x, &y) == 2) {
+    for (int i = 0; i < 3; i++) fakePush(x, y, true);
+    fakePush(x, y, false);
+  } else if (sscanf(line, "hold %d %d", &x, &y) == 2) {
+    for (int i = 0; i < 40; i++) fakePush(x, y, true);
+    fakePush(x, y, false);
+  } else if (sscanf(line, "swipe %c", &d) == 1) {
+    int cx = LCD_W / 2, cy = LCD_H / 2, dx = 0, dy = 0;
+    if (d == 'l') dx = -1; else if (d == 'r') dx = 1; else if (d == 'u') dy = -1; else dy = 1;
+    for (int i = 0; i <= 8; i++) fakePush(cx - dx * 120 + dx * 30 * i, cy - dy * 120 + dy * 30 * i, true);
+    fakePush(cx + dx * 120, cy + dy * 120, false);
+  } else if (sscanf(line, "bezel %d", &x) == 1) {  // am Rand drehen: von 12 Uhr um x Grad (negativ = gegen den Uhrzeigersinn)
+    int n = constrain(abs(x) / 6, 1, 44);
+    for (int i = 0; i <= n; i++) {
+      float a = (x * i / (float)n) * 0.0174533f;
+      fakePush(LCD_W / 2 + sinf(a) * 205, LCD_H / 2 - cosf(a) * 205, true);
+    }
+    fakePush(LCD_W / 2 + sinf(x * 0.0174533f) * 205, LCD_H / 2 - cosf(x * 0.0174533f) * 205, false);
+  } else if (!strcmp(line, "boot")) push(BOOT_SHORT);
+  else if (!strcmp(line, "ptt down")) push(BOOT_HOLD);
+  else if (!strcmp(line, "ptt up")) push(BOOT_RELEASE);
+  else if (!strcmp(line, "pwr")) push(PWR_SHORT);
+  else if (!strcmp(line, "pwrlong")) push(PWR_LONG);
+  else if (!strcmp(line, "shot")) sendShot();
+  else if (!strcmp(line, "dump")) {  // alle Labels des aktuellen Bildschirms mit Lage und Sichtbarkeit
+    std::function<void(lv_obj_t*, int)> walk = [&](lv_obj_t* o, int d) {
+      if (lv_obj_check_type(o, &lv_label_class)) {
+        lv_area_t a;
+        lv_obj_get_coords(o, &a);
+        Serial.printf("%*s[%d,%d %dx%d]%s „%s“\n", d * 2, "", (int)a.x1, (int)a.y1, (int)lv_area_get_width(&a),
+                      (int)lv_area_get_height(&a), lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN) ? " versteckt" : "",
+                      lv_label_get_text(o));
+      }
+      for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) walk(lv_obj_get_child(o, i), d + 1);
+    };
+    walk(lv_screen_active(), 0);
+  }
+  else if (!strcmp(line, "mem")) Serial.printf("Heap intern %u (min %u), PSRAM %u\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                                                heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL), ESP.getFreePsram());
+  else if (!appCommand(line)) Serial.printf("? %s\n", line);
+}
+
+static void pollSerial() {
+  static char line[160];
+  static int n = 0;
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\r') continue;
+    if (c == '\n') { line[n] = 0; if (n) handleLine(line); n = 0; }
+    else if (n < (int)sizeof(line) - 1) line[n++] = c;
+  }
+}
+
+// ------------------------------------------------------------------ Start, Schleife, Schlaf
+
+static bool wokeFromSleep = false;
+bool hwWokeFromSleep() { return wokeFromSleep; }
+
+void hwBegin() {
+  wokeFromSleep = esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED;
+  gpio_hold_dis((gpio_num_t)PA_EN);
+  gpio_deep_sleep_hold_dis();
+  pinMode(BTN_BOOT, INPUT_PULLUP);
+  pinMode(PWR_SENSE, INPUT);
+  Wire.begin(I2C_SDA, I2C_SCL, 400000);
+  pmuBegin();
+  pmuUpdate();
+
+  pinMode(TP_RST, OUTPUT);
+  digitalWrite(TP_RST, LOW);
+  delay(20);
+  digitalWrite(TP_RST, HIGH);
+  delay(50);
+  touch.setPins(TP_RST, TP_INT);
+  touchOk = touch.begin(Wire, CST92XX_SLAVE_ADDRESS, I2C_SDA, I2C_SCL);
+  if (touchOk) {
+    touch.setMaxCoordinates(LCD_W, LCD_H);
+    touch.setSwapXY(TOUCH_SWAP_XY);
+    touch.setMirrorXY(TOUCH_MIRROR_X, TOUCH_MIRROR_Y);
+  }
+  Serial.printf("Touch: %s\n", touchOk ? "ok" : "nicht gefunden");
+
+  if (!gfx->begin(80000000)) Serial.println("Display: Start fehlgeschlagen");
+  gfx->fillScreen(0x0000);
+  gfx->setBrightness(0);
+
+  lv_init();
+  lv_tick_set_cb([]() -> uint32_t { return millis(); });
+  disp = lv_display_create(LCD_W, LCD_H);
+  lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
+  // Ganzer Bildschirm als Puffer im PSRAM: geänderte Bereiche werden in einem Durchgang gezeichnet.
+  // (Mit schmalen Streifen im internen RAM liefen aufwendige Zifferblätter 10× pro Bild durch.)
+  size_t sz = LCD_W * LCD_H * 2;
+  void* b1 = heap_caps_aligned_alloc(64, sz, MALLOC_CAP_SPIRAM);
+  void* b2 = heap_caps_aligned_alloc(64, sz, MALLOC_CAP_SPIRAM);
+  lv_display_set_buffers(disp, b1, b2, sz, LV_DISPLAY_RENDER_MODE_PARTIAL);
+  lv_display_set_flush_cb(disp, flushCb);
+  lv_display_add_event_cb(disp, roundCb, LV_EVENT_INVALIDATE_AREA, nullptr);
+
+  indev = lv_indev_create();
+  lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+  lv_indev_set_read_cb(indev, touchRead);
+  lv_indev_set_scroll_limit(indev, 12);
+  hwActivity();
+}
+
+void hwLoop() {
+  pollBoot();
+  pmuUpdate();
+  int k = pwrKey();
+  if (k == 1) push(PWR_SHORT);
+  else if (k == 2) push(PWR_LONG);
+  pollSerial();
+}
+
+void hwDeepSleep(uint32_t wakeInS) {
+  gfx->setBrightness(0);
+  gfx->displayOff();
+  if (touchOk) {
+    int16_t x, y;
+    touch.getPoint(&x, &y, 1);  // anstehende Meldung abholen, damit INT wieder hoch ist
+  }
+  digitalWrite(PA_EN, LOW);
+  gpio_hold_en((gpio_num_t)PA_EN);
+  gpio_deep_sleep_hold_en();
+  rtc_gpio_pullup_en((gpio_num_t)BTN_BOOT);
+  rtc_gpio_pulldown_dis((gpio_num_t)BTN_BOOT);
+  esp_sleep_enable_ext1_wakeup((1ULL << BTN_BOOT) | (1ULL << TP_INT), ESP_EXT1_WAKEUP_ANY_LOW);
+  if (wakeInS) esp_sleep_enable_timer_wakeup((uint64_t)wakeInS * 1000000ULL);
+  Serial.println("Tiefschlaf …");
+  Serial.flush();
+  esp_deep_sleep_start();
+}

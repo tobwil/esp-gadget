@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Taschenfunk</title>
+<style>
+  :root {
+    --bg: #0b0b0d; --surf: #17171b; --surf2: #232329; --text: #f4f1ea; --dim: #8e8a82;
+    --accent: #ff5f57; --brass: #e0b25e; --ok: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, system-ui, "Inter", sans-serif;
+         padding: max(16px, env(safe-area-inset-top)) 16px calc(150px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 22px; margin: 4px 0 14px; display: flex; align-items: center; gap: 10px; }
+  h1 select { margin-left: auto; background: var(--surf); color: var(--text); border: 0; border-radius: 10px; padding: 8px 10px; font: inherit; max-width: 55%; }
+  .search { display: flex; gap: 8px; margin-bottom: 14px; }
+  .search input { flex: 1; min-width: 0; background: var(--surf); border: 0; border-radius: 14px; padding: 13px 16px; color: var(--text); font: inherit; }
+  button { font: inherit; color: var(--text); background: var(--surf2); border: 0; border-radius: 14px; padding: 12px 16px; cursor: pointer; }
+  button:active { filter: brightness(1.3); }
+  .crumb { display: flex; align-items: center; gap: 8px; margin: 6px 0 10px; color: var(--dim); }
+  .crumb button { padding: 6px 12px; border-radius: 10px; }
+  .crumb b { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surf); border-radius: 16px; margin-bottom: 8px; }
+  .row .t { flex: 1; min-width: 0; }
+  .row .t div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .s { color: var(--dim); font-size: 14px; }
+  .row .ic { width: 28px; text-align: center; color: var(--accent); }
+  .row .radio { padding: 8px 10px; font-size: 14px; color: var(--dim); }
+  .msg { color: var(--dim); text-align: center; padding: 30px 0; }
+  .player { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(23,23,27,.96); backdrop-filter: blur(10px);
+            padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid #26262c; }
+  .now { display: flex; gap: 10px; align-items: baseline; margin-bottom: 10px; }
+  .now .title { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .now .meta { color: var(--dim); font-size: 13px; white-space: nowrap; }
+  .ctrl { display: flex; gap: 10px; align-items: center; }
+  .ctrl .play { background: var(--accent); color: #000; font-weight: 700; min-width: 64px; }
+  .ctrl input { flex: 1; accent-color: var(--brass); }
+  .off { opacity: .45; }
+</style>
+</head>
+<body>
+<h1>Taschenfunk <select id="dev"></select></h1>
+<form class="search" id="sf"><input id="q" type="search" placeholder="Titel, Interpret, Album …" autocomplete="off"><button>Suchen</button></form>
+<div class="crumb"><button id="back">‹</button><b id="ttl">Musik</b></div>
+<div id="list"></div>
+
+<div class="player" id="player">
+  <div class="now"><span class="title" id="nowT">Keine Uhr gefunden</span><span class="meta" id="nowM"></span></div>
+  <div class="ctrl">
+    <button id="prev">⏮</button><button class="play" id="tog">⏯</button><button id="next">⏭</button>
+    <input type="range" id="vol" min="0" max="100" value="60" aria-label="Lautstärke">
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let stack = [];          // Pfade zum Zurückgehen
+let current = null;      // {path, title, items}
+let devs = [];
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  return r.status === 204 ? null : r.json();
+}
+
+function dev() { return $('dev').value; }
+
+async function send(cmd) {
+  if (!dev()) { alert('Keine Uhr verbunden'); return; }
+  await api('/api/remote/send?dev=' + encodeURIComponent(dev()), {method: 'POST', body: JSON.stringify(cmd)});
+  setTimeout(refreshDevices, 800);
+}
+
+function fmt(s) { s = +s || 0; return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+async function open(path, push = true) {
+  if (path === '@search') { $('q').focus(); return; }
+  if (push && current) stack.push(current.path);
+  $('list').innerHTML = '<div class="msg">Lädt …</div>';
+  const r = await api('/api/browse?path=' + encodeURIComponent(path));
+  if (r.error) { $('list').innerHTML = '<div class="msg"></div>'; $('list').firstChild.textContent = r.error; return; }
+  current = {path, title: r.title, items: r.items};
+  $('ttl').textContent = r.title;
+  $('back').classList.toggle('off', !stack.length);
+  render();
+}
+
+function render() {
+  const list = $('list');
+  list.innerHTML = '';
+  const tracks = current.items.filter(i => i.kind === 'track');
+  if (!current.items.length) list.innerHTML = '<div class="msg">Keine Einträge</div>';
+  for (const it of current.items) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const ic = document.createElement('span');
+    ic.className = 'ic';
+    ic.textContent = it.kind === 'track' ? '♪' : it.id === '@search' ? '⌕' : '›';
+    const t = document.createElement('div');
+    t.className = 't';
+    const a = document.createElement('div'); a.textContent = it.title;
+    const b = document.createElement('div'); b.className = 's';
+    b.textContent = [it.sub, it.dur ? fmt(it.dur) : ''].filter(Boolean).join(' · ');
+    t.append(a, b);
+    row.append(ic, t);
+    if (it.kind === 'track') {
+      const r = document.createElement('button');
+      r.className = 'radio'; r.textContent = 'Radio';
+      r.onclick = e => { e.stopPropagation(); send({cmd: 'radio', id: it.id}); };
+      row.append(r);
+      row.onclick = () => send({cmd: 'play', tracks, index: tracks.indexOf(it)});
+    } else {
+      row.onclick = () => open(it.id);
+    }
+    list.append(row);
+  }
+}
+
+async function refreshDevices() {
+  try { devs = await api('/api/devices'); } catch { return; }
+  const sel = $('dev'), keep = sel.value;
+  sel.innerHTML = '';
+  for (const d of devs) {
+    const o = document.createElement('option');
+    o.value = d.dev; o.textContent = (d.name || d.dev) + (d.online ? '' : ' (offline)');
+    sel.append(o);
+  }
+  if (keep && devs.some(d => d.dev === keep)) sel.value = keep;
+  const d = devs.find(x => x.dev === sel.value);
+  if (!d) { $('nowT').textContent = 'Keine Uhr gefunden'; $('nowM').textContent = ''; return; }
+  $('nowT').textContent = d.state === 'stopped' || !d.title ? 'Gerade läuft nichts' : (d.state === 'paused' ? '⏸ ' : '') + d.title + (d.artist ? ' – ' + d.artist : '');
+  $('nowM').textContent = (d.bat >= 0 ? d.bat + ' % · ' : '') + (d.online ? 'online' : 'offline');
+  if (document.activeElement !== $('vol')) $('vol').value = d.vol || 0;
+}
+
+$('sf').onsubmit = e => { e.preventDefault(); const q = $('q').value.trim(); if (q) { $('q').blur(); open('search:' + q); } };
+$('back').onclick = () => { if (stack.length) open(stack.pop(), false); };
+$('prev').onclick = () => send({cmd: 'prev'});
+$('next').onclick = () => send({cmd: 'next'});
+$('tog').onclick = () => send({cmd: 'toggle'});
+$('vol').onchange = e => send({cmd: 'volume', value: +e.target.value});
+$('dev').onchange = refreshDevices;
+
+open('home', false);
+refreshDevices();
+setInterval(refreshDevices, 4000);
+</script>
+</body>
+</html>

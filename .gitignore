@@ -1,0 +1,7 @@
+.pio/
+.vscode/
+.DS_Store
+__pycache__/
+bridge/.venv/
+bridge/browser.json
+bridge/oauth.json

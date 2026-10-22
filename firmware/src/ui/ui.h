@@ -63,6 +63,8 @@ void listFit(lv_obj_t* list);   // nach dem Füllen aufrufen
 void toast(const char* text, uint32_t ms = 2500);
 void keyboard(const char* title, const char* initial, bool password, void (*done)(const char* text));
 void powerDialog();
+// Uhr finden (aus der Weboberfläche): 30 s klingeln mit „Hier bin ich!“, Antippen oder BOOT beendet
+void findMe(bool on, int volume = 70);
 
 // Lautstärke: großer Regler (interactive) bzw. nur Anzeige beim Drehen am Rand
 void volumeShow(bool interactive);

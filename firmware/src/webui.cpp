@@ -69,7 +69,7 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 <header><h1><span id="name">Taschenfunk</span><span class="badge" id="kidb" hidden>Kindermodus</span></h1><p id="stat">verbinde …</p></header>
 <main>
 <div class="tab sel" id="t-home">
- <section><h2>Uhr</h2><div class="kv" id="info"></div></section>
+ <section><h2>Uhr</h2><div class="kv" id="info"></div><button class="wide ghost" id="findgo">🔔 Uhr klingeln lassen</button></section>
  <section><h2>Akku</h2><div class="kv" id="batkv"></div><svg id="batchart" viewBox="0 0 360 90" style="width:100%;height:90px;margin-top:10px"></svg>
   <label class="f" for="pmode">Sparmodus</label><select id="pmode"><option value="1">Automatisch ab 20 %</option><option value="2">Immer an</option><option value="0">Aus</option></select>
   <p class="note">Sparmodus: Display höchstens 40 % und nach 10 s aus, kein Funk im Hintergrund, ohne Musik schläft das WLAN.</p></section>
@@ -237,6 +237,7 @@ $('n8nload').onclick=async()=>{$('n8nall').innerHTML='<p class="note">Lade …</
 $('n8nsave').onclick=()=>{const sel=[...document.querySelectorAll('#n8nall input:checked')].map(c=>n8nList[+c.dataset.i]).map(w=>({id:w.id,name:w.name,kind:w.kind,desc:w.desc||''}));
  post('n8n/allow',{items:sel})};
 function unallow(id){post('n8n/allow',{items:S.assist.allowed.filter(a=>a.id!=id)})}
+$('findgo').onclick=()=>post('find',{on:true});
 $('pmode').onchange=e=>post('power',{mode:+e.target.value});
 $('fwgo').onclick=()=>{const f=$('fwfile').files[0];if(!f)return toast('Erst eine Datei wählen');
  const fd=new FormData();fd.append('file',f,f.name);const x=new XMLHttpRequest();x.open('POST','/api/update');x.setRequestHeader('X-Pin',pin);
@@ -489,6 +490,13 @@ void begin() {
     const char* t = d["n8nToken"] | "";
     if (u || t[0]) n8n::set(u, t[0] ? t : nullptr);
     msg("Gespeichert");
+  });
+  srv->on("/api/find", HTTP_POST, []() {
+    if (!authed()) return;
+    JsonDocument d;
+    body(d);
+    ui::findMe(d["on"] | true, d["volume"] | 70);
+    msg(d["on"] | true ? "Die Uhr klingelt 30 Sekunden" : "Beendet");
   });
   srv->on("/api/power", HTTP_POST, []() {
     if (!authed()) return;

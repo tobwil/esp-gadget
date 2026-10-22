@@ -287,6 +287,36 @@ void toast(const char* text, uint32_t ms) {
   lv_timer_set_repeat_count(toastTimer, 1);
 }
 
+// Uhr finden: laut piepen, bis jemand die Uhr in die Hand nimmt
+static lv_obj_t* findObj = nullptr;
+static uint32_t findAt = 0, findBeep = 0;
+
+void findMe(bool on, int volume) {
+  if (findObj) { lv_obj_delete(findObj); findObj = nullptr; }
+  audio::setVolume(cfg.volume);
+  if (!on) return;
+  hwScreen(true);
+  hwActivity();
+  findObj = overlay(C_BG(), LV_OPA_COVER);
+  lv_obj_t* i = label(findObj, &font_icon_64, C_RADIO(), I_BELL);
+  lv_obj_align(i, LV_ALIGN_CENTER, 0, -50);
+  lv_obj_t* t = label(findObj, &font_text_32, C_TEXT(), "Hier bin ich!");
+  lv_obj_align(t, LV_ALIGN_CENTER, 0, 40);
+  lv_obj_t* h = label(findObj, &font_text_20, C_DIM(), "Antippen zum Beenden");
+  lv_obj_align(h, LV_ALIGN_CENTER, 0, 90);
+  lv_obj_add_flag(findObj, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(findObj, [](lv_event_t*) { lv_async_call([](void*) { findMe(false); }, nullptr); }, LV_EVENT_CLICKED, nullptr);
+  audio::setVolume(constrain(volume, 5, 100));
+  findAt = millis();
+  findBeep = 0;
+}
+
+static void findTick() {
+  if (!findObj) return;
+  if (millis() - findAt > 30000) { findMe(false); return; }
+  if (millis() - findBeep > 1300) { findBeep = millis(); audio::play(audio::FX_ALARM); hwActivity(); }
+}
+
 // Klingeln (Timer abgelaufen / Wecker)
 static lv_obj_t* ringObj = nullptr;
 static lv_obj_t* ringIcon = nullptr;
@@ -659,6 +689,7 @@ void keyboard(const char* ttl, const char* initial, bool password, void (*done)(
 // ------------------------------------------------------------------ Tasten und Takt
 
 void onButton(BtnEvent e) {
+  if (findObj && e == BOOT_SHORT) { findMe(false); return; }
   if (kids::angry()) {  // Wutmodus: Tasten tun nichts außer einen Wecker stoppen
     if ((e == BOOT_SHORT || e == BOOT_HOLD) && cw::ringing()) cw::ringStop();
     return;
@@ -695,6 +726,7 @@ void onButton(BtnEvent e) {
 
 void tick() {
   static uint32_t at = 0;
+  findTick();
   // Klingeln
   cw::Ring r = cw::ringing();
   if (r && !ringObj) { hwScreen(true); ringShow(r); }

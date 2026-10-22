@@ -191,12 +191,16 @@ static void worker(void*) {
 // Radio: die Senderliste, aus der gespielt wurde – Weiter/Zurück wechseln den Sender
 static std::vector<Item> stations;
 static int stationIdx = 0;
+static String favPath, favTitle, favSub;  // merkbar: was gerade läuft
 
 static void playStation(int i) {
   if (stations.empty()) return;
   stationIdx = (i % (int)stations.size() + stations.size()) % stations.size();
   const Item& s = stations[stationIdx];
   const char* url = s.id + 6;  // „radio:“
+  favPath = s.id;
+  favTitle = s.title;
+  favSub = "Sender";
   podcast::playUrl(url, s.title, s.title, wradio::logo(url).c_str(), 0, true);
 }
 
@@ -214,14 +218,29 @@ void playList(const Item* list, int n, int start) {
     playStation(index);
     active = SRC_RADIO;
   } else if (!strncmp(id, "ard:a:", 6)) {
-    String show, image;
-    ard::meta(id + 6, show, image);
+    String show, image, set;
+    ard::meta(id + 6, show, image, set);
+    favPath = set;
+    favTitle = show;
+    favSub = "Audiothek";
     podcast::playUrl(id + 6, list[start].title, show.c_str(), image.c_str(), list[start].dur, false);
     active = SRC_PODCAST;
   } else {
     podcast::play(list[start]);
     active = SRC_PODCAST;
+    String feed;
+    podcast::currentFeed(feed, favTitle);
+    favPath = feed.length() && feed.length() + 9 < sizeof(Item::id) ? "pc:feed:" + feed : String();
+    favSub = "Podcast";
   }
+}
+
+bool favTarget(String& path, String& title, String& sub) {
+  if (active == SRC_NONE || !favPath.length()) return false;
+  path = favPath;
+  title = favTitle.length() ? favTitle : favPath;
+  sub = favSub;
+  return true;
 }
 
 void toggle() { if (active != SRC_NONE) podcast::toggle(); }

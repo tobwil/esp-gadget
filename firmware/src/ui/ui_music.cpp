@@ -21,6 +21,7 @@ static lv_obj_t* emptyBox;
 static lv_obj_t* ctrlBox;
 static lv_obj_t* hintL;
 static lv_obj_t* sleepB;    // Sleep-Timer
+static lv_obj_t* favB;      // merken
 static lv_image_dsc_t artDsc;
 static uint32_t artSeen = 0xFFFFFFFF;
 static char lastId[16];
@@ -92,7 +93,20 @@ static void build(lv_obj_t* scr) {
   sleepB = pill(scr, I_SLEEP, C_BG(), C_DIM());
   lv_obj_set_style_text_font(lv_obj_get_child(sleepB, 0), &font_text_20, 0);
   lv_obj_set_style_pad_ver(sleepB, 4, 0);
-  lv_obj_align(sleepB, LV_ALIGN_BOTTOM_MID, 0, -14);
+  lv_obj_align(sleepB, LV_ALIGN_BOTTOM_MID, 50, -14);
+  // Herz: das gerade Laufende merken (Sender, Audiothek-Sendung, Podcast)
+  favB = pill(scr, I_HEART, C_BG(), C_DIM());
+  lv_obj_set_style_text_font(lv_obj_get_child(favB, 0), &font_text_20, 0);
+  lv_obj_set_style_pad_ver(favB, 4, 0);
+  lv_obj_align(favB, LV_ALIGN_BOTTOM_MID, -50, -14);
+  lv_obj_add_event_cb(favB, [](lv_event_t*) {
+    String p, t, s;
+    if (!music::favTarget(p, t, s)) return;
+    bool had = favs::has(p.c_str());
+    favs::toggle(p.c_str(), t.c_str(), s.c_str());
+    play(had ? 0 : 1);
+    toast(had ? "Aus den Favoriten entfernt" : (t + " gemerkt").c_str(), 1800);
+  }, LV_EVENT_CLICKED, nullptr);
   lv_obj_add_event_cb(sleepB, [](lv_event_t*) {
     static const int STEPS[] = {15, 30, 45, 60, 90, 0};
     int left = (music::sleepLeftS() + 59) / 60, next = 15;
@@ -154,6 +168,10 @@ static void update() {
   lv_label_set_text(lv_obj_get_child(playB, 0), s.playing ? I_PAUSE : I_PLAY);
   // Sleep-Timer: nur zu sehen, wenn etwas läuft und der Hinweis weg ist
   hide(sleepB, !s.active || !lv_obj_has_flag(hintL, LV_OBJ_FLAG_HIDDEN));
+  String fp, ft, fs;
+  bool canFav = !kids::on() && music::favTarget(fp, ft, fs);
+  hide(favB, !canFav || !lv_obj_has_flag(hintL, LV_OBJ_FLAG_HIDDEN));
+  if (canFav) lv_obj_set_style_text_color(lv_obj_get_child(favB, 0), favs::has(fp.c_str()) ? C_MUSIC() : C_DIM(), 0);
   int sl = music::sleepLeftS();
   char sb[24];
   if (sl) snprintf(sb, sizeof(sb), I_SLEEP " %d Min.", (sl + 59) / 60);
@@ -348,7 +366,9 @@ static void fill(BrowseCtx* c) {
     else
       snprintf(sub, sizeof(sub), "%s", it.sub);
     bool station = !strncmp(it.id, "radio:", 6);
-    const char* icon = station                                                    ? I_RADIO
+    bool liked = station && favs::has(it.id);
+    const char* icon = liked                                                      ? I_HEART
+                       : station                                                  ? I_RADIO
                        : it.kind == music::K_TRACK                                ? I_MUSIC
                        : !strncmp(it.id, "fav", 3)                               ? I_HEART
                        : strstr(it.id, "search")                                 ? I_MIC
@@ -356,7 +376,7 @@ static void fill(BrowseCtx* c) {
                        : !strncmp(it.id, "rl", 2)                                ? I_RADIO
                        : !strncmp(it.id, "ard", 3)                               ? I_LIBRARY
                                                                                  : I_QUEUE;
-    lv_color_t ic = it.kind == music::K_TRACK ? C_DIM() : !strncmp(it.id, "fav:", 4) ? C_BRASS() : C_MUSIC();
+    lv_color_t ic = liked ? C_MUSIC() : it.kind == music::K_TRACK ? C_DIM() : !strncmp(it.id, "fav:", 4) ? C_BRASS() : C_MUSIC();
     lv_obj_t* r = listRow(c->list, icon, ic, it.title, sub[0] ? sub : nullptr);
     lv_obj_add_event_cb(r, itemClicked, LV_EVENT_SHORT_CLICKED, (void*)(intptr_t)i);
     // Sender lange drücken: merken bzw. aus den Favoriten nehmen (nicht im Kindermodus)

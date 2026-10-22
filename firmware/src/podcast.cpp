@@ -42,6 +42,7 @@ static String episodeUrl(const char* id) {
 
 // zuletzt gelesener Feed (Titel, Cover) – für Abos und die Anzeige beim Abspielen
 static String feedTitle, feedArt, feedUrlCur;
+static String playFeedUrl, playFeedTitle;  // Feed der laufenden Folge
 
 // ------------------------------------------------------------------ Position je Folge (Bytes + Sekunden)
 
@@ -238,6 +239,8 @@ void play(const music::Item& e) {
   reqUrl = episodeUrl(e.id);
   reqTitle = e.title;
   reqShow = feedTitle;
+  playFeedUrl = feedUrlCur;
+  playFeedTitle = feedTitle;
   reqArt = feedArt;
   reqDur = e.dur;
   reqLive = false;
@@ -254,6 +257,13 @@ void playUrl(const char* url, const char* title, const char* show, const char* i
   reqLive = live;
   xSemaphoreGive(mtx);
   cmd = C_PLAY;
+}
+
+void currentFeed(String& url, String& title) {
+  xSemaphoreTake(mtx, portMAX_DELAY);
+  url = playFeedUrl;
+  title = playFeedTitle;
+  xSemaphoreGive(mtx);
 }
 
 void toggle() { cmd = C_TOGGLE; }

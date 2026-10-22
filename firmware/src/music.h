@@ -50,6 +50,8 @@ int browseCopy(char* title, size_t titleLen, Item* out, int max, char* err, size
 int query(const char* path, char* title, size_t titleLen, Item* out, int max, char* err, size_t errLen);
 
 void playList(const Item* items, int n, int start);
+// Was sich vom gerade Laufenden merken lässt: Sender, Audiothek-Sendung oder Podcast (false = nichts)
+bool favTarget(String& path, String& title, String& sub);
 void toggle();
 void next();                 // Podcast: +30 s, Radio: nächster Sender
 void prev();                 // Podcast: −15 s, Radio: voriger Sender

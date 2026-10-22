@@ -50,11 +50,14 @@ Wie bei Pixel Watch und Apple Watch ist das Zifferblatt die Mitte:
 
 - **Radio:** Sender aus dem freien Verzeichnis radio-browser.info (MP3): Beliebt in Deutschland, Kinderradio,
   Nachrichten, Genres, Suche per Sprache oder Tastatur. Der laufende Songtitel kommt aus dem Stream,
-  Weiter/Zurück wechselt den Sender, **Sender lange drücken = merken**.
+  Weiter/Zurück wechselt den Sender.
 - **ARD Audiothek / ARD Sounds:** Rubriken (Für Kinder, Hörspiel, Hörbuch, Wissen, Comedy …), Suche, Folgen mit
   gemerkter Position, **alle ARD-Radiosender live** und **„Fußball live“** – die Sportschau-Übertragungen
   (Bundesliga-Konferenz und Einzelspiele, 2. Liga, Pokal, Europapokal), laufende und kommende.
-- **Podcasts** über die iTunes-Suche, **Favoriten** für alles.
+- **Podcasts** über die iTunes-Suche.
+- **Favoriten:** auf der Wiedergabe-Seite das **Herz** antippen – gemerkt wird der Sender, die
+  Audiothek-Sendung bzw. der Podcast, der gerade läuft. In Listen geht es auch: Sender lange drücken, bei
+  Sendungen und Podcasts die oberste Zeile „Als Favorit merken“.
 - **Sleep-Timer:** den Mond unten antippen (15 – 90 Min.), am Ende wird sanft ausgeblendet.
 - **Lautstärke:** Finger am Rand entlang ziehen oder Cover antippen; sie gleitet weich.
 

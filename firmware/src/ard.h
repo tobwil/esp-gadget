@@ -11,7 +11,7 @@ namespace ard {
 // Folgen sind Titel mit der Kennung "ard:a:<MP3-Adresse>"; Livestreams sind Sender ("radio:<Adresse>", webradio.h)
 bool browse(const char* path, char* title, size_t titleLen, music::Item* items, int max, int* count, char* err,
             size_t errLen);
-// Sendungsname und Bild zu einer Folge (aus der zuletzt geladenen Liste)
-void meta(const char* audioUrl, String& show, String& image);
+// Sendungsname, Bild und Sendungs-Kennung („ard:set:…“) zu einer Folge (aus den zuletzt geladenen Listen)
+void meta(const char* audioUrl, String& show, String& image, String& setPath);
 
 }  // namespace ard

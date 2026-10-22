@@ -10,7 +10,7 @@
 namespace ard {
 
 static const char* API = "https://api.ardaudiothek.de/graphql";
-struct Meta { String show, image; };
+struct Meta { String show, image, set; };
 static std::map<uint32_t, Meta> metas;  // MP3-Adresse (Hash) → Sendung, Bild
 static SemaphoreHandle_t mtx = nullptr;
 
@@ -30,12 +30,12 @@ static void ucopy(char* dst, size_t n, const char* src) {
   dst[cut] = 0;
 }
 
-void meta(const char* url, String& show, String& image) {
-  show = image = "";
+void meta(const char* url, String& show, String& image, String& setPath) {
+  show = image = setPath = "";
   if (!mtx) return;
   xSemaphoreTake(mtx, portMAX_DELAY);
   auto it = metas.find(hash(url));
-  if (it != metas.end()) { show = it->second.show; image = it->second.image; }
+  if (it != metas.end()) { show = it->second.show; image = it->second.image; setPath = it->second.set; }
   xSemaphoreGive(mtx);
 }
 
@@ -95,7 +95,7 @@ static String date(const char* d) {
   return b;
 }
 
-static void addEpisode(JsonObject e, const char* show, const char* setImage, music::Item* items, int max, int* count) {
+static void addEpisode(JsonObject e, const char* show, const char* setImage, const char* setId, music::Item* items, int max, int* count) {
   if (*count >= max) return;
   // erste MP3-Adresse, die in die Kennung passt
   String url;
@@ -115,7 +115,8 @@ static void addEpisode(JsonObject e, const char* show, const char* setImage, mus
   ucopy(o.sub, sizeof(o.sub), sub.c_str());
   const char* im = e["image"]["url"] | setImage;
   xSemaphoreTake(mtx, portMAX_DELAY);
-  metas[hash(url.c_str())] = {ps ? ps : "", img(im)};
+  const char* sid = e["programSet"]["id"] | setId;
+  metas[hash(url.c_str())] = {ps ? ps : "", img(im), sid && sid[0] ? String("ard:set:") + sid : String()};
   xSemaphoreGive(mtx);
 }
 
@@ -244,16 +245,16 @@ bool browse(const char* path, char* title, size_t titleLen, music::Item* items, 
     JsonObject s = d["data"]["programSet"];
     const char* show = s["title"] | "";
     ucopy(title, titleLen, show[0] ? show : "Sendung");
-    for (JsonObject e : s["items"]["nodes"].as<JsonArray>()) addEpisode(e, show, s["image"]["url"] | "", items, max, count);
+    for (JsonObject e : s["items"]["nodes"].as<JsonArray>()) addEpisode(e, show, s["image"]["url"] | "", path + 8, items, max, count);
   } else if (!strncmp(path, "ardsearch:", 10)) {
     String q = "{ search(query:" + quote(path + 10) +
                ", limit:15){ programSets{ nodes{ id title numberOfElements publicationService{title} } }"
-               " items{ nodes{ id title duration publishDate image{url} audios{url} programSet{title} } } } }";
+               " items{ nodes{ id title duration publishDate image{url} audios{url} programSet{id title} } } } }";
     if (!gql(q, d, err, errLen)) return false;
     snprintf(title, titleLen, "„%s“", path + 10);
     JsonObject r = d["data"]["search"];
     for (JsonObject s : r["programSets"]["nodes"].as<JsonArray>()) addSet(s, items, max, count);
-    for (JsonObject e : r["items"]["nodes"].as<JsonArray>()) addEpisode(e, "", "", items, max, count);
+    for (JsonObject e : r["items"]["nodes"].as<JsonArray>()) addEpisode(e, "", "", "", items, max, count);
   } else {
     snprintf(err, errLen, "Unbekannte Liste");
     return false;

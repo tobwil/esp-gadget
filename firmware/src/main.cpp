@@ -25,6 +25,7 @@
 #include "imu.h"
 #include "kids.h"
 #include "power.h"
+#include "phone.h"
 #include "assist.h"
 #include "ui/ui.h"
 extern const ui::Page PAGE_WEB_;
@@ -200,6 +201,7 @@ void loop() {
   music::poll();
   kids::poll();
   pwr::poll();
+  phone::poll();
   webui::poll();
 
   cw::poll();

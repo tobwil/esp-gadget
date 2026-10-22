@@ -7,6 +7,7 @@
 #include "../settings.h"
 #include "../assist.h"
 #include "../kids.h"
+#include "../phone.h"
 #include "ui.h"
 
 namespace ui {
@@ -377,7 +378,7 @@ static void pttShow() {
   lv_obj_align(l, LV_ALIGN_CENTER, 0, 140);
 }
 
-static void rxShow(bool on) {
+static void rxShow(bool on, const char* who) {
   if (on && !rxPill) {
     rxPill = lv_obj_create(lv_layer_top());
     lv_obj_set_style_bg_color(rxPill, C_RADIO(), 0);
@@ -389,7 +390,7 @@ static void rxShow(bool on) {
     lv_obj_remove_flag(rxPill, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
     lv_obj_t* l = label(rxPill, &font_text_20, C_BG(), "");
     char t[48];
-    snprintf(t, sizeof(t), I_RADIO "  %s spricht", radio::talker());
+    snprintf(t, sizeof(t), I_RADIO "  %s spricht", who);
     lv_label_set_text(l, t);
     lv_obj_align(rxPill, LV_ALIGN_BOTTOM_MID, 0, -38);
   } else if (!on && rxPill) {
@@ -741,9 +742,9 @@ void tick() {
     lv_obj_set_size(pttRing, s, s);
     lv_obj_center(pttRing);
   }
-  bool rx = radio::receiving() && top() != &PAGE_RADIO;
-  if (rx) hwActivity();
-  rxShow(rx);
+  bool rx = radio::receiving() && top() != &PAGE_RADIO, ph = phone::talking();
+  if (rx || ph) { if (!hwScreenOn()) hwScreen(true); hwActivity(); }
+  rxShow(rx || ph, ph ? "Handy" : radio::talker());
   radio::Event ev;
   while (radio::takeEvent(&ev)) {
     if (ev.type == radio::EV_KNOCK) {

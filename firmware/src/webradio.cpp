@@ -51,18 +51,10 @@ static void addList(music::Item* items, int max, int* count, const char* id, con
   ucopy(o.sub, sizeof(o.sub), sub);
 }
 
-// Abfrage an das Senderverzeichnis; bei Ausfall eines Servers der nächste
+// Abfrage an das Senderverzeichnis. Bei schwachem WLAN reißt die Antwort manchmal mittendrin ab – dann
+// erneut versuchen, abwechselnd bei zwei Servern.
 static bool query(const String& q, music::Item* items, int max, int* count, char* err, size_t errLen) {
-  static const char* HOSTS[] = {"de1", "de2", "fi1"};
-  String body;
-  int code = -1;
-  for (const char* h : HOSTS) {
-    code = web::get(String("https://") + h + ".api.radio-browser.info/json/stations/search?" + q +
-                        "&codec=MP3&hidebroken=true&order=votes&reverse=true&limit=40",
-                    body);
-    if (code == 200 && body.length() > 2) break;
-  }
-  if (code != 200) { snprintf(err, errLen, "Senderliste nicht erreichbar (%d)", code); return false; }
+  static const char* HOSTS[] = {"de1", "de2", "de1", "fi1"};
   JsonDocument filter;
   filter[0]["name"] = true;
   filter[0]["url_resolved"] = true;
@@ -70,7 +62,22 @@ static bool query(const String& q, music::Item* items, int max, int* count, char
   filter[0]["tags"] = true;
   filter[0]["bitrate"] = true;
   JsonDocument d;
-  if (deserializeJson(d, body, DeserializationOption::Filter(filter))) { snprintf(err, errLen, "Antwort unlesbar"); return false; }
+  int code = -1;
+  bool ok = false;
+  for (const char* h : HOSTS) {
+    String body;
+    code = web::get(String("https://") + h + ".api.radio-browser.info/json/stations/search?" + q +
+                        "&codec=MP3&hidebroken=true&order=votes&reverse=true&limit=30",
+                    body);
+    if (code != 200 || body.length() < 2) continue;
+    DeserializationError e = deserializeJson(d, body, DeserializationOption::Filter(filter));
+    if (!e) { ok = true; break; }
+    Serial.printf("Radio: Antwort von %s unvollständig (%s, %u Zeichen), versuche erneut\n", h, e.c_str(), body.length());
+  }
+  if (!ok) {
+    snprintf(err, errLen, code == 200 ? "Verbindung zu schwach – nochmal versuchen" : "Senderliste nicht erreichbar (%d)", code);
+    return false;
+  }
   for (JsonObject s : d.as<JsonArray>()) {
     if (*count >= max) break;
     String url = s["url_resolved"] | "";

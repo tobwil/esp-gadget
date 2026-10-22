@@ -10,7 +10,7 @@ using namespace ui;
 
 namespace {
 
-constexpr int N = 150;          // Pixel
+constexpr int N = 230;          // Pixel (das Logo braucht gut 180)
 constexpr float PX = 9;         // Kantenlänge eines Pixels
 struct Px { float x, y, vx, vy, tx, ty; uint8_t shade; };
 Px px[N];
@@ -32,14 +32,15 @@ float segDist(float px_, float py, float ax, float ay, float bx, float by) {
 void buildLogo() {
   nLogo = 0;
   const float C = 10.5f;  // Rasterabstand
-  for (int gy = 0; gy < 16 && nLogo < N; gy++)
+  for (int gy = 0; gy < 18 && nLogo < N; gy++)
     for (int gx = 0; gx < 24 && nLogo < N; gx++) {
       float x = gx + 0.5f, y = gy + 0.5f;
-      bool on = x < 3.0f && y < 14;                                    // K: Balken
-      on |= segDist(x, y, 3.0f, 8.0f, 9.4f, 0.6f) < 1.45f;             // K: obere Schräge
-      on |= segDist(x, y, 4.8f, 6.4f, 9.6f, 13.4f) < 1.45f;            // K: untere Schräge
+      bool k = x < 3.0f;                                               // K: Balken
+      k |= segDist(x, y, 3.0f, 8.0f, 9.4f, 0.6f) < 1.45f;              // K: obere Schräge
+      k |= segDist(x, y, 4.8f, 6.4f, 9.6f, 13.4f) < 1.45f;             // K: untere Schräge
+      bool on = k && y < 14;                                           // K und I enden bündig auf der Grundlinie
       on |= x > 12.0f && x < 15.0f && y < 14;                          // I
-      on |= segDist(x, y, 17.0f, 15.6f, 21.0f, 7.0f) < 0.7f;           // / (reicht unter die Grundlinie)
+      on |= segDist(x, y, 16.4f, 17.4f, 21.6f, 4.0f) < 0.72f;          // / – lang und dünn, reicht unter die Grundlinie
       if (!on) continue;
       logoX[nLogo] = (x - 11.5f) * C;
       logoY[nLogo] = (y - 7.5f) * C - 10;

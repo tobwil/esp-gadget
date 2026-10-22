@@ -4,6 +4,8 @@
 #include <esp_wifi.h>
 #include <sys/time.h>
 #include "config.h"
+#include "hw.h"
+#include "radio.h"
 #include "settings.h"
 
 // Zuletzt benutztes Netz mit Kanal und Router-Adresse, übersteht den Tiefschlaf: schnelles Neuverbinden
@@ -15,6 +17,13 @@ enum WifiState : uint8_t { W_IDLE, W_TRYING, W_SCANNING, W_USERSCAN };
 static WifiState wst = W_IDLE;
 static uint32_t wAt = 0;
 static bool wasOnline = false, manual = false, ntpStarted = false, mdnsStarted = false;
+// Ohne WLAN: in wachsenden Abständen nach bekannten Netzen suchen – 10 s, 20 s, 40 s … bis 1 Minute bei
+// eingeschaltetem Display, bis 5 Minuten bei dunklem (Akku, und jede Suche unterbricht kurz den Funk).
+// Display an → gleich wieder suchen.
+static const uint32_t RETRY_MIN = 10000, RETRY_SCREEN = 60000, RETRY_DARK = 300000;
+static uint32_t retryEvery = RETRY_MIN;
+static uint8_t failedTries = 0;
+static bool lastScreen = true;
 
 bool netMdnsReady() { return mdnsStarted; }
 
@@ -116,6 +125,8 @@ void netPoll() {
       snprintf(rtcSsid, sizeof(rtcSsid), "%s", WiFi.SSID().c_str());
       memcpy(rtcBssid, WiFi.BSSID(), 6);
       rtcChannel = WiFi.channel();
+      retryEvery = RETRY_MIN;
+      failedTries = 0;
       if (!ntpStarted) { configTzTime(TIMEZONE, "pool.ntp.org", "time.cloudflare.com"); ntpStarted = true; }
       if (!mdnsStarted) mdnsStarted = MDNS.begin(netHost());
       Serial.printf("WLAN: verbunden mit %s, IP %s, Kanal %d\n", rtcSsid, netIp().c_str(), (int)rtcChannel);
@@ -133,10 +144,23 @@ void netPoll() {
     return;
   }
   if (manual || !knownCount) { parkChannel(); return; }
+  bool screen = hwScreenOn();
+  if (screen && !lastScreen && wst == W_IDLE) { retryEvery = RETRY_MIN; wAt = now - RETRY_MIN + 1500; }  // Display an: bald suchen
+  lastScreen = screen;
   if (wst == W_TRYING && now - wAt > 12000) {
-    Serial.println("WLAN: kein Erfolg, suche bekannte Netze");
-    startScan();
-  } else if (wst == W_IDLE && now - wAt > 60000) {
+    WiFi.disconnect();
+    if (++failedTries >= 2) {  // Netz da, aber Verbinden klappt nicht (Router startet neu, Passwort falsch): Pause
+      Serial.printf("WLAN: kein Erfolg, nächster Versuch in %u s\n", (unsigned)(retryEvery / 1000));
+      wst = W_IDLE;
+      wAt = now;
+      failedTries = 0;
+    } else {
+      Serial.println("WLAN: kein Erfolg, suche bekannte Netze");
+      startScan();
+    }
+  } else if (wst == W_IDLE && now - wAt > retryEvery) {
+    if (radio::transmitting() || radio::receiving()) return;  // laufenden Funk nicht unterbrechen
+    retryEvery = min(retryEvery * 2, screen ? RETRY_SCREEN : RETRY_DARK);
     startScan();
   } else if (wst == W_SCANNING) {
     int n = WiFi.scanComplete();

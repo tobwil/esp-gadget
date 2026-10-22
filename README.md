@@ -109,6 +109,14 @@ Audio-Schlüssel ([librespot#1649](https://github.com/librespot-org/librespot/is
 Suchen funktionieren, abgespielt wird dann aber nichts; die Uhr hält an und zeigt „Spotify verweigert den Ton“.
 Ältere Konten können noch funktionieren. Den Kopierschutz zu umgehen ist keine Option.
 
+## WLAN
+
+Beim Start verbindet sich die Uhr sofort mit dem zuletzt benutzten Netz, sonst mit dem stärksten bekannten
+(bis zu sechs werden gemerkt). Reißt die Verbindung ab, versucht sie es erst beim selben Netz und sucht dann in
+wachsenden Abständen nach bekannten Netzen: 10 s, 20 s, 40 s … bis 1 Minute bei eingeschaltetem Display, bis
+5 Minuten bei dunklem. Wird das Display eingeschaltet, sucht sie gleich wieder. Läuft gerade Funk, wartet die
+Suche, denn sie unterbricht ESP-NOW kurz.
+
 ## Funk mit mehreren Geräten
 
 Alle Geräte mit dieser Firmware finden sich automatisch. Für ESP-NOW müssen sie auf demselben WLAN-Kanal sein.

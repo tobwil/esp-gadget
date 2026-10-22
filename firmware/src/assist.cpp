@@ -47,7 +47,13 @@ static String getText(const String& src) {
 }
 
 bool available() { return !kids::on() && keys::gemini()[0]; }
-void open() { if (available()) wantOpen = true; }
+static void task(void*);
+static TaskHandle_t taskH = nullptr;
+void open() {
+  if (!available()) return;
+  wantOpen = true;
+  if (!taskH) xTaskCreatePinnedToCore(task, "assist", 16384, nullptr, 3, &taskH, 1);
+}
 void close() { wantOpen = false; down = false; }
 void talk(bool d) { if (d) open(); down = d; }
 Phase phase() { return ph; }
@@ -261,9 +267,9 @@ static void handle(wsock::Client& ws, const char* msg, size_t len) {
 // ------------------------------------------------------------------ Task
 
 static void sendAudio(wsock::Client& ws, const int16_t* s, size_t n) {
-  static unsigned char b64[4400];
+  static unsigned char* b64 = (unsigned char*)heap_caps_malloc(4400, MALLOC_CAP_SPIRAM);
   size_t ol = 0;
-  mbedtls_base64_encode(b64, sizeof(b64), &ol, (const unsigned char*)s, n * 2);
+  mbedtls_base64_encode(b64, 4400, &ol, (const unsigned char*)s, n * 2);
   String m;
   m.reserve(ol + 96);
   m = "{\"realtimeInput\":{\"audio\":{\"mimeType\":\"audio/pcm;rate=16000\",\"data\":\"";
@@ -272,10 +278,12 @@ static void sendAudio(wsock::Client& ws, const int16_t* s, size_t n) {
   ws.sendText(m);
 }
 
+// Der Task lebt nur, solange die Assistentin offen ist – sein Stack (16 KB, intern) ist sonst frei
+
 static void task(void*) {
-  static int16_t mic[1600];  // 100 ms
+  static int16_t* mic = (int16_t*)heap_caps_malloc(1600 * 2, MALLOC_CAP_SPIRAM);  // 100 ms
   for (;;) {
-    if (!wantOpen) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
+    if (!wantOpen) { taskH = nullptr; vTaskDelete(nullptr); }
     if (!netOnline()) { setText(statusTxt, "Kein WLAN"); ph = FAILED; vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
     ph = CONNECTING;
     setText(statusTxt, "");
@@ -350,7 +358,6 @@ void begin() {
   cfgSearch = p.getBool("search", true);
   p.end();
   n8n::begin();
-  xTaskCreatePinnedToCore(task, "assist", 16384, nullptr, 3, nullptr, 1);
 }
 
 }  // namespace assist

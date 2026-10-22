@@ -294,9 +294,12 @@ static uint32_t id3Size(const uint8_t* b, int n) {
 
 static void task(void*) {
   HMP3Decoder dec = MP3InitDecoder();
-  static uint8_t in[8192];
-  static int16_t pcm[1152 * 2];
-  static int16_t mono[1152 * 3];
+  // Puffer im PSRAM – der interne Speicher wird für TLS-Verbindungen gebraucht
+  const int IN_SZ = 8192, MONO_N = 1152 * 3;
+  uint8_t* in = (uint8_t*)heap_caps_malloc(IN_SZ, MALLOC_CAP_SPIRAM);
+  int16_t* pcm = (int16_t*)heap_caps_malloc(1152 * 2 * 2, MALLOC_CAP_SPIRAM);
+  int16_t* mono = (int16_t*)heap_caps_malloc(MONO_N * 2, MALLOC_CAP_SPIRAM);
+  uint8_t* meta = (uint8_t*)heap_caps_malloc(16 * 255 + 1, MALLOC_CAP_SPIRAM);
   web::Conn* c = nullptr;
   String url;
   uint32_t offset = 0, pausedAt = 0, savedAt = 0, kbps = 128;
@@ -400,14 +403,14 @@ static void task(void*) {
 
     // Puffer füllen
     NetworkClient* s = c->stream();
-    if (have < (int)sizeof(in) / 2) {
-      int room = sizeof(in) - have;
+    if (have < IN_SZ / 2) {
+      int room = IN_SZ - have;
       if (metaint) room = min(room, metaLeft);
       int n = s->read(in + have, room);
       if (n > 0) { have += n; offset += n; if (metaint) metaLeft -= n; }
       if (metaint && metaLeft == 0) {
         // Titel-Einschub: 1 Byte Länge (×16), dann Text
-        static uint8_t m[16 * 255 + 1];
+        uint8_t* m = meta;
         int len = -1, got = 0;
         uint32_t t0 = millis();
         while (millis() - t0 < 3000) {
@@ -476,7 +479,7 @@ static void task(void*) {
       int on = 0;
       for (int i = 0; i < frames; i++) {
         int16_t x = fi.nChans == 2 ? ((int)pcm[2 * i] + pcm[2 * i + 1]) / 2 : pcm[i];
-        while (rsPhase < 1 && on < (int)(sizeof(mono) / sizeof(mono[0]))) {
+        while (rsPhase < 1 && on < MONO_N) {
           mono[on++] = rsPrev + (x - rsPrev) * rsPhase;
           rsPhase += step;
         }

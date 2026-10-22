@@ -286,7 +286,7 @@ static void state() {
   JsonDocument al;
   deserializeJson(al, n8n::allowedJson());
   ai["allowed"] = al;
-  static music::Item fv[favs::MAX];
+  static music::Item* fv = (music::Item*)heap_caps_malloc(sizeof(music::Item) * favs::MAX, MALLOC_CAP_SPIRAM);
   addItems(d["favs"].to<JsonArray>(), fv, favs::list(fv, favs::MAX));
   const kids::Cfg& kc = kids::cfg();
   JsonObject ko = d["kids"].to<JsonObject>();

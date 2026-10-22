@@ -76,6 +76,7 @@ bool appCommand(const char* line) {
   else if (sscanf(line, "alarm %99s", a) == 1) {  // Test: Wecker stellen, z. B. „alarm 7:30“
     int h = 0, m = 0;
     if (sscanf(a, "%d:%d", &h, &m) == 2) { cfg.alarmH = h; cfg.alarmM = m; cfg.alarmOn = true; settingsSave(); }
+    else if (!strcmp(a, "off")) { cfg.alarmOn = false; settingsSave(); }
   }
   else if (sscanf(line, "kidtime %99s", a) == 1) { int h = 0, m = 0; kidFaceTestMin = sscanf(a, "%d:%d", &h, &m) == 2 ? h * 60 + m : -1; }
   else if (!strcmp(line, "imu")) { imu::sleep(false); delay(50); float x, y; imu::gravity(x, y); Serial.printf("Neigung: x %.2f y %.2f\n", x, y); }

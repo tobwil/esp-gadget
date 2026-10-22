@@ -20,6 +20,9 @@ Phase phase() { return ph; }
 const char* text() { return result; }
 float level() { return audio::micLevel(); }
 
+static void task(void*);
+static TaskHandle_t taskH = nullptr;
+
 void start() {
   if (ph == LISTENING || ph == THINKING) return;
   if (!configured()) { snprintf(result, sizeof(result), "Gemini-Schlüssel fehlt (Weboberfläche)"); ph = FAILED; return; }
@@ -28,6 +31,8 @@ void start() {
   result[0] = 0;
   audio::micStart();
   ph = LISTENING;
+  // Task nur für diese eine Anfrage (Stack intern, wird danach wieder frei)
+  if (!taskH) xTaskCreatePinnedToCore(task, "voice", 12288, nullptr, 3, &taskH, 1);
 }
 
 void finish() { if (ph == LISTENING) wantFinish = true; }
@@ -91,7 +96,7 @@ static bool transcribe() {
 
 static void task(void*) {
   for (;;) {
-    if (ph != LISTENING) { vTaskDelay(pdMS_TO_TICKS(30)); continue; }
+    if (ph != LISTENING) { taskH = nullptr; vTaskDelete(nullptr); }
     int n = audio::micRead(rec + recN, RATE * MAX_S - recN);
     recN = recN + n;
     if (recN >= RATE * MAX_S) wantFinish = true;
@@ -100,12 +105,14 @@ static void task(void*) {
     if (recN < RATE * 4 / 10) { snprintf(result, sizeof(result), "Zu kurz – Knopf beim Sprechen halten"); ph = FAILED; continue; }
     ph = THINKING;
     ph = transcribe() ? DONE : FAILED;
+    taskH = nullptr;
+    vTaskDelete(nullptr);
   }
 }
 
 void begin() {
   rec = (int16_t*)heap_caps_malloc(RATE * MAX_S * 2, MALLOC_CAP_SPIRAM);
-  xTaskCreatePinnedToCore(task, "voice", 12288, nullptr, 3, nullptr, 1);  // HTTPS zu Gemini braucht Stack
+
 }
 
 }  // namespace voice

@@ -13,13 +13,13 @@ namespace {
 constexpr int N = 230;          // Pixel (das Logo braucht gut 180)
 constexpr float PX = 9;         // Kantenlänge eines Pixels
 struct Px { float x, y, vx, vy, tx, ty; uint8_t shade; };
-Px px[N];
+Px* px = nullptr;  // im PSRAM
 lv_obj_t *root, *nameL, *textL, *hintL;
 lv_timer_t* timer = nullptr;
 uint32_t lastStep = 0;
 bool musicWasPlaying = false;
 int nLogo = 0;
-float logoX[N], logoY[N];
+float *logoX = nullptr, *logoY = nullptr;
 
 // „KI/“ als Raster: K (Balken + zwei Schrägen), I (Balken), dünner Schrägstrich tiefer
 float segDist(float px_, float py, float ax, float ay, float bx, float by) {
@@ -87,7 +87,8 @@ void step(lv_timer_t*) {
   lastStep = now;
   assist::Phase p = assist::phase();
   targets(p, t, assist::level());
-  for (auto& q : px) {  // Feder zum Ziel, etwas Zittern
+  for (int i = 0; i < N; i++) {  // Feder zum Ziel
+    Px& q = px[i];
     q.vx += ((q.tx - q.x) * 38 - q.vx * 9) * dt;
     q.vy += ((q.ty - q.y) * 38 - q.vy * 9) * dt;
     q.x += q.vx * dt;
@@ -125,6 +126,11 @@ void draw(lv_event_t* e) {
 }  // namespace
 
 static void build(lv_obj_t* scr) {
+  if (!px) {
+    px = (Px*)heap_caps_malloc(sizeof(Px) * N, MALLOC_CAP_SPIRAM);
+    logoX = (float*)heap_caps_malloc(sizeof(float) * N, MALLOC_CAP_SPIRAM);
+    logoY = (float*)heap_caps_malloc(sizeof(float) * N, MALLOC_CAP_SPIRAM);
+  }
   buildLogo();
   for (int i = 0; i < N; i++) {  // aus dem Nichts zusammensetzen
     float a = i * 2.39996f, r = 260;

@@ -1,6 +1,8 @@
 // Timer, Stoppuhr und Wecker.
 #include "../clockwork.h"
 #include "../settings.h"
+#include "../favs.h"
+#include "../music.h"
 #include "ui.h"
 
 using namespace ui;
@@ -190,7 +192,8 @@ const Page PAGE_STOPWATCH = {swBuild, swUpdate, nullptr, nullptr, false};
 
 // ================================================================== Wecker
 
-static lv_obj_t *aH, *aM, *aToggle, *aInfo;
+static lv_obj_t *aH, *aM, *aToggle, *aInfo, *aSrc;
+extern const ui::Page PAGE_ALARMSRC;
 
 static void aSave(lv_event_t*) {
   cfg.alarmH = lv_roller_get_selected(aH);
@@ -203,8 +206,8 @@ static void alarmBuild(lv_obj_t* scr) {
   title(scr, "Wecker", C_ALARM());
   lv_obj_t* row = lv_obj_create(scr);
   lv_obj_remove_style_all(row);
-  lv_obj_set_size(row, 300, 230);
-  lv_obj_align(row, LV_ALIGN_CENTER, 0, -14);
+  lv_obj_set_size(row, 300, 196);
+  lv_obj_align(row, LV_ALIGN_CENTER, 0, -30);
   lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_column(row, 6, 0);
@@ -214,11 +217,19 @@ static void alarmBuild(lv_obj_t* scr) {
   lv_obj_add_event_cb(aH, aSave, LV_EVENT_VALUE_CHANGED, nullptr);
   lv_obj_add_event_cb(aM, aSave, LV_EVENT_VALUE_CHANGED, nullptr);
   aInfo = label(scr, &font_text_20, C_DIM(), "");
-  lv_obj_align(aInfo, LV_ALIGN_TOP_MID, 0, 90);
+  lv_obj_align(aInfo, LV_ALIGN_TOP_MID, 0, 80);
+  // Radiowecker: womit geweckt wird
+  aSrc = pill(scr, "", C_SURF(), C_TEXT());
+  lv_obj_set_width(aSrc, 270);
+  lv_label_set_long_mode(lv_obj_get_child(aSrc, 0), LV_LABEL_LONG_DOT);
+  lv_obj_set_width(lv_obj_get_child(aSrc, 0), 240);
+  lv_obj_set_style_text_align(lv_obj_get_child(aSrc, 0), LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_align(aSrc, LV_ALIGN_CENTER, 0, 96);
+  lv_obj_add_event_cb(aSrc, [](lv_event_t*) { play(0); push(&PAGE_ALARMSRC); }, LV_EVENT_CLICKED, nullptr);
   aToggle = pill(scr, "", C_SURF2(), C_TEXT());
   lv_obj_set_size(aToggle, 210, 60);
   lv_obj_set_style_radius(aToggle, 30, 0);
-  lv_obj_align(aToggle, LV_ALIGN_BOTTOM_MID, 0, -46);
+  lv_obj_align(aToggle, LV_ALIGN_BOTTOM_MID, 0, -34);
   lv_obj_add_event_cb(aToggle, [](lv_event_t*) {
     cfg.alarmOn = !cfg.alarmOn;
     aSave(nullptr);
@@ -235,6 +246,53 @@ static void alarmUpdate() {
   if (cfg.alarmOn && s) snprintf(b, sizeof(b), "klingelt in %u Std. %u Min.", s / 3600, s / 60 % 60);
   else if (cfg.alarmOn) snprintf(b, sizeof(b), "Uhrzeit unbekannt");
   lv_label_set_text(aInfo, b);
+  char s2[80];
+  snprintf(s2, sizeof(s2), "%s  %s", cfg.alarmSrc[0] ? I_RADIO : I_BELL, cfg.alarmSrc[0] ? cfg.alarmName : "Wecken mit Ton");
+  if (strcmp(lv_label_get_text(lv_obj_get_child(aSrc, 0)), s2)) lv_label_set_text(lv_obj_get_child(aSrc, 0), s2);
 }
 
 const Page PAGE_ALARM = {alarmBuild, alarmUpdate, nullptr, nullptr, false};
+
+// ================================================================== Wecken mit …
+
+static music::Item* srcItems = nullptr;
+static int srcN = 0;
+
+static void setSrc(const char* src, const char* name) {
+  snprintf(cfg.alarmSrc, sizeof(cfg.alarmSrc), "%s", src);
+  snprintf(cfg.alarmName, sizeof(cfg.alarmName), "%s", name);
+  settingsSave();
+  play(1);
+  back();
+}
+
+static void srcBuild(lv_obj_t* scr) {
+  lv_obj_t* l = roundList(scr);
+  lv_obj_t* t = label(l, &font_text_24, C_ALARM(), "Wecken mit");
+  lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_t* r = listRow(l, I_BELL, C_ALARM(), "Ton", "Klassisch piepen");
+  lv_obj_add_event_cb(r, [](lv_event_t*) { setSrc("", ""); }, LV_EVENT_CLICKED, nullptr);
+  r = listRow(l, I_RADIO_WAVES, C_ALARM(), "tagesschau in 100 Sekunden", "Neueste Folge");
+  lv_obj_add_event_cb(r, [](lv_event_t*) { setSrc("ard:set:10815223", "tagesschau in 100 Sekunden"); }, LV_EVENT_CLICKED, nullptr);
+  // gemerkte Sender und Audiothek-Sendungen
+  if (!srcItems) srcItems = (music::Item*)heap_caps_malloc(sizeof(music::Item) * favs::MAX, MALLOC_CAP_SPIRAM);
+  srcN = favs::list(srcItems, favs::MAX);
+  int shown = 0;
+  for (int i = 0; i < srcN; i++) {
+    const music::Item& it = srcItems[i];
+    bool station = !strncmp(it.id, "radio:", 6), show = !strncmp(it.id, "ard:set:", 8);
+    if (!station && !show) continue;
+    shown++;
+    r = listRow(l, station ? I_RADIO : I_LIBRARY, C_ALARM(), it.title, station ? "Sender" : "Neueste Folge");
+    lv_obj_add_event_cb(r, [](lv_event_t* e) {
+      int k = (int)(intptr_t)lv_event_get_user_data(e);
+      if (k < srcN) setSrc(srcItems[k].id, srcItems[k].title);
+    }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+  }
+  lv_obj_t* h = label(l, &font_text_20, C_DIM(), shown ? "Weitere: in Radio oder Audiothek merken" : "Sender merken: in Radio lange drücken");
+  lv_label_set_long_mode(h, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_align(h, LV_TEXT_ALIGN_CENTER, 0);
+  listFit(l);
+}
+
+const Page PAGE_ALARMSRC = {srcBuild, nullptr, nullptr, nullptr, false};

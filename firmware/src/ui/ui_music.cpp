@@ -20,6 +20,7 @@ static lv_obj_t* playB;
 static lv_obj_t* emptyBox;
 static lv_obj_t* ctrlBox;
 static lv_obj_t* hintL;
+static lv_obj_t* sleepB;    // Sleep-Timer
 static lv_image_dsc_t artDsc;
 static uint32_t artSeen = 0xFFFFFFFF;
 static char lastId[16];
@@ -87,6 +88,24 @@ static void build(lv_obj_t* scr) {
   lv_obj_t* vol = roundButton(ctrlBox, I_VOL_UP, 52, C_BG(), C_DIM(), &font_text_32);
   lv_obj_add_event_cb(vol, [](lv_event_t*) { volumeShow(true); }, LV_EVENT_CLICKED, nullptr);
 
+  // Sleep-Timer: Antippen schaltet 15 → 30 → 45 → 60 → 90 Min → aus
+  sleepB = pill(scr, I_SLEEP, C_BG(), C_DIM());
+  lv_obj_set_style_text_font(lv_obj_get_child(sleepB, 0), &font_text_20, 0);
+  lv_obj_set_style_pad_ver(sleepB, 4, 0);
+  lv_obj_align(sleepB, LV_ALIGN_BOTTOM_MID, 0, -14);
+  lv_obj_add_event_cb(sleepB, [](lv_event_t*) {
+    static const int STEPS[] = {15, 30, 45, 60, 90, 0};
+    int left = (music::sleepLeftS() + 59) / 60, next = 15;
+    for (int i = 0; i < 6; i++) if (left > 0 && left <= STEPS[i]) { next = STEPS[(i + 1) % 6]; break; }
+    if (!left) next = 15;
+    music::sleepSet(next);
+    play(next ? 1 : 0);
+    char b[48];
+    if (next) snprintf(b, sizeof(b), "Musik geht in %d Min. aus", next);
+    else snprintf(b, sizeof(b), "Sleep-Timer aus");
+    toast(b, 1800);
+  }, LV_EVENT_CLICKED, nullptr);
+
   hintL = label(scr, &font_text_20, C_BRASS(), "Am Rand drehen = Lautstärke");
   lv_obj_align(hintL, LV_ALIGN_BOTTOM_MID, 0, -22);
   hide(hintL, hintShown);
@@ -133,6 +152,14 @@ static void update() {
   if (strcmp(lv_label_get_text(artistL), sub)) lv_label_set_text(artistL, sub);
   lv_obj_set_style_text_color(artistL, s.msg[0] ? C_TIMER() : C_DIM(), 0);
   lv_label_set_text(lv_obj_get_child(playB, 0), s.playing ? I_PAUSE : I_PLAY);
+  // Sleep-Timer: nur zu sehen, wenn etwas läuft und der Hinweis weg ist
+  hide(sleepB, !s.active || !lv_obj_has_flag(hintL, LV_OBJ_FLAG_HIDDEN));
+  int sl = music::sleepLeftS();
+  char sb[24];
+  if (sl) snprintf(sb, sizeof(sb), I_SLEEP " %d Min.", (sl + 59) / 60);
+  else snprintf(sb, sizeof(sb), I_SLEEP);
+  if (strcmp(lv_label_get_text(lv_obj_get_child(sleepB, 0)), sb)) lv_label_set_text(lv_obj_get_child(sleepB, 0), sb);
+  lv_obj_set_style_text_color(lv_obj_get_child(sleepB, 0), sl ? C_ALARM() : C_DIM(), 0);
 
   uint32_t v;
   const uint16_t* px = music::art(&v);

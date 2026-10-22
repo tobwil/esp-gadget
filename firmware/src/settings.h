@@ -11,6 +11,8 @@ struct Settings {
   // Wecker
   bool alarmOn;
   uint8_t alarmH, alarmM;
+  char alarmSrc[232];    // Radiowecker: "" = Ton, "radio:<Adresse>" = Sender, "ard:set:<id>" = neueste Folge
+  char alarmName[48];    // Anzeige dazu
   // zuletzt benutzte Timer-Dauer in Sekunden
   uint32_t timerS;
   // Zifferblatt (0 = Taschenuhr, siehe ui_watch.cpp)

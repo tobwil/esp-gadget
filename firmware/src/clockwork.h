@@ -26,6 +26,7 @@ int swLaps(uint32_t* out, int max);  // Rundenzeiten (ms), neueste zuerst
 enum Ring : uint8_t { RING_NONE, RING_TIMER, RING_ALARM };
 Ring ringing();
 void ringStop();
+void ringQuiet(bool quiet);    // Radiowecker spielt: nicht piepen, bis zu 60 Minuten statt 90 Sekunden
 void snooze();                 // Wecker: 5 Minuten später nochmal
 uint32_t alarmInS();           // Sekunden bis zum nächsten Wecken (0 = keiner)
 

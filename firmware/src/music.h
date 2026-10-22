@@ -57,6 +57,13 @@ void stop();
 State state();
 const uint16_t* art(uint32_t* version);
 int takeRemoteVolume();      // −1 = nichts; sonst Lautstärke aus der Spotify-App
+
+// Radiowecker: Sender ("radio:<Adresse>") oder neueste Folge einer Audiothek-Sendung ("ard:set:<id>") spielen,
+// leise beginnend und über 45 s lauter werdend
+void wake(const char* src, const char* name);
+// Sleep-Timer: nach so vielen Minuten ausblenden und anhalten (0 = aus)
+void sleepSet(int minutes);
+int sleepLeftS();            // 0 = aus
 void volumeChanged(int pct);
 
 }  // namespace music

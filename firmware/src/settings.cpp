@@ -50,6 +50,8 @@ void settingsLoad() {
   cfg.alarmOn = prefs.getBool("alon", false);
   cfg.alarmH = prefs.getUChar("alh", 7);
   cfg.alarmM = prefs.getUChar("alm", 0);
+  prefs.getString("alsrc", cfg.alarmSrc, sizeof(cfg.alarmSrc));
+  prefs.getString("alname", cfg.alarmName, sizeof(cfg.alarmName));
   cfg.timerS = prefs.getUInt("timer", 5 * 60);
   cfg.face = prefs.getUChar("face", 0);
   cfg.lat = prefs.getFloat("lat", 0);
@@ -77,6 +79,8 @@ void settingsSave() {
   prefs.putBool("alon", cfg.alarmOn);
   prefs.putUChar("alh", cfg.alarmH);
   prefs.putUChar("alm", cfg.alarmM);
+  prefs.putString("alsrc", cfg.alarmSrc);
+  prefs.putString("alname", cfg.alarmName);
   prefs.putUInt("timer", cfg.timerS);
   prefs.putUChar("face", cfg.face);
   prefs.putFloat("lat", cfg.lat);

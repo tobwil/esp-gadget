@@ -302,10 +302,14 @@ static void ringShow(cw::Ring r) {
   lv_obj_set_style_border_width(halo, 0, 0);
   ringIcon = label(ringObj, &font_icon_64, col, r == cw::RING_TIMER ? I_HOURGLASS : I_ALARM);
   lv_obj_align(ringIcon, LV_ALIGN_CENTER, 0, -50);
-  char t[40];
+  char t[80];
   if (r == cw::RING_TIMER) snprintf(t, sizeof(t), "Timer abgelaufen");
+  else if (cfg.alarmSrc[0]) snprintf(t, sizeof(t), "%02d:%02d · %s", cfg.alarmH, cfg.alarmM, cfg.alarmName);
   else snprintf(t, sizeof(t), "Wecker · %02d:%02d", cfg.alarmH, cfg.alarmM);
   lv_obj_t* l = label(ringObj, &font_text_24, C_TEXT(), t);
+  lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
+  lv_obj_set_size(l, 340, lv_font_get_line_height(&font_text_24));
+  lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(l, LV_ALIGN_CENTER, 0, 70);
   lv_obj_t* stop = pill(ringObj, "Stopp", col, C_BG());
   lv_obj_set_size(stop, r == cw::RING_ALARM ? 150 : 200, 64);

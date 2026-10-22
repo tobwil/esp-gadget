@@ -16,6 +16,7 @@ static int lapCount = 0;
 
 static Ring ring = RING_NONE;
 static uint32_t ringStart = 0, ringBeep = 0;
+static bool quiet = false;
 static time_t snoozeUntil = 0;
 static int lastAlarmMin = -1;
 
@@ -61,6 +62,7 @@ int swLaps(uint32_t* out, int max) {
 }
 
 Ring ringing() { return ring; }
+void ringQuiet(bool q) { quiet = q; }
 void ringStop() { ring = RING_NONE; }
 void snooze() {
   if (ring == RING_ALARM) snoozeUntil = time(nullptr) + 5 * 60;
@@ -85,6 +87,7 @@ static void startRing(Ring r) {
   ring = r;
   ringStart = millis();
   ringBeep = 0;
+  quiet = false;
 }
 
 void poll() {
@@ -104,8 +107,8 @@ void poll() {
     if (snoozeUntil && now >= snoozeUntil) { snoozeUntil = 0; startRing(RING_ALARM); }
   }
   if (ring != RING_NONE) {
-    if (millis() - ringStart > 90000) ring = RING_NONE;  // höchstens 90 s
-    else if (millis() - ringBeep > 1000) { ringBeep = millis(); audio::play(audio::FX_ALARM); }
+    if (millis() - ringStart > (quiet ? 3600000UL : 90000UL)) ring = RING_NONE;  // Ton höchstens 90 s, Radio 1 Std.
+    else if (!quiet && millis() - ringBeep > 1000) { ringBeep = millis(); audio::play(audio::FX_ALARM); }
   }
 }
 

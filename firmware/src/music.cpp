@@ -3,6 +3,7 @@
 #include "favs.h"
 #include "kids.h"
 #include "audio.h"
+#include "settings.h"
 #include "podcast.h"
 #include "ard.h"
 #include "webradio.h"
@@ -19,12 +20,16 @@ static volatile uint32_t seq = 0;
 static char want[240] = "";
 static volatile bool wanted = false, busy = false;
 static Source active = SRC_NONE;
+static uint32_t fadeInAt = 0, sleepEnd = 0;  // Einblenden (Wecker), Sleep-Timer
 // Abfragen der Weboberfläche (eigener Puffer, damit die Liste auf der Uhr unberührt bleibt)
 static char qPath[240];
 static Item* qItems;
 static int qCount;
 static char qTitle[72], qErr[64];
 static volatile bool qWanted = false, qDone = false;
+// Radiowecker: neueste Folge einer Sendung im Arbeits-Task holen
+static char wakePath[40];
+static volatile bool wakeWanted = false;
 
 static void ucopy(char* dst, size_t n, const char* src) {
   size_t len = strlen(src);
@@ -135,6 +140,13 @@ int browseCopy(char* title, size_t titleLen, Item* out, int max, char* err, size
 static void worker(void*) {
   Item* tmp = (Item*)heap_caps_calloc(BROWSE_MAX, sizeof(Item), MALLOC_CAP_SPIRAM);
   for (;;) {
+    if (wakeWanted) {
+      wakeWanted = false;
+      char t[72], e[64];
+      int n = fetch(wakePath, tmp, t, sizeof(t), e, sizeof(e));
+      for (int i = 0; i < n; i++)
+        if (tmp[i].kind == K_TRACK) { playList(tmp, n, i); break; }
+    }
     if (qWanted) {
       qTitle[0] = qErr[0] = 0;
       qCount = fetch(qPath, qItems, qTitle, sizeof(qTitle), qErr, sizeof(qErr));
@@ -278,8 +290,62 @@ State state() {
 
 const uint16_t* art(uint32_t* version) { return art::image(version); }
 int takeRemoteVolume() { return spotify::takeRemoteVolume(); }
-void volumeChanged(int pct) { spotify::volumeChanged(pct); }
-void poll() { spotify::poll(); }
+void volumeChanged(int pct) {
+  fadeInAt = 0;  // von Hand lauter/leiser: Einblenden beenden
+  spotify::volumeChanged(pct);
+}
+// Lautstärke-Verläufe: Einblenden beim Wecken, Ausblenden beim Sleep-Timer
+static int lastFadeVol = -1;
+
+static void fadeVolume(int pct) {
+  if (pct == lastFadeVol) return;
+  lastFadeVol = pct;
+  audio::setVolume(pct);
+}
+
+void wake(const char* src, const char* name) {
+  if (!strncmp(src, "radio:", 6)) {
+    Item it{};
+    it.kind = K_TRACK;
+    ucopy(it.id, sizeof(it.id), src);
+    ucopy(it.title, sizeof(it.title), name);
+    playList(&it, 1, 0);
+  } else {
+    ucopy(wakePath, sizeof(wakePath), src);
+    wakeWanted = true;
+  }
+  fadeInAt = millis();
+  lastFadeVol = -1;
+  fadeVolume(max(3, cfg.volume / 6));
+}
+
+void sleepSet(int minutes) {
+  sleepEnd = minutes > 0 ? millis() + minutes * 60000UL : 0;
+  if (!sleepEnd) { lastFadeVol = -1; audio::setVolume(cfg.volume); }
+}
+
+int sleepLeftS() { return sleepEnd ? max(0L, (long)(sleepEnd - millis()) / 1000) : 0; }
+
+void poll() {
+  spotify::poll();
+  uint32_t now = millis();
+  if (fadeInAt) {  // 45 s von leise auf die eingestellte Lautstärke
+    float k = (now - fadeInAt) / 45000.0f;
+    if (k >= 1) { fadeInAt = 0; lastFadeVol = -1; audio::setVolume(cfg.volume); }
+    else fadeVolume(max(3, (int)(cfg.volume * (0.16f + 0.84f * k))));
+  }
+  if (sleepEnd) {
+    if (!state().active) sleepSet(0);  // nichts läuft mehr: Timer aus
+    else if ((int32_t)(sleepEnd - now) <= 0) {
+      sleepEnd = 0;
+      stop();
+      lastFadeVol = -1;
+      audio::setVolume(cfg.volume);
+    } else if (sleepEnd - now < 30000) {
+      fadeVolume((int)(cfg.volume * (sleepEnd - now) / 30000.0f));
+    }
+  }
+}
 
 void begin() {
   mtx = xSemaphoreCreateMutex();

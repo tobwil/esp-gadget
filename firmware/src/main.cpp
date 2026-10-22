@@ -61,6 +61,19 @@ bool appCommand(const char* line) {
   else if (sscanf(line, "angry %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.angry = !strcmp(a, "on"); if (k.angry) { k.on = true; music::stop(); } kids::set(k); ui::home(); }
   else if (sscanf(line, "shake %99s", a) == 1) angryTestShake = atof(a);
   else if (sscanf(line, "level %99s", a) == 1) gameTestLevel(atoi(a));
+  else if (sscanf(line, "sleep %99s", a) == 1) music::sleepSet(atoi(a));  // Test: Sleep-Timer in Minuten
+  else if (!strncmp(line, "alarmsrc ", 9)) {
+    snprintf(a, sizeof(a), "%s", line + 9);  // Test: „alarmsrc ard:set:10815223 Name“, „-“ = Ton
+    char* sp = strchr(a, ' ');
+    if (sp) *sp++ = 0;
+    snprintf(cfg.alarmSrc, sizeof(cfg.alarmSrc), "%s", strcmp(a, "-") ? a : "");
+    snprintf(cfg.alarmName, sizeof(cfg.alarmName), "%s", sp ? sp : "Test");
+    settingsSave();
+  }
+  else if (sscanf(line, "alarm %99s", a) == 1) {  // Test: Wecker stellen, z. B. „alarm 7:30“
+    int h = 0, m = 0;
+    if (sscanf(a, "%d:%d", &h, &m) == 2) { cfg.alarmH = h; cfg.alarmM = m; cfg.alarmOn = true; settingsSave(); }
+  }
   else if (sscanf(line, "kidtime %99s", a) == 1) { int h = 0, m = 0; kidFaceTestMin = sscanf(a, "%d:%d", &h, &m) == 2 ? h * 60 + m : -1; }
   else if (!strcmp(line, "imu")) { imu::sleep(false); delay(50); float x, y; imu::gravity(x, y); Serial.printf("Neigung: x %.2f y %.2f\n", x, y); }
   else if (!strcmp(line, "status")) {
@@ -100,6 +113,31 @@ void setup() {
   lv_timer_handler();
   hwBrightness(cfg.brightness);
   Serial.printf("Taschenfunk %s bereit (%s)\n", FW_VERSION, cfg.name);
+}
+
+// Radiowecker: statt zu piepen einen Sender bzw. die neueste Folge spielen. Kommt nach 20 s kein Ton
+// (kein WLAN, Sender weg), piept der Wecker doch. Stopp, Schlummern oder Zeitablauf beenden die Wiedergabe.
+static void radioAlarm() {
+  static cw::Ring last = cw::RING_NONE;
+  static uint32_t at = 0;
+  static bool on = false, heard = false;
+  cw::Ring r = cw::ringing();
+  if (r == cw::RING_ALARM && last != cw::RING_ALARM && cfg.alarmSrc[0] && netOnline()) {
+    cw::ringQuiet(true);
+    music::wake(cfg.alarmSrc, cfg.alarmName);
+    at = millis();
+    on = true;
+    heard = false;
+  }
+  if (on && music::state().pos >= 1) heard = true;
+  if (on && heard && r == cw::RING_ALARM && !music::state().active) { cw::ringStop(); on = false; }  // Folge zu Ende
+  if (on && r == cw::RING_ALARM && millis() - at > 20000 && music::state().pos < 1) {
+    cw::ringQuiet(false);  // kein Ton angekommen: klassisch klingeln
+    music::stop();
+    on = false;
+  }
+  if (on && r != cw::RING_ALARM) { music::stop(); on = false; }
+  last = r;
 }
 
 static void power() {
@@ -155,6 +193,7 @@ void loop() {
   webui::poll();
 
   cw::poll();
+  radioAlarm();
   ui::tick();
   uint32_t t0 = micros();
   uint32_t next = lv_timer_handler();

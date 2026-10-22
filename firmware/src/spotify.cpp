@@ -75,6 +75,7 @@ struct Acc { String user, cred; };
 static Acc accs[ACCOUNTS];
 static int accN = 0, accCur = -1;
 static std::atomic<bool> relogin{false};
+static std::atomic<bool> accDirty{false};  // Konten geändert, poll() speichert sie
 
 static void saveAccounts() {
   Preferences p;
@@ -108,8 +109,11 @@ static void loadAccounts() {
   if (accCur >= accN) accCur = accN - 1;
 }
 
-// erfolgreich angemeldet: Konto (wieder)verwenden bzw. vorne einfügen
+// erfolgreich angemeldet: Konto (wieder)verwenden bzw. vorne einfügen.
+// Läuft im Spotify-Task, dessen Stack im PSRAM liegt – von dort darf nicht in den Flash geschrieben werden
+// (der Cache ist dabei aus). Gespeichert wird deshalb erst in poll() aus der Hauptschleife.
 static void rememberAccount(const std::string& user, const std::string& cred) {
+  xSemaphoreTake(mtx, portMAX_DELAY);
   int i = 0;
   while (i < accN && accs[i].user != user.c_str()) i++;
   if (i == accN) {
@@ -120,7 +124,8 @@ static void rememberAccount(const std::string& user, const std::string& cred) {
   accs[i].user = user.c_str();
   accs[i].cred = cred.c_str();
   accCur = i;
-  saveAccounts();
+  xSemaphoreGive(mtx);
+  accDirty = true;
 }
 
 int accounts(char names[][64], int max, int* current) {
@@ -350,6 +355,12 @@ void poll() {
     mdnsDone = true;
   }
   zc->handleClient();
+  if (accDirty) {
+    accDirty = false;
+    xSemaphoreTake(mtx, portMAX_DELAY);
+    saveAccounts();
+    xSemaphoreGive(mtx);
+  }
   // neuer Titel ist im Lautsprecher angekommen → an Spotify melden (Titelinfo, Position)
   auto h = handler;
   if (pending && h && audio::musicPlayed() >= pendingAt) {

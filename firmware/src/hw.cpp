@@ -9,7 +9,7 @@
 #include "pins.h"
 
 static Arduino_DataBus* bus = new Arduino_ESP32QSPI(LCD_CS, LCD_SCLK, LCD_SDIO0, LCD_SDIO1, LCD_SDIO2, LCD_SDIO3);
-static Arduino_CO5300* gfx = new Arduino_CO5300(bus, LCD_RESET, 0, LCD_W, LCD_H, 6, 0, 0, 0);
+static Arduino_CO5300* gfx = new Arduino_CO5300(bus, LCD_RESET, 0, PANEL_W, PANEL_H, LCD_COL_OFS, 0, 0, 0);
 static TouchDrvCST92xx touch;
 static bool touchOk = false;
 static lv_display_t* disp;
@@ -149,7 +149,7 @@ uint32_t hwIdleMs() { return millis() - lastActivity; }
 bool hwWakeRequested() { bool w = wakeReq; wakeReq = false; return w; }
 
 static void flushCb(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
-  if (screenOn) gfx->draw16bitRGBBitmap(a->x1, a->y1, (uint16_t*)px, lv_area_get_width(a), lv_area_get_height(a));
+  if (screenOn) gfx->draw16bitRGBBitmap(a->x1 + PANEL_X, a->y1 + PANEL_Y, (uint16_t*)px, lv_area_get_width(a), lv_area_get_height(a));
   lv_display_flush_ready(d);
 }
 
@@ -186,7 +186,7 @@ static void touchRead(lv_indev_t*, lv_indev_data_t* data) {
   }
   int16_t x[2], y[2];
   bool pressed = touchOk && touch.getPoint(x, y, 1) > 0;
-  if (pressed) { lx = x[0]; ly = y[0]; }
+  if (pressed) { lx = constrain(x[0] - PANEL_X, 0, LCD_W - 1); ly = constrain(y[0] - PANEL_Y, 0, LCD_H - 1); }
   // Bei dunklem Display weckt die Berührung nur und wird nicht an die Oberfläche weitergegeben
   if (!screenOn && pressed) { wakeReq = true; swallow = true; }
   if (swallow && !pressed) swallow = false;
@@ -303,21 +303,33 @@ void hwBegin() {
   pmuBegin();
   pmuUpdate();
 
+#ifdef EXTRA_RST
+  pinMode(EXTRA_RST, OUTPUT);
+  digitalWrite(EXTRA_RST, LOW);
+#endif
   pinMode(TP_RST, OUTPUT);
   digitalWrite(TP_RST, LOW);
   delay(20);
   digitalWrite(TP_RST, HIGH);
+#ifdef EXTRA_RST
+  digitalWrite(EXTRA_RST, HIGH);
+#endif
   delay(50);
   touch.setPins(TP_RST, TP_INT);
   touchOk = touch.begin(Wire, CST92XX_SLAVE_ADDRESS, I2C_SDA, I2C_SCL);
   if (touchOk) {
-    touch.setMaxCoordinates(LCD_W, LCD_H);
+    touch.setMaxCoordinates(PANEL_W, PANEL_H);
     touch.setSwapXY(TOUCH_SWAP_XY);
     touch.setMirrorXY(TOUCH_MIRROR_X, TOUCH_MIRROR_Y);
   }
   Serial.printf("Touch: %s\n", touchOk ? "ok" : "nicht gefunden");
 
   if (!gfx->begin(80000000)) Serial.println("Display: Start fehlgeschlagen");
+#ifdef LCD_MADCTL
+  bus->beginWrite();
+  bus->writeC8D8(0x36, LCD_MADCTL);
+  bus->endWrite();
+#endif
   gfx->fillScreen(0x0000);
   gfx->setBrightness(0);
 

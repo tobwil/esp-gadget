@@ -1,7 +1,8 @@
 # Taschenfunk
 
 Firmware für das **Waveshare ESP32-S3-Touch-AMOLED-1.75C** (rundes 466 × 466 AMOLED, Touch, Lautsprecher,
-zwei Mikrofone, Bewegungssensor, Akku). Sie macht daraus eine Uhr mit Spotify, Podcasts, Walkie-Talkie, Timer,
+zwei Mikrofone, Bewegungssensor, Akku) und das fast gleiche **ESP32-S3-Touch-AMOLED-2.16** (quadratisch,
+480 × 480; die runde Oberfläche sitzt dort mittig, die Ecken bleiben schwarz). Sie macht daraus eine Uhr mit Spotify, Podcasts, Walkie-Talkie, Timer,
 Stoppuhr, Wecker, Wetter, Balance-Spiel und Kindermodus. Alles läuft auf dem Gerät selbst, ohne Rechner.
 
 ![Bildschirme](docs/screens.png)
@@ -81,8 +82,11 @@ Wischbewegung entfernt.
 1. **Firmware aufspielen**
    ```bash
    cp firmware/include/secrets.example.h firmware/include/secrets.h   # optional vorbelegen
-   cd firmware && pio run -t upload
+   cd firmware && pio run -t upload                 # 1.75C
+   cd firmware && pio run -e amoled-216 -t upload   # 2.16
    ```
+   Die Unterschiede der Boards (Reset-Pins, Audio-Takt, Display-Ausrichtung, Touch-Achsen) stehen in
+   `firmware/include/pins.h` und `config.h`.
    Erkennt der Rechner das Board nicht: **BOOT** halten, kurz **PWR** drücken, BOOT loslassen, erneut hochladen.
 2. **WLAN** am Gerät: Apps → Einstellungen → WLAN.
 3. **Weboberfläche** öffnen: Einstellungen → Weboberfläche zeigt einen QR-Code. Dort lassen sich alle weiteren

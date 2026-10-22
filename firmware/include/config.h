@@ -30,10 +30,16 @@
 #define MIC_PGA 10
 #define MIC_GAIN 3.0f
 
-// Touch-Ausrichtung (wie im Waveshare-Beispiel für das 1.75C)
+// Touch-Ausrichtung (wie in den Waveshare-Beispielen des jeweiligen Boards)
+#if defined(BOARD_AMOLED_216)
+#define TOUCH_SWAP_XY 1
+#define TOUCH_MIRROR_X 1
+#define TOUCH_MIRROR_Y 0
+#else
 #define TOUCH_SWAP_XY 0
 #define TOUCH_MIRROR_X 1
 #define TOUCH_MIRROR_Y 1
+#endif
 
 // Balance-Spiel: Richtung der Neigung. Rollt die Kugel verkehrt herum, das Vorzeichen umdrehen.
 #define IMU_SIGN_X 1

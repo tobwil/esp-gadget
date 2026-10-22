@@ -1,6 +1,7 @@
 #include "voice.h"
 #include <ArduinoJson.h>
 #include <mbedtls/base64.h>
+#include "assist.h"
 #include "audio.h"
 #include "config.h"
 #include "web.h"
@@ -74,7 +75,7 @@ static bool transcribe() {
   free(b64);
 
   String out;
-  String url = String("https://generativelanguage.googleapis.com/v1beta/models/") + GEMINI_MODEL + ":generateContent";
+  String url = String("https://generativelanguage.googleapis.com/v1beta/models/") + assist::sttModel() + ":generateContent";
   String key = String("x-goog-api-key: ") + keys::gemini();
   int code = web::post(url, body, "application/json", out, key.c_str());
   if (code != 200) {

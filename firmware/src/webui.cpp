@@ -101,6 +101,11 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
  <section><h2 id="ainame2">Assistent</h2><p class="note">Gemini 3.8 Live mit Stimme. Auf der Uhr: App öffnen, halten und sprechen. Nicht im Kindermodus.</p>
   <label class="f" for="ainame">Name</label><input id="ainame" maxlength="20"><button class="wide" id="ainamego">Speichern</button>
   <div class="row" style="margin-top:8px"><div class="t"><b>Google-Suche</b><small>Aktuelles, Nachrichten, Sport, Wetter</small></div><label class="sw"><input type="checkbox" id="aisearch"><span></span></label></div></section>
+ <section><h2>Modelle</h2><p class="note">Die Liste kommt direkt von Google – neue Modelle tauchen von selbst auf.</p>
+  <label class="f" for="aimodel">KIra (Live, mit Stimme)</label><select id="aimodel"></select>
+  <label class="f" for="aivoice">Stimme</label><select id="aivoice"></select>
+  <label class="f" for="aistt">Spracheingabe bei der Suche</label><select id="aistt"></select>
+  <button class="wide" id="aimodgo">Speichern</button></section>
  <section><h2>n8n</h2><p class="note" id="n8nst"></p>
   <label class="f" for="n8nurl">MCP-Adresse</label><input id="n8nurl" placeholder="https://…/mcp-server/http" autocapitalize="off" autocomplete="off">
   <label class="f" for="n8ntok">Token</label><input id="n8ntok" type="password" autocomplete="off" placeholder="unverändert lassen">
@@ -169,6 +174,7 @@ function render(){
  if(document.activeElement!==$('n8nurl'))$('n8nurl').value=ai.n8nUrl;
  $('n8nst').innerHTML=ai.n8nSet?'<span class="ok">Eingerichtet</span>':'Noch nicht eingerichtet – Adresse und Token aus n8n (Einstellungen → MCP).';
  $('n8nallow').innerHTML=ai.allowed.map(a=>row(a.name,a.kind=='agent'?'Agent':'Workflow',btn('✕',`unallow(${J(a.id)})`))).join('')||'<p class="note">Noch nichts freigegeben.</p>';
+ if($('t-ai').classList.contains('sel'))loadModels();
  $('fwst').textContent=`Version ${s.version} · ${s.board} · gebaut ${s.built}`;
  $('gst').innerHTML=s.gemini?'<span class="ok">Schlüssel gesetzt</span>':'<span class="bad">Kein Schlüssel – Spracheingabe aus</span>';
 }
@@ -193,6 +199,14 @@ $('lgo').onclick=()=>{pin=val('lpin');try{localStorage.setItem('pin',pin)}catch(
 $('nmgo').onclick=()=>post('name',{name:val('nm')});
 $('wgo').onclick=()=>post('wifi',{ssid:val('ss'),pass:val('pw')});
 $('gemgo').onclick=()=>post('keys',{gemini:val('gem')});
+const VOICES=['Kore','Leda','Aoede','Zephyr','Callirrhoe','Autonoe','Despina','Erinome','Laomedeia','Achernar','Gacrux','Pulcherrima','Sulafat','Vindemiatrix','Puck','Charon','Fenrir','Orus','Enceladus','Iapetus','Umbriel','Algieba','Algenib','Rasalgethi','Alnilam','Schedar','Achird','Zubenelgenubi','Sadachbia','Sadaltager'];
+function opts(sel,list,cur){$(sel).innerHTML=[...new Set([cur,...list])].filter(Boolean).map(m=>`<option ${m==cur?'selected':''}>${esc(m)}</option>`).join('')}
+let modelsLoaded=false;
+async function loadModels(){if(modelsLoaded||!S)return;modelsLoaded=true;const a=S.assist;
+ opts('aimodel',[],a.model);opts('aistt',[],a.stt);opts('aivoice',VOICES,a.voice);
+ try{const j=await api('models');if(j.err)return toast(j.err);opts('aimodel',j.live,a.model);opts('aistt',j.text,a.stt)}catch(e){}}
+$('aimodgo').onclick=()=>post('assist',{model:$('aimodel').value,voice:$('aivoice').value,stt:$('aistt').value});
+document.querySelector('nav button[data-t=ai]').addEventListener('click',()=>setTimeout(loadModels,50));
 $('ainamego').onclick=()=>post('assist',{name:val('ainame')});
 $('aisearch').onchange=e=>post('assist',{search:e.target.checked},true);
 $('n8ngo').onclick=()=>{post('assist',{n8nUrl:val('n8nurl'),n8nToken:val('n8ntok')});$('n8ntok').value=''};
@@ -332,6 +346,9 @@ static void state() {
   JsonObject ai = d["assist"].to<JsonObject>();
   ai["name"] = assist::name();
   ai["search"] = assist::search();
+  ai["model"] = assist::model();
+  ai["voice"] = assist::voice();
+  ai["stt"] = assist::sttModel();
   ai["n8nUrl"] = n8n::url();
   ai["n8nSet"] = n8n::configured();  // nie den Token selbst
   JsonDocument al;
@@ -433,11 +450,18 @@ void begin() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d)) return msg("Ungültige Anfrage", 400);
-    assist::configure(d["name"] | (const char*)nullptr, d["search"].is<bool>() ? (int)d["search"].as<bool>() : -1);
+    assist::configure(d["name"] | (const char*)nullptr, d["search"].is<bool>() ? (int)d["search"].as<bool>() : -1,
+                      d["model"] | (const char*)nullptr, d["voice"] | (const char*)nullptr, d["stt"] | (const char*)nullptr);
     const char* u = d["n8nUrl"] | (const char*)nullptr;
     const char* t = d["n8nToken"] | "";
     if (u || t[0]) n8n::set(u, t[0] ? t : nullptr);
     msg("Gespeichert");
+  });
+  srv->on("/api/models", HTTP_GET, []() {
+    if (!authed()) return;
+    String err, m = assist::models(err);
+    if (!m.length()) { JsonDocument d; d["err"] = err; return json(200, d); }
+    srv->send(200, "application/json", m);
   });
   srv->on("/api/n8n/list", HTTP_GET, []() {
     if (!authed()) return;

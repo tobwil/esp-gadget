@@ -22,6 +22,12 @@ String status();           // Hinweis (Werkzeug läuft, Fehler)
 // Einstellungen (Weboberfläche)
 String name();
 bool search();             // Google-Suche erlaubt
-void configure(const char* name, int search);  // nullptr / −1 = unverändert
+String model();            // Live-Modell, z. B. „gemini-3.8-live“
+String voice();            // Stimme, z. B. „Kore“
+String sttModel();         // Modell für die Spracheingabe der Suche
+void configure(const char* name, int search, const char* model = nullptr, const char* voice = nullptr,
+               const char* sttModel = nullptr);  // nullptr / −1 = unverändert
+// Verfügbare Modelle beim Gemini-Schlüssel abfragen (für die Auswahl in der Weboberfläche), als JSON
+String models(String& err);
 
 }  // namespace assist

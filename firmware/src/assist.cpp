@@ -12,12 +12,13 @@
 #include "net.h"
 #include "settings.h"
 #include "weather.h"
+#include "web.h"
 #include "wsock.h"
 
 namespace assist {
 
 static const char* HOST = "generativelanguage.googleapis.com";
-static const char* MODEL = "models/gemini-3.8-live";
+
 
 // ArduinoJson im PSRAM (Antworten mit Audio sind groß)
 struct SpiAlloc : ArduinoJson::Allocator {
@@ -31,7 +32,7 @@ static volatile Phase ph = OFF;
 static volatile bool wantOpen = false, down = false;
 static SemaphoreHandle_t mtx;
 static String saidTxt, heardTxt, statusTxt;
-static String cfgName = "KIra";
+static String cfgName = "KIra", cfgModel = "gemini-3.8-live", cfgVoice = "Kore", cfgStt = GEMINI_MODEL;
 static bool cfgSearch = true;
 
 static void setText(String& dst, const String& v) {
@@ -63,13 +64,57 @@ String heard() { return getText(heardTxt); }
 String status() { return getText(statusTxt); }
 String name() { return cfgName; }
 bool search() { return cfgSearch; }
+String model() { return cfgModel; }
+String voice() { return cfgVoice; }
+String sttModel() { return cfgStt; }
 
-void configure(const char* n, int s) {
+void configure(const char* n, int s, const char* m, const char* v, const char* stt) {
   Preferences p;
   p.begin("assist", false);
   if (n && n[0]) { cfgName = n; p.putString("name", cfgName); }
   if (s >= 0) { cfgSearch = s; p.putBool("search", cfgSearch); }
+  if (m && m[0]) { cfgModel = m; p.putString("model", cfgModel); }
+  if (v && v[0]) { cfgVoice = v; p.putString("voice", cfgVoice); }
+  if (stt && stt[0]) { cfgStt = stt; p.putString("stt", cfgStt); }
   p.end();
+}
+
+String models(String& err) {
+  JsonDocument filter;
+  filter["models"][0]["name"] = true;
+  filter["models"][0]["displayName"] = true;
+  filter["models"][0]["supportedGenerationMethods"] = true;
+  filter["nextPageToken"] = true;
+  JsonDocument out;
+  JsonArray live = out["live"].to<JsonArray>(), text = out["text"].to<JsonArray>();
+  String page;
+  for (int i = 0; i < 4; i++) {
+    String body;
+    String url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100" + (page.length() ? "&pageToken=" + page : String());
+    String hdr = String("x-goog-api-key: ") + keys::gemini();
+    int code = web::get(url, body, hdr.c_str());
+    if (code != 200) { err = "Gemini antwortet nicht (" + String(code) + ")"; return ""; }
+    JsonDocument d(&spi);
+    if (deserializeJson(d, body, DeserializationOption::Filter(filter))) { err = "Antwort unlesbar"; return ""; }
+    for (JsonObject m : d["models"].as<JsonArray>()) {
+      String n = m["name"] | "";
+      n.replace("models/", "");
+      bool bidi = false, gen = false;
+      for (const char* g : m["supportedGenerationMethods"].as<JsonArray>()) {
+        if (!strcmp(g, "bidiGenerateContent")) bidi = true;
+        if (!strcmp(g, "generateContent")) gen = true;
+      }
+      // Live: Sprachdialog (ohne reine Übersetzer/Transkribierer); Spracheingabe: schnelle Text-Modelle
+      if (bidi && n.indexOf("translate") < 0 && n.indexOf("transcribe") < 0 && n.indexOf("robotics") < 0) live.add(n);
+      else if (gen && n.indexOf("flash") >= 0 && n.indexOf("tts") < 0 && n.indexOf("image") < 0 && n.indexOf("live") < 0)
+        text.add(n);
+    }
+    page = d["nextPageToken"] | "";
+    if (!page.length()) break;
+  }
+  String r;
+  serializeJson(out, r);
+  return r;
 }
 
 // ------------------------------------------------------------------ Sitzung einrichten
@@ -77,10 +122,10 @@ void configure(const char* n, int s) {
 static String setupJson() {
   JsonDocument d(&spi);
   JsonObject s = d["setup"].to<JsonObject>();
-  s["model"] = MODEL;
+  s["model"] = "models/" + cfgModel;
   JsonObject g = s["generationConfig"].to<JsonObject>();
   g["responseModalities"].add("AUDIO");
-  g["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"]["voiceName"] = "Kore";
+  g["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"]["voiceName"] = cfgVoice;
   g["speechConfig"]["languageCode"] = "de-DE";
   s["realtimeInputConfig"]["automaticActivityDetection"]["disabled"] = true;  // Push-to-Talk
   s["outputAudioTranscription"].to<JsonObject>();
@@ -356,6 +401,9 @@ void begin() {
   p.begin("assist", true);
   cfgName = p.getString("name", "KIra");
   cfgSearch = p.getBool("search", true);
+  cfgModel = p.getString("model", cfgModel);
+  cfgVoice = p.getString("voice", cfgVoice);
+  cfgStt = p.getString("stt", cfgStt);
   p.end();
   n8n::begin();
 }

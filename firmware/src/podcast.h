@@ -13,6 +13,9 @@ bool browse(const char* path, char* title, size_t titleLen, music::Item* items, 
 
 // Wiedergabe einer Folge (id = Audio-URL)
 void play(const music::Item& episode);
+// beliebige MP3-Adresse: Audiothek-Folge (mit gemerkter Position) oder Radiosender (live = ohne Position,
+// ohne Springen, Titel aus dem Stream, verbindet bei Abbruch neu)
+void playUrl(const char* url, const char* title, const char* show, const char* image, uint16_t dur, bool live);
 void toggle();
 void skip(int seconds);          // vor/zurück springen
 void stop();

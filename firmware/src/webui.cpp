@@ -81,9 +81,9 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
  <section class="kidc"><h2>Lautstärke</h2><div class="row"><div class="t"><b>Höchstens <span id="kvv"></span> %</b></div></div><input type="range" id="kv" min="10" max="100" step="5"></section>
  <section class="kidc"><h2>Erlaubte Apps</h2><p class="note">Musik ist immer dabei. Einstellungen und Zifferblätter sind gesperrt.</p><div id="kapps"></div></section>
  <section class="kidc"><h2>Freigegeben</h2><div id="krel"></div></section>
- <section class="kidc"><h2>Freigeben</h2>
-  <div class="seg" id="ssrc"><button data-v="spotify" class="sel">Spotify</button><button data-v="podcast">Podcasts</button></div>
-  <label class="f" for="sq">Suche</label><input id="sq" type="search" placeholder="z. B. Bibi Blocksberg" enterkeyhint="search">
+ <section class="kidc"><h2>Freigeben</h2><p class="note">Radiosender, Audiothek-Sendungen, Podcasts oder Spotify-Listen.</p>
+  <div class="seg" id="ssrc"><button data-v="radio" class="sel">Radio</button><button data-v="ard">Audiothek</button><button data-v="podcast">Podcasts</button><button data-v="spotify">Spotify</button></div>
+  <label class="f" for="sq">Suche</label><input id="sq" type="search" placeholder="z. B. Radio Teddy, Ohrenbär, Figarino" enterkeyhint="search">
   <button class="wide kid" id="sgo">Suchen</button><div id="sres"></div>
   <label class="f" for="slink">… oder Spotify-Link einfügen (Playlist oder Album)</label><input id="slink" placeholder="https://open.spotify.com/playlist/…">
   <button class="wide ghost" id="slinkgo">Link freigeben</button>
@@ -116,7 +116,7 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 <script>
 const $=id=>document.getElementById(id),val=id=>$(id).value.trim();
 const APPS=[[1,'Funk','Walkie-Talkie mit anderen Uhren'],[2,'Timer',''],[4,'Stoppuhr',''],[8,'Balance','Kugel-Spiel'],[16,'Wecker',''],[32,'Wetter','']];
-let S=null,pin='',src='spotify';
+let S=null,pin='',src='radio';
 try{pin=localStorage.getItem('pin')||''}catch(e){}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(t){const m=$('msg');m.textContent=t;m.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>m.style.display='none',2500)}
@@ -291,17 +291,20 @@ static void search() {
   if (!authed()) return;
   static music::Item* it = nullptr;
   if (!it) it = (music::Item*)heap_caps_calloc(40, sizeof(music::Item), MALLOC_CAP_SPIRAM);
-  String q = srv->arg("q");
-  bool pod = srv->arg("src") == "podcast";
-  String path = (pod ? "pcsearch:" : "search:") + q;
+  String q = srv->arg("q"), src = srv->arg("src");
+  String path = (src == "podcast" ? "pcsearch:" : src == "radio" ? "rlsearch:" : src == "ard" ? "ardsearch:" : "search:") + q;
   char title[72], err[64];
   int n = music::query(path.c_str(), title, sizeof(title), it, 40, err, sizeof(err));
   JsonDocument d;
   JsonArray a = d["items"].to<JsonArray>();
   for (int i = 0; i < n; i++) {
     const char* id = it[i].id;
-    if (it[i].kind != music::K_LIST) continue;
-    if (strncmp(id, "sp:album:", 9) && strncmp(id, "sp:playlist:", 12) && strncmp(id, "pc:feed:", 8)) continue;
+    // freigeben lassen sich Listen (Alben, Playlists, Podcasts, Audiothek-Sendungen) und Radiosender
+    bool station = !strncmp(id, "radio:", 6);
+    if (it[i].kind != music::K_LIST && !station) continue;
+    if (!station && strncmp(id, "sp:album:", 9) && strncmp(id, "sp:playlist:", 12) && strncmp(id, "pc:feed:", 8) &&
+        strncmp(id, "ard:set:", 8))
+      continue;
     addItems(a, &it[i], 1);
   }
   if (err[0]) d["err"] = err;

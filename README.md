@@ -21,7 +21,7 @@ tools/      Fernsteuerung/Bildschirmfotos über USB, Schrift- und Zertifikat-Gen
 | App | Funktion |
 |---|---|
 | **Uhr** (Startseite) | Fünf Zifferblätter, **lange drücken** zum Wechseln: **Taschenuhr** sowie vier Designs aus [FaceLab](https://github.com/tobwil/garminwatchface): **Daylight**, **Sternenhimmel**, **Kiesel Text** und **Glitch**. Akku auf jedem Zifferblatt. |
-| **Musik** | **Spotify** (Premium) direkt auf der Uhr: per Sprache oder Tastatur suchen, Alben, Playlists, Interpreten. Gleichzeitig ist die Uhr ein Spotify-Connect-Lautsprecher, die Spotify-App kann also mitsteuern. **Podcasts** über die iTunes-Suche; die Uhr merkt sich, wo man in jeder Folge war (±30/15 s springen). **Favoriten** für Alben, Playlists, Interpreten und Podcasts. **Lautstärke:** Finger am Rand entlang ziehen oder Cover antippen; sie gleitet weich. |
+| **Musik** | **Radio**: Sender aus dem freien Verzeichnis radio-browser.info (nur MP3), Beliebt, Kinderradio, Nachrichten, Genres, Suche; der laufende Songtitel kommt aus dem Stream, Weiter/Zurück wechselt den Sender, **Sender lange drücken = merken**. **ARD Audiothek** (ARD Sounds): Rubriken wie „Für Kinder“, Hörspiel, Wissen, Suche; Folgen mit gemerkter Position; **„Fußball live“** mit den Sportschau-Übertragungen (Konferenz und Einzelspiele, laufende und kommende), **alle ARD-Radiosender live**. **Podcasts** über die iTunes-Suche. **Favoriten** für Sender, Sendungen, Podcasts und Listen. **Spotify** ist eingebaut, Spotify gibt inoffiziellen Geräten bei vielen neueren Konten aber keinen Ton mehr (siehe unten). **Lautstärke:** Finger am Rand entlang ziehen oder Cover antippen; sie gleitet weich. |
 | **Sprechen** | Mikrofon-Knopf halten und z. B. „Bibi und Tina Folge 1“ sagen. Gemini macht daraus die Suche. |
 | **Funk** | Walkie-Talkie: großen Knopf halten und sprechen. In der Nähe per **ESP-NOW** (ohne Router), im selben WLAN zusätzlich per UDP-Multicast. |
 | **Timer · Stoppuhr · Wecker** | Restzeit als Ring am Rand, Runden, Schlummern; der Wecker weckt auch aus dem Tiefschlaf. |
@@ -40,8 +40,8 @@ Ist er an:
   Gute-Nacht-Geschichte, Schlafen. Der Ring zeigt den ganzen Tag vom Aufstehen (oben) bis zur Bettzeit; was
   vorbei ist, ist dunkler. Aufstehen und Bettzeit stellt man ein (Standard 6:30 und 20:30), der Rest richtet
   sich danach.
-- **Musik:** nur, was die Eltern freigegeben haben (Spotify-Alben und -Playlists, Podcasts). Freigeben geht über
-  die Suche in der Weboberfläche, per Spotify-Link oder direkt aus den Favoriten. Auf der Uhr gibt es keine
+- **Musik:** nur, was die Eltern freigegeben haben: Radiosender, Audiothek-Sendungen, Podcasts, Spotify-Listen.
+  Freigeben geht über die Suche in der Weboberfläche, per Spotify-Link oder direkt aus den Favoriten. Auf der Uhr gibt es keine
   Suche, keine Sprache, keine Favoriten.
 - **Apps:** Musik ist immer da; Funk, Timer, Stoppuhr, Balance, Wecker und Wetter einzeln erlaubt. Einstellungen
   und Zifferblatt-Wahl sind gesperrt.
@@ -101,6 +101,13 @@ Wischbewegung entfernt.
 `secrets.h` steht in `.gitignore`. Was darin steht, ist nur die Vorbelegung. Was in der Weboberfläche
 eingetragen wird, speichert die Uhr im NVS.
 
+### Spotify: Ton bei neueren Konten gesperrt
+
+Seit Ende 2025 verweigert Spotify inoffiziellen Connect-Geräten (librespot, cspot) bei vielen neueren Konten den
+Audio-Schlüssel ([librespot#1649](https://github.com/librespot-org/librespot/issues/1649)). Koppeln, Anmelden und
+Suchen funktionieren, abgespielt wird dann aber nichts; die Uhr hält an und zeigt „Spotify verweigert den Ton“.
+Ältere Konten können noch funktionieren. Den Kopierschutz zu umgehen ist keine Option.
+
 ## Funk mit mehreren Geräten
 
 Alle Geräte mit dieser Firmware finden sich automatisch. Für ESP-NOW müssen sie auf demselben WLAN-Kanal sein.
@@ -116,7 +123,7 @@ Befehle im seriellen Monitor:
 
 - **Eingaben:** `tap X Y`, `hold X Y`, `swipe l|r|u|d`, `boot`, `pwr`, `shot`
 - **Seiten:** `page apps|music|timer|stopwatch|alarm|radio|settings|game|web`, `home`, `browse search:Coldplay`
-- **Musik:** `toggle`, `next`, `vol 60`
+- **Musik:** `toggle`, `next`, `vol 60`, `browse rl:tag:kids`, `browse ard:soccer`, `voice start` / `voice stop`
 - **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung), `angry on|off`, `shake 10` (10 s Schütteln vortäuschen)
 - **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status`
 
@@ -127,13 +134,13 @@ Befehle im seriellen Monitor:
   Software-Lautstärke (Rampe, Begrenzer).
 - **Spotify:** [cspot](https://github.com/feelfreelinux/cspot) (Fork von philippe44) für Connect und Wiedergabe
   (Ogg Vorbis über Tremor), dazu die Web-API für die Suche.
-- **Podcasts:** RSS-Parser im Datenstrom, MP3 über libhelix mit Resampling, Range-Anfragen zum Springen.
+- **Podcasts, Audiothek, Radio:** ein MP3-Spieler (libhelix, Resampling); Range-Anfragen zum Springen, live mit ICY-Titeln und automatischem Neuverbinden. RSS-Parser im Datenstrom, Audiothek über GraphQL (api.ardaudiothek.de), Sender über radio-browser.info.
 - **TLS:** mbedTLS mit dem CA-Bundle aus ESP-IDF (`tools/make_crt_bundle.sh`), Speicher dafür im PSRAM.
 - **Cover:** JPEG-Decoder des Chips, rund maskiert; andere Formate über den Bild-Proxy wsrv.nl.
 - **Bewegungssensor:** QMI8658, läuft nur im Spiel.
 - **Module:**
   - `hw`, `audio`, `net`, `radio`, `clockwork`, `weather`, `imu`
-  - `music` mit `spotify`, `podcast` und `favs`
+  - `music` mit `spotify`, `podcast` (MP3-Spieler, auch live), `webradio`, `ard` und `favs`
   - `kids`, `voice`, `keys`, `webui`
   - `faces/` (FaceLab-Designs)
   - `ui/` (Seiten, Kindermodus-Zifferblatt `ui_kidface.cpp`, Wut-Glas `ui_angry.cpp`, Spiel `ui_game.cpp` + `game_theme.cpp`)

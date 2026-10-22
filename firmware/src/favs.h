@@ -1,4 +1,5 @@
-// Gemerkte Listen (Spotify-Alben, -Playlists, -Interpreten, Podcasts), im Gerät gespeichert.
+// Gemerkte Listen (Spotify-Alben, -Playlists, -Interpreten, Podcasts, Audiothek-Sendungen) und Radiosender,
+// im Gerät gespeichert.
 // Dieselbe Ablage dient auch für die Freigaben im Kindermodus (kids.h).
 #pragma once
 #include <Arduino.h>

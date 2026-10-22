@@ -2,12 +2,15 @@
 #include "../music.h"
 #include "../voice.h"
 #include "../settings.h"
+#include "../favs.h"
+#include "../kids.h"
 #include "ui.h"
 
 using namespace ui;
 
 // ================================================================== Läuft gerade
 
+static lv_obj_t* phIcon;  // Symbol im Cover-Platzhalter
 static lv_obj_t* ring;      // Fortschritt am Rand
 static lv_obj_t* cover;
 static lv_obj_t* coverPh;   // Platzhalter ohne Cover
@@ -44,8 +47,8 @@ static void build(lv_obj_t* scr) {
   lv_obj_set_style_bg_color(coverPh, C_SURF(), 0);
   lv_obj_set_style_border_width(coverPh, 0, 0);
   lv_obj_remove_flag(coverPh, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_t* ph = label(coverPh, &font_icon_64, C_SURF2(), I_ALBUM);
-  lv_obj_center(ph);
+  phIcon = label(coverPh, &font_icon_64, C_SURF2(), I_ALBUM);
+  lv_obj_center(phIcon);
   cover = lv_image_create(scr);
   lv_obj_align(cover, LV_ALIGN_TOP_MID, 0, 34);
   lv_obj_add_flag(cover, LV_OBJ_FLAG_HIDDEN);
@@ -121,6 +124,7 @@ static void update() {
   if (strcmp(lastId, s.id)) {
     snprintf(lastId, sizeof(lastId), "%s", s.id);
     lv_label_set_text(titleL, s.active ? s.title : "");
+    lv_label_set_text(phIcon, s.src == music::SRC_RADIO ? I_RADIO : I_ALBUM);  // Radio ohne Logo
     lv_obj_add_flag(cover, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(coverPh, LV_OBJ_FLAG_HIDDEN);
   }
@@ -172,7 +176,14 @@ static char pendingPath[240];
 
 // ================================================================== Suchen (Sprache oder Tastatur)
 
-static bool searchPodcast = false;  // sonst Spotify
+// Suche für vier Quellen: Sprache oder Tastatur
+enum SearchMode { S_SPOTIFY, S_PODCAST, S_RADIO, S_ARD };
+static int searchMode = S_SPOTIFY;
+static const char* const S_TITLE[] = {"Spotify durchsuchen", "Podcast suchen", "Sender suchen", "Audiothek durchsuchen"};
+static const char* const S_PREFIX[] = {"search:", "pcsearch:", "rlsearch:", "ardsearch:"};
+static lv_color_t sColor() {
+  return searchMode == S_PODCAST ? C_ALARM() : searchMode == S_RADIO ? C_WATCH() : searchMode == S_ARD ? C_TIMER() : C_RADIO();
+}
 static lv_obj_t *sMic, *sHalo, *sStatus, *sTitle;
 static bool sHolding = false;
 static uint32_t sDoneAt = 0;
@@ -180,18 +191,18 @@ static uint32_t sDoneAt = 0;
 static void runSearch(const char* q) {
   if (!q[0]) return;
   char p[160];
-  snprintf(p, sizeof(p), searchPodcast ? "pcsearch:%s" : "search:%s", q);
+  snprintf(p, sizeof(p), "%s%s", S_PREFIX[searchMode], q);
   snprintf(pendingPath, sizeof(pendingPath), "%s", p);
   push(&PAGE_BROWSE);
 }
 
 static void searchKeyboard() {
-  keyboard(searchPodcast ? "Podcast suchen" : "Spotify durchsuchen", "", false, [](const char* q) { runSearch(q); });
+  keyboard(S_TITLE[searchMode], "", false, [](const char* q) { runSearch(q); });
 }
 
 static void searchBuild(lv_obj_t* scr) {
-  lv_color_t c = searchPodcast ? C_ALARM() : C_RADIO();
-  sTitle = title(scr, searchPodcast ? "Podcast suchen" : "Spotify durchsuchen", c);
+  lv_color_t c = sColor();
+  sTitle = title(scr, S_TITLE[searchMode], c);
   sHalo = lv_obj_create(scr);
   lv_obj_set_style_radius(sHalo, LV_RADIUS_CIRCLE, 0);
   lv_obj_set_style_border_width(sHalo, 0, 0);
@@ -253,13 +264,13 @@ static void searchLeave() { voice::cancel(); }
 const Page PAGE_SEARCH = {searchBuild, searchUpdate, searchLeave, nullptr, false};
 
 void browseOpen(const char* path) {
-  if (!strcmp(path, "@voice") || !strcmp(path, "@pcsearch")) {
-    searchPodcast = path[1] == 'p';
+  if (!strcmp(path, "@voice") || !strcmp(path, "@pcsearch") || !strcmp(path, "@radiosearch") || !strcmp(path, "@ardsearch")) {
+    searchMode = path[1] == 'p' ? S_PODCAST : path[1] == 'r' ? S_RADIO : path[1] == 'a' ? S_ARD : S_SPOTIFY;
     push(&PAGE_SEARCH);
     return;
   }
   if (!strcmp(path, "@search")) {
-    searchPodcast = false;
+    searchMode = S_SPOTIFY;
     searchKeyboard();
     return;
   }
@@ -320,16 +331,33 @@ static void fill(BrowseCtx* c) {
       snprintf(sub, sizeof(sub), "%s%s%d:%02d", it.sub, it.sub[0] ? " · " : "", it.dur / 60, it.dur % 60);
     else
       snprintf(sub, sizeof(sub), "%s", it.sub);
-    const char* icon = it.kind == music::K_TRACK ? I_MUSIC
+    bool station = !strncmp(it.id, "radio:", 6);
+    const char* icon = station                                                    ? I_RADIO
+                       : it.kind == music::K_TRACK                                ? I_MUSIC
                        : !strncmp(it.id, "fav", 3)                               ? I_HEART
                        : !strcmp(it.id, "@search")                              ? I_SEARCH
-                       : !strcmp(it.id, "@voice") || !strcmp(it.id, "@pcsearch") ? I_MIC
+                       : !strncmp(it.id, "@voice", 6) || strstr(it.id, "search") ? I_MIC
                        : !strncmp(it.id, "pc", 2)                                ? I_RADIO_WAVES
+                       : !strncmp(it.id, "rl", 2)                                ? I_RADIO
+                       : !strncmp(it.id, "ard", 3)                               ? I_LIBRARY
+                       : !strcmp(it.id, "sp:home")                               ? I_MUSIC
                        : !strcmp(it.id, "@spotifyhelp")                          ? I_INFO
                                                                                  : I_QUEUE;
     lv_color_t ic = it.kind == music::K_TRACK ? C_DIM() : !strncmp(it.id, "fav:", 4) ? C_BRASS() : C_MUSIC();
     lv_obj_t* r = listRow(c->list, icon, ic, it.title, sub[0] ? sub : nullptr);
     lv_obj_add_event_cb(r, itemClicked, LV_EVENT_SHORT_CLICKED, (void*)(intptr_t)i);
+    // Sender lange drücken: merken bzw. aus den Favoriten nehmen (nicht im Kindermodus)
+    if (station && !kids::on())
+      lv_obj_add_event_cb(r, [](lv_event_t* e) {
+        BrowseCtx* c = ctx();
+        int k = (int)(intptr_t)lv_event_get_user_data(e);
+        if (!c || k >= c->n) return;
+        const music::Item& s = c->items[k];
+        bool had = favs::has(s.id);
+        favs::toggle(s.id, s.title, s.sub);
+        play(had ? 0 : 1);
+        toast(had ? "Sender aus den Favoriten entfernt" : "Sender gemerkt");
+      }, LV_EVENT_LONG_PRESSED, (void*)(intptr_t)i);
   }
   listFit(c->list);
 }

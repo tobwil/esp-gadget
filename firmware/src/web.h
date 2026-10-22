@@ -15,6 +15,7 @@ struct Conn {
   int code = 0;
   int size = -1;            // Content-Length, −1 = unbekannt
   String type;              // Content-Type
+  int metaint = 0;          // Internetradio: Abstand der Titel-Einschübe (icy-metaint), 0 = keine
   NetworkClient* stream() { return http.getStreamPtr(); }
   ~Conn() { http.end(); }
 };

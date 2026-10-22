@@ -229,6 +229,7 @@ static volatile Cmd cmd = C_NONE;
 static volatile int skipBy = 0;
 static String reqUrl, reqTitle, reqShow, reqArt;
 static uint16_t reqDur = 0;
+static bool reqLive = false;
 static volatile bool paused = false;
 static volatile uint32_t baseSec = 0;
 
@@ -239,9 +240,22 @@ void play(const music::Item& e) {
   reqShow = feedTitle;
   reqArt = feedArt;
   reqDur = e.dur;
+  reqLive = false;
   xSemaphoreGive(mtx);
   cmd = C_PLAY;
 }
+void playUrl(const char* url, const char* title, const char* show, const char* image, uint16_t dur, bool live) {
+  xSemaphoreTake(mtx, portMAX_DELAY);
+  reqUrl = url;
+  reqTitle = title;
+  reqShow = show;
+  reqArt = image;
+  reqDur = dur;
+  reqLive = live;
+  xSemaphoreGive(mtx);
+  cmd = C_PLAY;
+}
+
 void toggle() { cmd = C_TOGGLE; }
 void skip(int s) { skipBy = s; cmd = C_SKIP; }
 void stop() { cmd = C_STOP; }
@@ -259,6 +273,17 @@ static void setMsg(const char* m) {
   xSemaphoreTake(mtx, portMAX_DELAY);
   ucopy(st.msg, sizeof(st.msg), m);
   xSemaphoreGive(mtx);
+}
+
+// Internetradio: „StreamTitle='Interpret - Titel';“ aus dem Einschub lesen
+static String streamTitle(const char* m) {
+  const char* a = strstr(m, "StreamTitle='");
+  if (!a) return "";
+  a += 13;
+  const char* b = strstr(a, "';");
+  String t = b ? String(a).substring(0, b - a) : String(a);
+  t.trim();
+  return t;
 }
 
 // Länge eines ID3v2-Kopfs am Dateianfang (0 = keiner)
@@ -281,6 +306,10 @@ static void task(void*) {
   float rsPhase = 0;
   int16_t rsPrev = 0;
   bool reopen = false;
+  bool live = false;          // Radiosender
+  int metaint = 0, metaLeft = 0;
+  String station;
+  uint32_t retryAt = 0;
 
   auto close = [&]() { if (c) { delete c; c = nullptr; } };
   auto openAt = [&](uint32_t at, uint32_t sec) -> bool {
@@ -291,13 +320,17 @@ static void task(void*) {
     have = 0;
     c = new web::Conn();
     char range[40];
+    if (live) at = 0;
     snprintf(range, sizeof(range), "Range: bytes=%u-", (unsigned)at);
-    if (!web::open(*c, url, at ? range : nullptr, 15000)) {
-      Serial.printf("Podcast: Folge nicht erreichbar (%d)\n", c->code);
+    if (!web::open(*c, url, live ? "Icy-MetaData: 1" : at ? range : nullptr, 15000)) {
+      Serial.printf("Podcast: %s nicht erreichbar (%d)\n", live ? "Sender" : "Folge", c->code);
       close();
-      setMsg("Folge nicht erreichbar");
+      setMsg(live ? "Sender nicht erreichbar" : "Folge nicht erreichbar");
+      if (live) retryAt = millis() + 5000;
       return false;
     }
+    metaint = metaLeft = live ? c->metaint : 0;
+    retryAt = 0;
     if (at && c->code != 206) { at = 0; baseSec = 0; }  // Server kann keine Bereiche: von vorn
     offset = at;
     skipId3 = 0;
@@ -313,28 +346,30 @@ static void task(void*) {
     if (k != C_NONE) {
       cmd = C_NONE;
       if (k == C_PLAY) {
-        if (c && url.length()) savePos(url.c_str(), offset, baseSec + audio::musicPlayed() / audio::SR);
+        if (c && url.length() && !live) savePos(url.c_str(), offset, baseSec + audio::musicPlayed() / audio::SR);
         xSemaphoreTake(mtx, portMAX_DELAY);
         url = reqUrl;
+        live = reqLive;
+        station = reqTitle;
         st.active = true;
-        st.src = music::SRC_PODCAST;
+        st.src = live ? music::SRC_RADIO : music::SRC_PODCAST;
         ucopy(st.title, sizeof(st.title), reqTitle.c_str());
         ucopy(st.artist, sizeof(st.artist), reqShow.c_str());
         snprintf(st.id, sizeof(st.id), "%08x", (unsigned)hash(url.c_str()));
         st.dur = reqDur;
         xSemaphoreGive(mtx);
         art::request(reqArt.c_str());
-        uint32_t at, sec;
-        loadPos(url.c_str(), &at, &sec);  // dort weiter, wo man aufgehört hat
+        uint32_t at = 0, sec = 0;
+        if (!live) loadPos(url.c_str(), &at, &sec);  // dort weiter, wo man aufgehört hat
         paused = false;
         Serial.printf("Podcast: %s (ab %u s)\n", reqTitle.c_str(), (unsigned)sec);
         openAt(at, sec);
       } else if (k == C_TOGGLE && st.active) {
         paused = !paused;
         audio::musicPause(paused);
-        if (paused) { pausedAt = millis(); savePos(url.c_str(), offset, baseSec + audio::musicPlayed() / audio::SR); }
+        if (paused) { pausedAt = millis(); if (!live) savePos(url.c_str(), offset, baseSec + audio::musicPlayed() / audio::SR); }
         else if (reopen || !c) { reopen = false; openAt(offset, baseSec + audio::musicPlayed() / audio::SR); }
-      } else if (k == C_SKIP && st.active) {
+      } else if (k == C_SKIP && st.active && !live) {
         uint32_t sec = baseSec + audio::musicPlayed() / audio::SR;
         int target = max(0, (int)sec + skipBy);
         // Byte-Position aus der Bitrate schätzen (MP3 meist mit konstanter Bitrate):
@@ -344,8 +379,9 @@ static void task(void*) {
         int32_t at = max((int32_t)0, heard + (target - (int)sec) * bps);
         openAt(at, target);
       } else if (k == C_STOP) {
-        if (c) savePos(url.c_str(), offset, baseSec + audio::musicPlayed() / audio::SR);
+        if (c && !live) savePos(url.c_str(), offset, baseSec + audio::musicPlayed() / audio::SR);
         close();
+        retryAt = 0;
         audio::musicPause(true);
         audio::musicFlush();
         xSemaphoreTake(mtx, portMAX_DELAY);
@@ -353,19 +389,54 @@ static void task(void*) {
         xSemaphoreGive(mtx);
       }
     }
+    // Sender weg: nach kurzer Pause neu verbinden
+    if (!c && live && retryAt && !paused && st.active && millis() > retryAt) { setMsg("Verbinde neu …"); openAt(0, 0); continue; }
     if (!c) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
 
     // lange Pause: Verbindung schließen, beim Weiterhören mit Range neu öffnen
     if (paused && millis() - pausedAt > 30000) { close(); reopen = true; continue; }
     // Position regelmäßig sichern
-    if (millis() - savedAt > 15000) { savedAt = millis(); savePos(url.c_str(), offset, baseSec + audio::musicPlayed() / audio::SR); }
+    if (!live && millis() - savedAt > 15000) { savedAt = millis(); savePos(url.c_str(), offset, baseSec + audio::musicPlayed() / audio::SR); }
 
     // Puffer füllen
     NetworkClient* s = c->stream();
     if (have < (int)sizeof(in) / 2) {
-      int n = s->read(in + have, sizeof(in) - have);
-      if (n > 0) { have += n; offset += n; }
-      else if (!s->connected() && !s->available() && have < 4) {
+      int room = sizeof(in) - have;
+      if (metaint) room = min(room, metaLeft);
+      int n = s->read(in + have, room);
+      if (n > 0) { have += n; offset += n; if (metaint) metaLeft -= n; }
+      if (metaint && metaLeft == 0) {
+        // Titel-Einschub: 1 Byte Länge (×16), dann Text
+        static uint8_t m[16 * 255 + 1];
+        int len = -1, got = 0;
+        uint32_t t0 = millis();
+        while (millis() - t0 < 3000) {
+          if (len < 0) { int b = s->read(); if (b >= 0) len = b * 16; else { vTaskDelay(pdMS_TO_TICKS(5)); continue; } }
+          if (got >= len) break;
+          int r = s->read(m + got, len - got);
+          if (r > 0) got += r; else vTaskDelay(pdMS_TO_TICKS(5));
+        }
+        metaLeft = metaint;
+        if (len > 0 && got == len) {
+          m[got] = 0;
+          String t = streamTitle((const char*)m);
+          if (t.length()) {
+            xSemaphoreTake(mtx, portMAX_DELAY);
+            ucopy(st.title, sizeof(st.title), t.c_str());
+            ucopy(st.artist, sizeof(st.artist), station.c_str());
+            xSemaphoreGive(mtx);
+          }
+        }
+        continue;
+      }
+      if (n <= 0 && live && !s->connected() && !s->available()) {
+        // Sender hat die Verbindung beendet: neu verbinden
+        Serial.println("Radio: Verbindung weg, verbinde neu");
+        close();
+        retryAt = millis() + 2000;
+        continue;
+      }
+      if (n <= 0 && !s->connected() && !s->available() && have < 4) {
         // Folge zu Ende: nach dem Leerlaufen des Puffers als gehört markieren
         close();
         while (audio::musicUsed() && cmd == C_NONE) vTaskDelay(pdMS_TO_TICKS(100));

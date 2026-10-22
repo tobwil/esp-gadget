@@ -4,6 +4,8 @@
 #include "kids.h"
 #include "audio.h"
 #include "podcast.h"
+#include "ard.h"
+#include "webradio.h"
 #include "spotify.h"
 
 namespace music {
@@ -53,6 +55,7 @@ static const char* favKind(const char* path) {
   if (!strncmp(path, "sp:playlist:", 12)) return "Playlist";
   if (!strncmp(path, "sp:artist:", 10)) return "Interpret";
   if (!strncmp(path, "pc:feed:", 8)) return "Podcast";
+  if (!strncmp(path, "ard:set:", 8)) return "Audiothek";
   return "";
 }
 
@@ -61,10 +64,17 @@ static char lastTitle[72] = "";
 // Startmenü der Musik-App
 static void home(Item* it, int* n, char* title, size_t titleLen) {
   ucopy(title, titleLen, "Musik");
+  addList(it, n, "rl:home", "Radio", "Sender aus aller Welt");
+  addList(it, n, "ard:home", "ARD Audiothek", "Hörspiele, Wissen, Kinder …");
+  addList(it, n, "pc:subs", "Podcasts", "Meine Podcasts und Suche");
+  addList(it, n, "favs", "Favoriten", "Gemerkte Sender, Sendungen, Listen");
+  addList(it, n, "sp:home", "Spotify", spotify::linked() ? "Suchen und abspielen" : "Noch nicht gekoppelt");
+}
+
+static void spotifyHome(Item* it, int* n, char* title, size_t titleLen) {
+  ucopy(title, titleLen, "Spotify");
   addList(it, n, "@voice", "Sprechen", "Titel, Interpret, Album …");
   addList(it, n, "@search", "Suchen", "Mit der Tastatur");
-  addList(it, n, "favs", "Favoriten", "Gemerkte Alben, Playlists, Podcasts");
-  addList(it, n, "pc:subs", "Podcasts", "Meine Podcasts und Suche");
   if (!spotify::linked())
     addList(it, n, "@spotifyhelp", "Spotify koppeln", "In der Spotify-App die Uhr als Lautsprecher wählen");
 }
@@ -79,7 +89,9 @@ static void kidsHome(Item* it, int* n, char* title, size_t titleLen, char* err, 
 // Liste holen (läuft im Arbeits-Task)
 static int fetch(const char* path, Item* tmp, char* title, size_t titleLen, char* err, size_t errLen) {
   int n = 0;
-  if (!strncmp(path, "pc", 2)) podcast::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
+  if (!strncmp(path, "rl", 2)) wradio::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
+  else if (!strncmp(path, "ard", 3)) ard::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
+  else if (!strncmp(path, "pc", 2)) podcast::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
   else spotify::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
   return n;
 }
@@ -147,10 +159,11 @@ static void worker(void*) {
       else if (kids::released(path)) n = fetch(path, tmp, title, sizeof(title), err, sizeof(err));
       else ucopy(err, sizeof(err), "Nicht freigegeben");
     } else if (!strcmp(path, "home")) home(tmp, &n, title, sizeof(title));
+    else if (!strcmp(path, "sp:home")) spotifyHome(tmp, &n, title, sizeof(title));
     else if (!strcmp(path, "favs")) {
       ucopy(title, sizeof(title), "Favoriten");
       n = favs::list(tmp, BROWSE_MAX);
-      if (!n) ucopy(err, sizeof(err), "Noch keine – oben in Alben, Playlists und Podcasts merken");
+      if (!n) ucopy(err, sizeof(err), "Noch keine – Sender lange drücken, Listen oben merken");
     } else n = fetch(path, tmp, title, sizeof(title), err, sizeof(err));
     // merkbare Listen: oben ein Eintrag zum Merken / Entfernen
     if (!kid && favKind(path)[0] && n > 0 && n < BROWSE_MAX) {
@@ -177,9 +190,22 @@ static void worker(void*) {
 
 // ------------------------------------------------------------------ Wiedergabe
 
+// Radio: die Senderliste, aus der gespielt wurde – Weiter/Zurück wechseln den Sender
+static std::vector<Item> stations;
+static int stationIdx = 0;
+
+static void playStation(int i) {
+  if (stations.empty()) return;
+  stationIdx = (i % (int)stations.size() + stations.size()) % stations.size();
+  const Item& s = stations[stationIdx];
+  const char* url = s.id + 6;  // „radio:“
+  podcast::playUrl(url, s.title, s.title, wradio::logo(url).c_str(), 0, true);
+}
+
 void playList(const Item* list, int n, int start) {
   if (start < 0 || start >= n || list[start].kind != K_TRACK) return;
-  if (!strncmp(list[start].id, "spotify:", 8)) {
+  const char* id = list[start].id;
+  if (!strncmp(id, "spotify:", 8)) {
     std::vector<std::string> uris;
     int index = 0;
     for (int i = 0; i < n; i++) {
@@ -187,10 +213,27 @@ void playList(const Item* list, int n, int start) {
       if (i == start) index = uris.size();
       uris.push_back(list[i].id);
     }
-    if (active == SRC_PODCAST) podcast::stop();
+    if (active == SRC_PODCAST || active == SRC_RADIO) podcast::stop();
     if (spotify::play(uris, index, uris[index])) active = SRC_SPOTIFY;
+    return;
+  }
+  if (active == SRC_SPOTIFY) spotify::stop();
+  if (!strncmp(id, "radio:", 6)) {
+    stations.clear();
+    int index = 0;
+    for (int i = 0; i < n; i++) {
+      if (list[i].kind != K_TRACK || strncmp(list[i].id, "radio:", 6)) continue;
+      if (i == start) index = stations.size();
+      stations.push_back(list[i]);
+    }
+    playStation(index);
+    active = SRC_RADIO;
+  } else if (!strncmp(id, "ard:a:", 6)) {
+    String show, image;
+    ard::meta(id + 6, show, image);
+    podcast::playUrl(id + 6, list[start].title, show.c_str(), image.c_str(), list[start].dur, false);
+    active = SRC_PODCAST;
   } else {
-    if (active == SRC_SPOTIFY) spotify::stop();
     podcast::play(list[start]);
     active = SRC_PODCAST;
   }
@@ -198,23 +241,37 @@ void playList(const Item* list, int n, int start) {
 
 static Source current() {
   // die Spotify-App kann jederzeit übernehmen
-  if (spotify::state().active && active != SRC_PODCAST) active = SRC_SPOTIFY;
+  if (spotify::state().active && active != SRC_PODCAST && active != SRC_RADIO) active = SRC_SPOTIFY;
   return active;
 }
 
-void toggle() { if (current() == SRC_SPOTIFY) spotify::toggle(); else if (active == SRC_PODCAST) podcast::toggle(); }
-void next() { if (current() == SRC_SPOTIFY) spotify::next(); else if (active == SRC_PODCAST) podcast::skip(30); }
-void prev() { if (current() == SRC_SPOTIFY) spotify::prev(); else if (active == SRC_PODCAST) podcast::skip(-15); }
+void toggle() {
+  Source s = current();
+  if (s == SRC_SPOTIFY) spotify::toggle();
+  else if (s == SRC_PODCAST || s == SRC_RADIO) podcast::toggle();
+}
+void next() {  // Podcast: +30 s, Radio: nächster Sender
+  Source s = current();
+  if (s == SRC_SPOTIFY) spotify::next();
+  else if (s == SRC_RADIO) playStation(stationIdx + 1);
+  else if (s == SRC_PODCAST) podcast::skip(30);
+}
+void prev() {
+  Source s = current();
+  if (s == SRC_SPOTIFY) spotify::prev();
+  else if (s == SRC_RADIO) playStation(stationIdx - 1);
+  else if (s == SRC_PODCAST) podcast::skip(-15);
+}
 void stop() {
   if (active == SRC_SPOTIFY) spotify::stop();
-  if (active == SRC_PODCAST) podcast::stop();
+  if (active == SRC_PODCAST || active == SRC_RADIO) podcast::stop();
   active = SRC_NONE;
 }
 
 State state() {
   Source s = current();
   if (s == SRC_SPOTIFY) return spotify::state();
-  if (s == SRC_PODCAST) return podcast::state();
+  if (s == SRC_PODCAST || s == SRC_RADIO) return podcast::state();
   State e{};
   return e;
 }

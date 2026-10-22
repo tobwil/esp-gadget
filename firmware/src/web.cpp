@@ -25,7 +25,7 @@ static void addHeaders(HTTPClient& h, const char* headers) {
 }
 
 bool open(Conn& c, String url, const char* headers, uint32_t timeoutMs) {
-  static const char* keep[] = {"Location", "Content-Type"};
+  static const char* keep[] = {"Location", "Content-Type", "icy-metaint"};
   for (int hop = 0; hop < 6; hop++) {
     c.http.end();
     bool https = url.startsWith("https://");
@@ -41,7 +41,7 @@ bool open(Conn& c, String url, const char* headers, uint32_t timeoutMs) {
     c.http.setTimeout(timeoutMs);
     c.http.setConnectTimeout(timeoutMs);
     c.http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
-    c.http.collectHeaders(keep, 2);
+    c.http.collectHeaders(keep, 3);
     c.http.useHTTP10(true);  // kein Chunked-Encoding beim Streamen
     addHeaders(c.http, headers);
     c.code = c.http.GET();
@@ -56,6 +56,7 @@ bool open(Conn& c, String url, const char* headers, uint32_t timeoutMs) {
     }
     c.size = c.http.getSize();
     c.type = c.http.header("Content-Type");
+    c.metaint = c.http.header("icy-metaint").toInt();
     return c.code == 200 || c.code == 206;
   }
   return false;

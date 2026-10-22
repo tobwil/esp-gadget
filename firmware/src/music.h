@@ -8,7 +8,7 @@
 namespace music {
 
 enum Kind : uint8_t { K_TRACK = 0, K_LIST = 1 };
-enum Source : uint8_t { SRC_NONE = 0, SRC_SPOTIFY = 1, SRC_PODCAST = 2 };
+enum Source : uint8_t { SRC_NONE = 0, SRC_SPOTIFY = 1, SRC_PODCAST = 2, SRC_RADIO = 3 };  // PODCAST auch für die Audiothek
 
 struct Item {
   uint8_t kind;
@@ -37,8 +37,9 @@ static const int ART = 220;  // Cover-Kantenlänge in Pixeln
 void begin();
 void poll();                 // aus der Hauptschleife
 
-// Listen: „home“, „search:…“ (Spotify), „sp:album:…“, „sp:playlist:…“, „sp:artist:…“,
-//         „pc:subs“, „pcsearch:…“, „pc:feed:…“
+// Listen: „home“, „sp:home“, „search:…“ (Spotify), „sp:album:…“, „sp:playlist:…“, „sp:artist:…“,
+//         „pc:subs“, „pcsearch:…“, „pc:feed:…“ (Podcasts), „rl:…“, „rlsearch:…“ (Radio, webradio.h),
+//         „ard:…“, „ardsearch:…“ (ARD Audiothek, ard.h)
 void browse(const char* path);
 bool browseBusy();
 uint32_t browseSeq();        // zählt hoch, sobald ein neues Ergebnis da ist
@@ -50,8 +51,8 @@ int query(const char* path, char* title, size_t titleLen, Item* out, int max, ch
 
 void playList(const Item* items, int n, int start);
 void toggle();
-void next();                 // Podcast: +30 s
-void prev();                 // Podcast: −15 s
+void next();                 // Podcast: +30 s, Radio: nächster Sender
+void prev();                 // Podcast: −15 s, Radio: voriger Sender
 void stop();
 State state();
 const uint16_t* art(uint32_t* version);

@@ -84,6 +84,8 @@ static int fetch(const char* path, Item* tmp, char* title, size_t titleLen, char
   if (!strncmp(path, "rl", 2)) wradio::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
   else if (!strncmp(path, "ard", 3)) ard::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
   else if (!strncmp(path, "pc", 2)) podcast::browse(path, title, titleLen, tmp, BROWSE_MAX, &n, err, errLen);
+  else if (!strcmp(path, "favs")) { ucopy(title, titleLen, "Favoriten"); n = favs::list(tmp, BROWSE_MAX); }
+  else if (!strcmp(path, "kids")) { ucopy(title, titleLen, "Freigegeben"); n = kids::list(tmp, BROWSE_MAX); }
   else ucopy(err, errLen, "Unbekannte Liste");
   return n;
 }
@@ -209,9 +211,9 @@ static void playStation(int i) {
   podcast::playUrl(url, s.title, s.title, wradio::logo(url).c_str(), 0, true);
 }
 
-void playList(const Item* list, int n, int start) {
+void playList(const Item* list, int n, int start, bool force) {
   if (start < 0 || start >= n || list[start].kind != K_TRACK) return;
-  if (kids::musicLocked()) return;  // Schlafenszeit
+  if (kids::musicLocked() && !force) return;  // Schlafenszeit
   const char* id = list[start].id;
   if (!strncmp(id, "radio:", 6)) {
     stations.clear();

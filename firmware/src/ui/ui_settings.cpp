@@ -352,7 +352,7 @@ static void webBuild(lv_obj_t* scr) {
     return;
   }
   static char url[48];
-  snprintf(url, sizeof(url), "http://%s/", netIp().c_str());  // IP statt .local: klappt auch auf Android
+  snprintf(url, sizeof(url), "https://%s/", netIp().c_str());  // IP statt .local: klappt auch auf Android
   lv_obj_t* qr = lv_qrcode_create(scr);
   lv_qrcode_set_size(qr, 200);
   lv_qrcode_set_dark_color(qr, lv_color_black());

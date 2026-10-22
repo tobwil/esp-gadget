@@ -6,6 +6,7 @@
 #include <math.h>
 #include <time.h>
 #include "../kids.h"
+#include "../routines.h"
 #include "../music.h"
 #include "../net.h"
 #include "ui.h"
@@ -515,13 +516,15 @@ void kidFaceBuild(lv_obj_t* scr) {
   lv_obj_align(actL, LV_ALIGN_TOP_MID, 0, 386);
   nextL = label(scr, &font_text_20, C_DIM(), "");
   lv_obj_align(nextL, LV_ALIGN_TOP_MID, 0, 416);
-  // ganze Fläche: Antippen führt zur Musik, wenn etwas läuft; am Rand drehen = Lautstärke
+  // ganze Fläche: Antippen führt zu den Aufgaben (wenn gerade welche dran sind), sonst zur Musik, wenn etwas läuft
   touch = lv_obj_create(scr);
   lv_obj_remove_style_all(touch);
   lv_obj_set_size(touch, W, H);
   lv_obj_add_flag(touch, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(touch, [](lv_event_t*) {
-    if (!bezelMoved() && music::state().active) push(&PAGE_MUSIC);
+    if (bezelMoved()) return;
+    if (routines::active()) push(&PAGE_ROUTINE);
+    else if (music::state().active) push(&PAGE_MUSIC);
   }, LV_EVENT_SHORT_CLICKED, nullptr);
   bezel(touch, []() { return music::state().active; });
   lastFrame = lastMin = -1;

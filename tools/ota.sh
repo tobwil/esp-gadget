@@ -9,5 +9,5 @@ ENV=${2:-amoled-175c}
 PIN=${3:-}
 cd "$(dirname "$0")/../firmware"
 ~/.platformio/penv/bin/pio run -e "$ENV" | tail -1
-curl -s --max-time 180 -H "X-Pin: $PIN" -F "file=@.pio/build/$ENV/firmware.bin" "http://$HOST/api/update"
+curl -sk --max-time 180 -H "X-Pin: $PIN" -F "file=@.pio/build/$ENV/firmware.bin" "https://$HOST/api/update"
 echo

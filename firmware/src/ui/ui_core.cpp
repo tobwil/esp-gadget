@@ -363,7 +363,7 @@ static lv_obj_t* pttObj = nullptr;
 static lv_obj_t* pttRing = nullptr;
 static lv_obj_t* rxPill = nullptr;
 
-static void pttShow() {
+static void pttShow(const char* to = "Funk an alle") {
   pttObj = overlay(C_BG(), LV_OPA_80);
   lv_obj_remove_flag(pttObj, LV_OBJ_FLAG_CLICKABLE);
   pttRing = lv_obj_create(pttObj);
@@ -374,7 +374,7 @@ static void pttShow() {
   lv_obj_set_style_border_width(pttRing, 0, 0);
   lv_obj_t* m = label(pttObj, &font_icon_64, C_TEXT(), I_MIC);
   lv_obj_center(m);
-  lv_obj_t* l = label(pttObj, &font_text_24, C_TEXT(), "Funk an alle");
+  lv_obj_t* l = label(pttObj, &font_text_24, C_TEXT(), to);
   lv_obj_align(l, LV_ALIGN_CENTER, 0, 140);
 }
 
@@ -708,12 +708,14 @@ void onButton(BtnEvent e) {
     case BOOT_HOLD:
       if (cw::ringing()) { cw::ringStop(); break; }
       if (top() == &PAGE_ASSIST) { assist::talk(true); break; }  // auf der Assistenten-Seite: BOOT = sprechen
+      if (phone::connected()) { phone::talk(true); pttShow("An das Handy"); break; }  // Antwort ans Handy
       if (!kids::allowed(kids::A_RADIO) || kids::night()) break;
       if (top() != &PAGE_RADIO) { radio::pttDown(0); pttShow(); }
       else radio::pttDown(radioTarget());
       break;
     case BOOT_RELEASE:
       assist::talk(false);
+      phone::talk(false);
       radio::pttUp();
       if (pttObj) { lv_obj_delete(pttObj); pttObj = nullptr; }
       break;

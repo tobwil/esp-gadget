@@ -11,6 +11,7 @@ struct Entry { String id, name, kind, desc; };  // kind: "workflow" oder "agent"
 void begin();
 bool configured();
 String url();
+String token();  // nur für die Sicherung (mit Schlüsseln)
 void set(const char* url, const char* token);  // nullptr = unverändert; Token wird nie zurückgegeben
 
 std::vector<Entry> allowed();

@@ -106,6 +106,8 @@ Ein- und ausgeschaltet wird **nur über die Weboberfläche** (Reiter „Kinder�
 - **Apps:** Musik ist immer da; Funk, Timer, Stoppuhr, Balance, Wecker, Wetter einzeln erlaubt. Keine
   Einstellungen, keine Zifferblatt-Wahl, keine KI.
 - **Lautstärke** mit Obergrenze (Standard 60 %).
+- **Fernbedienung:** in der Weboberfläche (Reiter „Musik“) Sender, Sendungen und Podcasts aussuchen, starten,
+  anhalten, weiterschalten, Lautstärke und Sleep-Timer setzen – die Eltern dürfen alles, auch nachts.
 
 ![Kindermodus](docs/screens/kindermodus.png)
 
@@ -114,6 +116,14 @@ Ein- und ausgeschaltet wird **nur über die Weboberfläche** (Reiter „Kinder�
 Ab der Bettzeit bis zum Aufstehen ist die Uhr gesperrt: keine Apps, kein Funk, keine Kacheln, das Display
 gedimmt. Was beim Zubettgehen läuft, darf noch eine Einschlafzeit lang weiterlaufen (Standard 30 Minuten,
 in der Weboberfläche 0 – 60) und wird dann sanft ausgeblendet. Der Wecker funktioniert weiter.
+
+### Routinen mit Sternen
+
+Morgens (ab dem Aufstehen 2 Stunden) und abends (2 Stunden vor der Bettzeit) zeigt die App **Aufgaben** eine
+kurze Liste zum Abhaken – Anziehen, Zähne putzen, Schlafanzug an … Jeder Haken gibt einen **Stern**, eine ganz
+geschaffte Routine zwei Extrasterne und eine kleine Feier. Läuft eine Routine, öffnet ein Tipp aufs Zifferblatt
+direkt die Liste. Die Aufgaben stehen in der Weboberfläche (Reiter „Kinder“, eine pro Zeile, bis zu acht), dort
+auch die Sterne von heute, der Woche und insgesamt.
 
 ### Wutmodus
 
@@ -125,21 +135,29 @@ ein paar pro Sekunde, so braucht es eine Weile echte Kraft. Ist alles draußen, 
 sinkt, und ein Kreis atmet vor (4 s ein, 6 s aus). Wischen und Tasten tun nichts, Musik und Funk sind aus.
 Die Weboberfläche zeigt, wie oft heute die Wut rausgeschüttelt wurde.
 
-## Funk vom Handy und Uhr finden
+## Funk mit dem Handy und Uhr finden
 
-- **Funk vom Handy:** In der Weboberfläche „Funk vom Handy“ antippen – das öffnet eine sichere Seite der Uhr
-  (`https://<Uhr>/`). Knopf halten und sprechen, die Uhr spielt die Stimme ab und zeigt „Handy spricht“.
-  Browser geben das Mikrofon nur über HTTPS frei; das Zertifikat stellt sich die Uhr selbst aus, deshalb
-  warnt der Browser beim ersten Mal („trotzdem öffnen“).
+- **Funk mit dem Handy:** In der Weboberfläche „Funk vom Handy“ antippen (`https://<Uhr>/funk`). Knopf halten
+  und sprechen, die Uhr spielt die Stimme ab und zeigt „Handy spricht“. **Antworten:** auf der Uhr BOOT halten
+  und sprechen, solange die Seite offen ist – die Stimme kommt aus dem Handy.
 - **Uhr finden:** „Uhr klingeln lassen“ – 30 s Piepen mit „Hier bin ich!“, auch bei dunklem Display.
 
 ## Weboberfläche
 
 ![Weboberfläche](docs/screens/weboberflaeche.png)
 
-`http://taschenfunk-xxxx.local` oder die IP (QR-Code unter Einstellungen → Weboberfläche). Fürs Handy gebaut,
-hell und dunkel. Reiter: Übersicht (mit Akku) · Kinder · Musik · KI (Modelle, n8n) · Gerät (WLAN, Schlüssel, Firmware); direkt verlinkbar (`#kinder`, `#ki` …).
+`https://<IP der Uhr>` (QR-Code unter Einstellungen → Weboberfläche; `http://` leitet um). Fürs Handy gebaut,
+hell und dunkel. Reiter: Übersicht (mit Akku) · Kinder · Musik (Fernbedienung, Favoriten) · KI (Modelle, n8n) ·
+Gerät (WLAN, Schlüssel, Firmware, Sicherung); direkt verlinkbar (`#kinder`, `#ki` …).
 Schlüssel und Tokens werden nur gesetzt, nie ausgelesen.
+
+**Nur HTTPS:** Die Uhr stellt sich beim ersten Start ein eigenes Zertifikat aus, deshalb warnt der Browser
+einmal („trotzdem öffnen“) – danach ist die Verbindung verschlüsselt, auch PIN und Schlüssel. HTTPS ist
+außerdem nötig, damit der Browser das Mikrofon für den Funk freigibt.
+
+**Sicherung:** Gerät → Sicherung lädt alle Einstellungen als JSON herunter (WLAN, Kindermodus, Freigaben,
+Routinen, Favoriten, KI, n8n-Freigaben) und spielt sie wieder ein – etwa auf die zweite Uhr. Passwörter, PIN und
+Schlüssel kommen nur mit dem Haken „Mit Geheimnissen“ in die Datei.
 
 ## Einrichten
 
@@ -176,7 +194,7 @@ Prozessor auf 80 MHz, Tiefschlaf schon nach 3 statt 10 Minuten.
 Weboberfläche → Gerät → Firmware: `firmware.bin` auswählen und „Aktualisieren“. Oder vom Rechner:
 
 ```bash
-sh tools/ota.sh taschenfunk-e008.local amoled-175c   # baut und schickt die Firmware
+sh tools/ota.sh 192.168.178.112 amoled-175c   # baut und schickt die Firmware (über HTTPS)
 ```
 
 Die Uhr prüft, ob die Datei für ihr Board gebaut ist (rund/eckig), und lehnt sonst ab.
@@ -217,12 +235,16 @@ Befehle im seriellen Monitor:
 - **TLS:** mbedTLS mit dem CA-Bundle aus ESP-IDF (`tools/make_crt_bundle.sh`), Speicher dafür im PSRAM.
 - **Cover:** JPEG-Decoder des Chips, rund maskiert; andere Formate über den Bild-Proxy wsrv.nl.
 - **Bewegungssensor:** QMI8658, läuft nur im Spiel und im Wutmodus.
+- **Weboberfläche:** esp_https_server mit selbst ausgestelltem EC-Zertifikat (im NVS); der HTTPS-Task übergibt
+  jede Anfrage an die Hauptschleife, weil Oberfläche und Wiedergabe nicht threadsicher sind. Firmware-Uploads
+  schreibt er direkt in den Flash.
 - **KI:** Gemini 3.8 Live über einen eigenen WebSocket-Client (TLS), Push-to-Talk, 16 kHz hinein, 24 kHz Stimme in den Sprachkanal; n8n über den MCP-Server der Instanz (JSON-RPC, Server-Sent Events).
 - **Speicher:** große Puffer im PSRAM, Tasks für KI und Spracheingabe nur während einer Anfrage – so bleiben gut 100 KB internes RAM für TLS frei.
 - **Module:**
   - `hw`, `audio`, `net`, `radio`, `clockwork`, `weather`, `imu`
   - `music` mit `podcast` (MP3-Spieler, auch live), `webradio`, `ard` und `favs`
-  - `kids`, `voice`, `keys`, `webui`
+  - `kids`, `routines`, `voice`, `keys`, `backup`
+  - `webui` (Seite und API) auf dem HTTPS-Server aus `phone` (esp_https_server, auch Funk mit dem Handy)
   - `assist` (Gemini Live), `wsock` (WebSocket über TLS), `n8n` (MCP-Client mit Freigabeliste)
   - `faces/` (FaceLab-Designs)
   - `ui/` (Seiten, Kindermodus-Zifferblatt `ui_kidface.cpp`, Wut-Glas `ui_angry.cpp`, Spiel `ui_game.cpp` + `game_theme.cpp`)

@@ -26,6 +26,7 @@
 #include "kids.h"
 #include "power.h"
 #include "phone.h"
+#include "routines.h"
 #include "assist.h"
 #include "ui/ui.h"
 extern const ui::Page PAGE_WEB_;
@@ -119,6 +120,7 @@ void setup() {
   voice::begin();
   assist::begin();
   pwr::begin();
+  routines::begin();
   webui::begin();
   ui::begin();
   lv_timer_handler();

@@ -49,7 +49,7 @@ int browseCopy(char* title, size_t titleLen, Item* out, int max, char* err, size
 // ohne Kindermodus-Filter und ohne die Liste auf der Uhr zu ändern)
 int query(const char* path, char* title, size_t titleLen, Item* out, int max, char* err, size_t errLen);
 
-void playList(const Item* items, int n, int start);
+void playList(const Item* items, int n, int start, bool force = false);  // force: auch nachts (Eltern per Weboberfläche)
 // Was sich vom gerade Laufenden merken lässt: Sender, Audiothek-Sendung oder Podcast (false = nichts)
 bool favTarget(String& path, String& title, String& sub);
 void toggle();

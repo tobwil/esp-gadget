@@ -5,7 +5,7 @@
 
 namespace n8n {
 
-static String mcpUrl, token, allowJson = "[]";
+static String mcpUrl, tok, allowJson = "[]";
 static SemaphoreHandle_t mtx;
 
 void begin() {
@@ -13,19 +13,20 @@ void begin() {
   Preferences p;
   p.begin("n8n", true);
   mcpUrl = p.getString("url", "");
-  token = p.getString("tok", "");
+  tok = p.getString("tok", "");
   allowJson = p.getString("allow", "[]");
   p.end();
 }
 
-bool configured() { return mcpUrl.length() && token.length(); }
+bool configured() { return mcpUrl.length() && tok.length(); }
 String url() { return mcpUrl; }
+String token() { return tok; }
 
 void set(const char* u, const char* t) {
   Preferences p;
   p.begin("n8n", false);
   if (u) { mcpUrl = u; mcpUrl.trim(); p.putString("url", mcpUrl); }
-  if (t) { token = t; token.trim(); p.putString("tok", token); }
+  if (t) { tok = t; tok.trim(); p.putString("tok", tok); }
   p.end();
 }
 
@@ -77,7 +78,7 @@ static bool call(const char* tool, JsonDocument& args, String& out, String& err)
   req["params"]["arguments"] = args;
   String body, resp;
   serializeJson(req, body);
-  String headers = "Authorization: Bearer " + token + "\nAccept: application/json, text/event-stream";
+  String headers = "Authorization: Bearer " + tok + "\nAccept: application/json, text/event-stream";
   int code = web::post(mcpUrl, body, "application/json", resp, headers.c_str());
   if (code != 200) { err = "n8n antwortet nicht (" + String(code) + ")"; return false; }
   // Antwort kommt als Server-Sent-Event („data: {…}“) oder direkt als JSON

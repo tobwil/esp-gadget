@@ -11,6 +11,8 @@
 #include "n8n.h"
 #include "power.h"
 #include "phone.h"
+#include "routines.h"
+#include "backup.h"
 #include "music.h"
 #include "net.h"
 #include "radio.h"
@@ -22,7 +24,61 @@ extern const char TF_BOARD_TAG[];  // main.cpp
 
 namespace webui {
 
-static WebServer* srv = nullptr;
+// ------------------------------------------------------------------ Anfragen
+// Die Weboberfläche läuft auf dem HTTPS-Server (phone.cpp). Dessen Task nimmt eine Anfrage an und übergibt sie an die
+// Hauptschleife (Oberfläche und Musik sind nicht threadsicher); die Antwort schickt wieder der HTTPS-Task.
+// Die Handler sprechen „srv->…“ wie beim Arduino-WebServer. Port 80 leitet nur noch auf https um.
+struct Http {
+  String uri, query, body, pin;  // Anfrage
+  int code = 0;                  // Antwort
+  String type, out, disp;
+  const char* outP = nullptr;
+  void (*fn)() = nullptr;
+  volatile int state = 0;        // 0 frei, 1 wartet auf die Hauptschleife, 2 läuft dort
+  SemaphoreHandle_t ready = nullptr;
+
+  String arg(const char* name) const;
+  String header(const char*) const { return pin; }  // nur X-Pin wird gebraucht
+  void sendHeader(const char*, const String& v) { disp = v; }  // nur Content-Disposition
+  void send(int c, const char* t, const String& b) { code = c; type = t; out = b; outP = nullptr; xSemaphoreGive(ready); }
+  void send_P(int c, const char* t, const char* p) { code = c; type = t; out = ""; outP = p; xSemaphoreGive(ready); }
+};
+
+static Http req;
+static Http* const srv = &req;
+static WebServer* web80 = nullptr;
+
+static String urlDecode(const String& v) {
+  String o;
+  for (unsigned i = 0; i < v.length(); i++) {
+    char c = v[i];
+    if (c == '+') c = ' ';
+    else if (c == '%' && i + 2 < v.length()) { c = strtol(v.substring(i + 1, i + 3).c_str(), nullptr, 16); i += 2; }
+    o += c;
+  }
+  return o;
+}
+
+String Http::arg(const char* name) const {
+  if (!strcmp(name, "plain")) return body;
+  int n = strlen(name);
+  for (int i = 0; i < (int)query.length();) {
+    int amp = query.indexOf('&', i);
+    if (amp < 0) amp = query.length();
+    if (!strncmp(query.c_str() + i, name, n) && (i + n == amp || query[i + n] == '='))
+      return i + n == amp ? "" : urlDecode(query.substring(i + n + 1, amp));
+    i = amp + 1;
+  }
+  return "";
+}
+
+struct Route { const char* path; bool post; void (*fn)(); };
+static Route routes[32];
+static int nRoutes = 0;
+
+static void on(const char* path, http_method m, void (*fn)()) {
+  if (nRoutes < 32) routes[nRoutes++] = {path, m == HTTP_POST, fn};
+}
 
 // Für das Handy gebaut: eine Spalte, große Schalter, unten die Reiter. Hell und dunkel nach Systemeinstellung.
 static const char PAGE[] PROGMEM = R"HTML(<!doctype html>
@@ -43,6 +99,7 @@ section{background:var(--card);border:1px solid var(--line);border-radius:18px;p
 h2{font-size:15px;margin:0 0 6px;color:var(--acc);font-weight:650}.kidc h2{color:var(--kid)}
 p.note{color:var(--dim);font-size:14px;margin:6px 0}
 label.f{display:block;font-size:13px;color:var(--dim);margin:12px 0 4px}
+textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:16px;resize:vertical}
 input,select{width:100%;min-height:46px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:16px}
 button{font:inherit;font-weight:600;border:0;border-radius:12px;min-height:46px;padding:10px 16px;background:var(--acc);color:#000;cursor:pointer}
 button.wide{width:100%;margin-top:12px}button.ghost{background:transparent;color:var(--text);border:1px solid var(--line);min-height:40px;padding:6px 12px;font-weight:500}
@@ -71,7 +128,7 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 <main>
 <div class="tab sel" id="t-home">
  <section><h2>Uhr</h2><div class="kv" id="info"></div><button class="wide ghost" id="findgo">🔔 Uhr klingeln lassen</button>
-  <button class="wide" id="phonego">🎙 Funk vom Handy</button><p class="note">Öffnet eine sichere Seite der Uhr: Knopf halten und sprechen, die Uhr spielt deine Stimme ab. Beim ersten Mal warnt der Browser vor dem Zertifikat der Uhr – „trotzdem öffnen“.</p></section>
+  <button class="wide" id="phonego">🎙 Funk vom Handy</button><p class="note">Knopf halten und sprechen, die Uhr spielt deine Stimme ab. Antwort: auf der Uhr BOOT halten.</p></section>
  <section><h2>Akku</h2><div class="kv" id="batkv"></div><svg id="batchart" viewBox="0 0 360 90" style="width:100%;height:90px;margin-top:10px"></svg>
   <label class="f" for="pmode">Sparmodus</label><select id="pmode"><option value="1">Automatisch ab 20 %</option><option value="2">Immer an</option><option value="0">Aus</option></select>
   <p class="note">Sparmodus: Display höchstens 40 % und nach 10 s aus, kein Funk im Hintergrund, ohne Musik schläft das WLAN.</p></section>
@@ -88,6 +145,10 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
   <div class="seg" id="kplace"><button data-v="0">Kita</button><button data-v="1">Schule</button></div>
   <div class="row" style="margin-top:6px"><div class="t"><b>Mittagsruhe</b><small>12:45 bis 14:00</small></div><label class="sw"><input type="checkbox" id="knap"><span></span></label></div>
  </section>
+ <section class="kidc"><h2>Routinen mit Sternen</h2><p class="note" id="rst2"></p><div id="rnow"></div>
+  <label class="f" for="rmorn">Morgens (ab dem Aufstehen, eine Aufgabe pro Zeile)</label><textarea id="rmorn" rows="4"></textarea>
+  <label class="f" for="reve">Abends (2 Stunden vor der Bettzeit)</label><textarea id="reve" rows="4"></textarea>
+  <button class="wide kid" id="rgo">Routinen speichern</button><button class="wide ghost" id="rreset">Sterne zurücksetzen</button></section>
  <section class="kidc"><h2>Schlafenszeit</h2>
   <div class="row"><div class="t"><b>Nachts sperren</b><small>Ab der Bettzeit bis zum Aufstehen: keine Apps, kein Funk, gedimmt</small></div><label class="sw"><input type="checkbox" id="knight"><span></span></label></div>
   <label class="f" for="kstory">Einschlafmusik nach der Bettzeit</label>
@@ -104,6 +165,15 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 </div>
 
 <div class="tab" id="t-music">
+ <section><h2>Läuft auf der Uhr</h2><div id="np" class="note">Nichts</div>
+  <div class="seg" style="margin-top:12px"><button id="mprev">⏮</button><button id="mtog">⏯</button><button id="mnext">⏭</button><button id="mstop">⏹</button></div>
+  <label class="f" for="mvol">Lautstärke <span id="mvolv"></span> %</label><input type="range" id="mvol" min="0" max="100" step="5">
+  <label class="f" for="msleep">Sleep-Timer</label><select id="msleep"><option value="0">aus</option><option value="15">15 Min.</option><option value="30">30 Min.</option><option value="45">45 Min.</option><option value="60">60 Min.</option><option value="90">90 Min.</option></select></section>
+ <section><h2>Abspielen</h2>
+  <div class="seg" id="msrc"><button data-v="kids" class="sel">Freigegeben</button><button data-v="favs">Favoriten</button><button data-v="search">Suche</button></div>
+  <div id="msearch" hidden><div class="seg" id="mss"><button data-v="radio" class="sel">Radio</button><button data-v="ard">Audiothek</button><button data-v="podcast">Podcasts</button></div>
+   <input id="mq" type="search" placeholder="Sender, Sendung, Podcast" enterkeyhint="search" style="margin-top:10px"></div>
+  <p class="note" id="mpath"></p><div id="mlist"></div></section>
  <section><h2>Favoriten</h2><div id="favs"></div></section>
 </div>
 
@@ -135,6 +205,11 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
  <section><h2>Firmware</h2><p class="note" id="fwst"></p>
   <label class="f" for="fwfile">Neue Firmware (firmware.bin aus dem Build)</label><input id="fwfile" type="file" accept=".bin">
   <button class="wide" id="fwgo">Aktualisieren</button><p class="note" id="fwprog"></p></section>
+ <section><h2>Sicherung</h2><p class="note">Alle Einstellungen als Datei – zum Wiederherstellen oder für eine zweite Uhr.</p>
+  <div class="row"><div class="t"><b>Mit Geheimnissen</b><small>WLAN-Passwörter, Gemini-Schlüssel, n8n-Token, Eltern-PIN</small></div><label class="sw"><input type="checkbox" id="bsec"><span></span></label></div>
+  <button class="wide" id="bgo">Sicherung herunterladen</button>
+  <label class="f" for="bfile">Sicherung einspielen</label><input id="bfile" type="file" accept=".json,application/json">
+  <button class="wide ghost" id="bload">Einspielen und neu starten</button></section>
  <section><button class="wide ghost" id="rst">Uhr neu starten</button></section>
 </div>
 </main>
@@ -172,6 +247,11 @@ function render(){
  $('kidsum').textContent=k.on?`An · ${k.released.length} Freigaben · bis ${k.maxVol} %`:'Aus';
  if(document.activeElement!==$('kw'))$('kw').value=hm(k.wake);if(document.activeElement!==$('kb'))$('kb').value=hm(k.bed);
  [...$('kplace').children].forEach(b=>b.classList.toggle('sel',+b.dataset.v==+k.school));
+ const r=s.routines;
+ $('rst2').innerHTML=`⭐ heute <b>${r.today}</b> · Woche <b>${r.week}</b> · insgesamt <b>${r.total}</b>`;
+ $('rnow').innerHTML=[['Morgens',r.morning],['Abends',r.evening]].map(([n,l])=>`<p class="note">${n}: `+l.map(i=>(i.done?'✅ ':'⬜ ')+esc(i.text)).join(' · ')+'</p>').join('');
+ if(document.activeElement!==$('rmorn'))$('rmorn').value=r.morning.map(i=>i.text).join('\n');
+ if(document.activeElement!==$('reve'))$('reve').value=r.evening.map(i=>i.text).join('\n');
  $('knap').checked=k.nap;$('knight').checked=k.nightLock;if(document.activeElement!==$('kstory'))$('kstory').value=k.storyMin;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
  $('kapps').innerHTML=APPS.map(([b,n,d])=>row(n,d,`<label class="sw"><input type="checkbox" ${k.apps&b?'checked':''} onchange="kids({apps:this.checked?S.kids.apps|${b}:S.kids.apps&~${b}})"><span></span></label>`)).join('');
  $('krel').innerHTML=k.released.map(r=>row(r.title,r.sub,btn('Entfernen',`rel(${J(r)},false)`))).join('')||'<p class="note">Noch nichts – unten suchen oder einen Favoriten freigeben.</p>';
@@ -194,6 +274,10 @@ function render(){
   const pts=h.map(p=>`${(360-p[0]/mx*360).toFixed(1)},${(86-p[1]*0.82).toFixed(1)}`).join(' ');
   $('batchart').innerHTML=`<polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2"/><text x="0" y="10" font-size="10" fill="var(--dim)">-${mx} min</text><text x="330" y="10" font-size="10" fill="var(--dim)">jetzt</text>`}
  else $('batchart').innerHTML='<text x="0" y="50" font-size="12" fill="var(--dim)">Verlauf: alle 2 Minuten ein Messpunkt</text>';
+ const mu=s.music;$('np').innerHTML=mu.active?`<b>${mu.playing?'▶':'⏸'} ${esc(mu.title)}</b><br>${esc(mu.artist)}${mu.dur?' · '+Math.floor(mu.pos/60)+':'+String(Math.floor(mu.pos%60)).padStart(2,'0')+' / '+Math.floor(mu.dur/60)+':'+String(mu.dur%60).padStart(2,'0'):''}${mu.msg?'<br><span class="bad">'+esc(mu.msg)+'</span>':''}`:'Gerade läuft nichts.';
+ if(document.activeElement!==$('mvol')){$('mvol').value=mu.volume;$('mvolv').textContent=mu.volume}
+ if(document.activeElement!==$('msleep'))$('msleep').value=[0,15,30,45,60,90].reduce((a,v)=>Math.abs(v-mu.sleepMin)<Math.abs(a-mu.sleepMin)?v:a,0);
+ if($('t-music').classList.contains('sel')&&!mStack.length)mStart();
  $('fwst').textContent=`Version ${s.version} · ${s.board} · gebaut ${s.built}`;
  $('gst').innerHTML=s.gemini?'<span class="ok">Schlüssel gesetzt</span>':'<span class="bad">Kein Schlüssel – Spracheingabe aus</span>';
 }
@@ -208,6 +292,31 @@ $('kon').onchange=$('kon2').onchange=e=>{kids({on:e.target.checked});toast(e.tar
 $('kangry').onchange=$('kangry2').onchange=e=>{kids(e.target.checked?{angry:true,on:true}:{angry:false});toast(e.target.checked?'Wutmodus an – nur noch das Wut-Glas':'Wutmodus aus')};
 $('kw').onchange=()=>kids({wake:mins($('kw').value)});$('kb').onchange=()=>kids({bed:mins($('kb').value)});
 $('kplace').onclick=e=>{if(e.target.dataset.v)kids({school:e.target.dataset.v=='1'})};
+const lines=id=>$(id).value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,8);
+$('rgo').onclick=()=>post('routines',{morning:lines('rmorn'),evening:lines('reve')});
+$('rreset').onclick=()=>confirm('Alle Sterne auf 0 setzen?')&&post('routines/reset',{});
+$('bgo').onclick=async()=>{try{const r=await fetch('/api/backup'+($('bsec').checked?'?secrets=1':''),{headers:{'X-Pin':pin}});
+ if(!r.ok)return toast('Fehler '+r.status);const b=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(b);
+ a.download=(S?S.name:'taschenfunk')+'-sicherung.json';a.click()}catch(e){toast('Uhr nicht erreichbar')}};
+$('bload').onclick=async()=>{const f=$('bfile').files[0];if(!f)return toast('Erst eine Datei wählen');
+ if(!confirm('Einstellungen aus der Datei übernehmen und neu starten?'))return;post('restore',JSON.parse(await f.text()))};
+// ------------------------------------------------ Fernbedienung
+let mItems=[],mStack=[],mSrc='kids',mSs='radio';
+async function mOpen(path,title,push){$('mlist').innerHTML='<p class="note">Lade …</p>';
+ try{const j=await api('music/list?path='+encodeURIComponent(path));if(push)mStack.push({path,title});
+  $('mpath').innerHTML=mStack.length>1?`<a href="#" onclick="mBack();return false">← zurück</a> · ${esc(title||j.title)}`:esc(j.title||'');
+  mItems=j.items||[];$('mlist').innerHTML=mItems.map((it,i)=>row(it.title,it.sub,it.kind==1?btn('Öffnen',`mOpen(${J(it.id)},${J(it.title)},true)`):btn('▶',`mPlay(${i})`))).join('')||'<p class="note">'+esc(j.err||'Nichts da')+'</p>'}catch(e){$('mlist').innerHTML=''}}
+function mBack(){mStack.pop();const t=mStack.pop();if(t)mOpen(t.path,t.title,true)}
+function mPlay(i){post('music/play',{items:mItems,index:i},true).then(()=>toast('Läuft auf der Uhr'))}
+function mStart(){mStack=[];if(mSrc=='search'){if(val('mq'))mOpen((mSs=='radio'?'rlsearch:':mSs=='ard'?'ardsearch:':'pcsearch:')+val('mq'),'',true);else $('mlist').innerHTML=''}else mOpen(mSrc,'',true)}
+$('msrc').onclick=e=>{if(!e.target.dataset.v)return;mSrc=e.target.dataset.v;[...$('msrc').children].forEach(b=>b.classList.toggle('sel',b==e.target));$('msearch').hidden=mSrc!='search';mStart()};
+$('mss').onclick=e=>{if(!e.target.dataset.v)return;mSs=e.target.dataset.v;[...$('mss').children].forEach(b=>b.classList.toggle('sel',b==e.target));mStart()};
+$('mq').onkeydown=e=>{if(e.key=='Enter')mStart()};
+const ctl=c=>post('music/ctl',c,true);
+$('mprev').onclick=()=>ctl({cmd:'prev'});$('mtog').onclick=()=>ctl({cmd:'toggle'});$('mnext').onclick=()=>ctl({cmd:'next'});$('mstop').onclick=()=>ctl({cmd:'stop'});
+$('mvol').oninput=e=>$('mvolv').textContent=e.target.value;$('mvol').onchange=e=>ctl({volume:+e.target.value});
+$('msleep').onchange=e=>ctl({sleep:+e.target.value});
+document.querySelector('nav button[data-t=music]').addEventListener('click',()=>{if(!mStack.length)mStart()});
 $('knap').onchange=e=>kids({nap:e.target.checked});
 $('knight').onchange=e=>kids({nightLock:e.target.checked});$('kstory').onchange=e=>kids({storyMin:+e.target.value});
 $('kv').oninput=e=>$('kvv').textContent=e.target.value;$('kv').onchange=e=>kids({maxVol:+e.target.value});
@@ -239,7 +348,7 @@ $('n8nload').onclick=async()=>{$('n8nall').innerHTML='<p class="note">Lade …</
 $('n8nsave').onclick=()=>{const sel=[...document.querySelectorAll('#n8nall input:checked')].map(c=>n8nList[+c.dataset.i]).map(w=>({id:w.id,name:w.name,kind:w.kind,desc:w.desc||''}));
  post('n8n/allow',{items:sel})};
 function unallow(id){post('n8n/allow',{items:S.assist.allowed.filter(a=>a.id!=id)})}
-$('phonego').onclick=()=>{if(S&&S.phoneUrl)location.href=S.phoneUrl;else toast('Noch nicht bereit')};
+$('phonego').onclick=()=>{location.href='/funk'};
 $('findgo').onclick=()=>post('find',{on:true});
 $('pmode').onchange=e=>post('power',{mode:+e.target.value});
 $('fwgo').onclick=()=>{const f=$('fwfile').files[0];if(!f)return toast('Erst eine Datei wählen');
@@ -303,40 +412,76 @@ static void otaScan(const uint8_t* p, size_t n) {
   memcpy(otaTail, p + n - otaTailLen, otaTailLen);
 }
 
-static void otaUpload() {
-  HTTPUpload& u = srv->upload();
-  if (u.status == UPLOAD_FILE_START) {
-    otaErr = "";
-    otaTag = false;
-    otaTailLen = 0;
-    if (!pinOk()) { otaErr = "PIN nötig"; return; }
-    Serial.printf("Update: %s wird empfangen\n", u.filename.c_str());
-    music::stop();
-    assist::close();
-    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) otaErr = Update.errorString();
-  } else if (u.status == UPLOAD_FILE_WRITE) {
-    if (otaErr.length()) return;
-    otaScan(u.buf, u.currentSize);
-    if (Update.write(u.buf, u.currentSize) != u.currentSize) otaErr = Update.errorString();
-  } else if (u.status == UPLOAD_FILE_END) {
-    if (otaErr.length()) { Update.abort(); return; }
-    if (!otaTag) { Update.abort(); otaErr = "Diese Firmware ist für ein anderes Board"; return; }
-    if (!Update.end(true)) otaErr = Update.errorString();
-  } else if (u.status == UPLOAD_FILE_ABORTED) {
-    Update.abort();
-    otaErr = "Übertragung abgebrochen";
-  }
+static void otaPrep() {  // in der Hauptschleife: Wiedergabe und KI vor dem Schreiben anhalten
+  music::stop();
+  assist::close();
+  srv->send(200, "text/plain", "");
 }
 
-static void otaDone() {
+static esp_err_t respond(httpd_req_t* r);
+static bool runInLoop(void (*fn)(), uint32_t ms);
+
+// Firmware kommt als multipart/form-data mit genau einer Datei; sie wird direkt in den HTTPS-Task geschrieben
+static esp_err_t otaReceive(httpd_req_t* r) {
+  static char* buf = (char*)heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
+  otaErr = "";
+  otaTag = false;
+  otaTailLen = 0;
+  char ct[128] = "";
+  httpd_req_get_hdr_value_str(r, "Content-Type", ct, sizeof(ct));
+  const char* bnd = strstr(ct, "boundary=");
+  if (!pinOk()) otaErr = "PIN nötig";
+  else if (!bnd) otaErr = "Ungültige Anfrage";
+  else runInLoop(otaPrep, 5000);
+  size_t left = r->content_len, have = 0, data = 0;
+  char* hdrEnd = nullptr;
+  while (!otaErr.length() && !hdrEnd && left && have < 1024) {  // Kopf des Datei-Teils
+    int n = httpd_req_recv(r, buf + have, min(left, (size_t)1024 - have));
+    if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
+    if (n <= 0) { otaErr = "Übertragung abgebrochen"; break; }
+    have += n;
+    left -= n;
+    hdrEnd = (char*)memmem(buf, have, "\r\n\r\n", 4);
+  }
+  if (!otaErr.length()) {
+    if (!hdrEnd) otaErr = "Ungültige Anfrage";
+    else {
+      // hinter der Datei folgt nur noch „\r\n--<boundary>--\r\n“
+      size_t head = hdrEnd + 4 - buf, tail = strlen(bnd + 9) + 8;
+      data = r->content_len > head + tail ? r->content_len - head - tail : 0;
+      Serial.printf("Update: %u Bytes werden empfangen\n", (unsigned)data);
+      if (!data || !Update.begin(data)) otaErr = data ? Update.errorString() : "Leere Datei";
+      size_t k = min(have - head, data);
+      otaScan((uint8_t*)buf + head, k);
+      if (!otaErr.length() && Update.write((uint8_t*)buf + head, k) != k) otaErr = Update.errorString();
+      data -= k;
+    }
+  }
+  while (!otaErr.length() && left) {
+    int n = httpd_req_recv(r, buf, min(left, (size_t)4096));
+    if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
+    if (n <= 0) { otaErr = "Übertragung abgebrochen"; break; }
+    left -= n;
+    size_t k = min((size_t)n, data);
+    if (!k) continue;
+    otaScan((uint8_t*)buf, k);
+    if (Update.write((uint8_t*)buf, k) != k) otaErr = Update.errorString();
+    data -= k;
+  }
+  if (!otaErr.length() && !otaTag) otaErr = "Diese Firmware ist für ein anderes Board";
+  if (!otaErr.length() && !Update.end(true)) otaErr = Update.errorString();
   if (otaErr.length()) {
+    if (Update.isRunning()) Update.abort();
     Serial.printf("Update: abgelehnt (%s)\n", otaErr.c_str());
-    return msg(otaErr.c_str(), otaErr == "PIN nötig" ? 401 : 400);
+    msg(otaErr.c_str(), otaErr == "PIN nötig" ? 401 : 400);
+    return respond(r);
   }
   Serial.println("Update: installiert, starte neu");
   msg("Update installiert – die Uhr startet neu");
+  respond(r);
   delay(600);
   ESP.restart();
+  return ESP_OK;
 }
 
 static void addItems(JsonArray a, const music::Item* it, int n) {
@@ -367,6 +512,20 @@ static void state() {
   for (int i = 0; i < knownCount; i++) k.add(known[i].ssid);
   d["gemini"] = voice::configured();
   d["phoneUrl"] = phone::url();
+  music::State ms = music::state();
+  JsonObject mu = d["music"].to<JsonObject>();
+  mu["active"] = ms.active;
+  mu["playing"] = ms.playing;
+  mu["title"] = ms.title;
+  mu["artist"] = ms.artist;
+  mu["pos"] = (int)ms.pos;
+  mu["dur"] = ms.dur;
+  mu["msg"] = ms.msg;
+  mu["volume"] = cfg.volume;
+  mu["sleepMin"] = (music::sleepLeftS() + 59) / 60;
+  JsonDocument rd;
+  deserializeJson(rd, routines::stateJson());
+  d["routines"] = rd;
   JsonObject pw = d["power"].to<JsonObject>();
   pw["mode"] = (int)pwr::mode();
   pw["saving"] = pwr::saving();
@@ -455,23 +614,93 @@ static void search() {
 }
 
 
+// ------------------------------------------------------------------ Übergabe HTTPS-Task ↔ Hauptschleife
+
+static const char* statusText(int c) {
+  switch (c) {
+    case 200: return "200 OK";
+    case 400: return "400 Bad Request";
+    case 401: return "401 Unauthorized";
+    case 404: return "404 Not Found";
+    case 413: return "413 Payload Too Large";
+    case 503: return "503 Service Unavailable";
+    default: return "500 Internal Server Error";
+  }
+}
+
+static esp_err_t respond(httpd_req_t* r) {
+  httpd_resp_set_status(r, statusText(req.code));
+  httpd_resp_set_type(r, req.type.c_str());
+  if (req.disp.length()) httpd_resp_set_hdr(r, "Content-Disposition", req.disp.c_str());
+  if (req.outP) return httpd_resp_send(r, req.outP, HTTPD_RESP_USE_STRLEN);
+  return httpd_resp_send(r, req.out.c_str(), req.out.length());
+}
+
+// fn in der Hauptschleife ausführen und auf ihre Antwort warten (die Hauptschleife ruft poll() alle paar ms)
+static bool runInLoop(void (*fn)(), uint32_t ms) {
+  for (uint32_t t = millis(); req.state && millis() - t < ms;) delay(5);  // die vorige Anfrage läuft noch
+  if (req.state) return false;
+  xSemaphoreTake(req.ready, 0);
+  req.code = 0;
+  req.disp = "";
+  req.fn = fn;
+  req.state = 1;
+  return xSemaphoreTake(req.ready, pdMS_TO_TICKS(ms)) == pdTRUE;
+}
+
+esp_err_t handle(httpd_req_t* r) {
+  const char* q = strchr(r->uri, '?');
+  String path = q ? String(r->uri).substring(0, q - r->uri) : String(r->uri);
+  bool post = r->method == HTTP_POST;
+  const Route* rt = nullptr;
+  for (int i = 0; i < nRoutes && !rt; i++)
+    if (routes[i].post == post && path == routes[i].path) rt = &routes[i];
+  if (!rt) return httpd_resp_send_err(r, HTTPD_404_NOT_FOUND, "Nicht gefunden");
+  for (uint32_t t = millis(); req.state && millis() - t < 30000;) delay(5);
+  if (req.state) return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "Die Uhr ist beschäftigt");
+  char pin[24] = "";
+  httpd_req_get_hdr_value_str(r, "X-Pin", pin, sizeof(pin));
+  req.uri = path;
+  req.query = q ? q + 1 : "";
+  req.pin = pin;
+  req.body = "";
+  if (post && path == "/api/update") return otaReceive(r);
+  if (r->content_len > 32768) return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "Zu groß");
+  char b[512];
+  for (size_t left = r->content_len; left;) {
+    int n = httpd_req_recv(r, b, min(left, sizeof(b)));
+    if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
+    if (n <= 0) return ESP_FAIL;
+    req.body.concat(b, n);
+    left -= n;
+  }
+  if (!runInLoop(rt->fn, 30000)) return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "Keine Antwort");
+  return respond(r);
+}
+
 void begin() {
-  srv = new WebServer(80);
-  const char* hdrs[] = {"X-Pin"};
-  srv->collectHeaders(hdrs, 1);
-  srv->on("/", HTTP_GET, []() { srv->send_P(200, "text/html; charset=utf-8", PAGE); });
-  srv->on("/api/state", HTTP_GET, state);
-  srv->on("/api/update", HTTP_POST, otaDone, otaUpload);
-  srv->on("/api/search", HTTP_GET, search);
-  srv->on("/api/kids", HTTP_POST, setKids);
-  srv->on("/api/kids/release", HTTP_POST, []() {
+  req.ready = xSemaphoreCreateBinary();
+  // http:// leitet auf https:// um (der HTTPS-Server startet, sobald das WLAN steht)
+  web80 = new WebServer(80);
+  web80->onNotFound([]() {
+    String host = web80->hostHeader().length() ? web80->hostHeader() : netIp();
+    web80->sendHeader("Location", "https://" + host + web80->uri());
+    web80->send(301, "text/plain", "Bitte https verwenden");
+  });
+  web80->begin();
+  on("/", HTTP_GET, []() { srv->send_P(200, "text/html; charset=utf-8", PAGE); });
+  on("/api/state", HTTP_GET, state);
+  on("/api/update", HTTP_POST, []() {});  // otaReceive
+  on("/api/search", HTTP_GET, search);
+  on("/api/kids", HTTP_POST, setKids);
+  on("/api/kids/release", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d) || !(d["path"] | "")[0]) return msg("Ungültige Anfrage", 400);
     kids::release(d["path"], d["title"] | "", d["sub"] | "", d["on"] | true);
     msg("Gespeichert");
   });
-  srv->on("/api/kids/pin", HTTP_POST, []() {
+  on("/api/kids/pin", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d)) return msg("Ungültige Anfrage", 400);
@@ -484,7 +713,7 @@ void begin() {
     kids::set(c);
     msg(n ? "PIN gespeichert" : "PIN entfernt");
   });
-  srv->on("/api/assist", HTTP_POST, []() {
+  on("/api/assist", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d)) return msg("Ungültige Anfrage", 400);
@@ -495,33 +724,109 @@ void begin() {
     if (u || t[0]) n8n::set(u, t[0] ? t : nullptr);
     msg("Gespeichert");
   });
-  srv->on("/api/find", HTTP_POST, []() {
+  // Fernbedienung: Listen holen, abspielen, steuern (Eltern dürfen alles, auch nachts)
+  on("/api/music/list", HTTP_GET, []() {
+    if (!authed()) return;
+    static music::Item* it = nullptr;
+    if (!it) it = (music::Item*)heap_caps_calloc(80, sizeof(music::Item), MALLOC_CAP_SPIRAM);
+    char title[72] = "", err[64] = "";
+    int n = music::query(srv->arg("path").c_str(), title, sizeof(title), it, 80, err, sizeof(err));
+    JsonDocument d;
+    d["title"] = title;
+    if (err[0]) d["err"] = err;
+    JsonArray a = d["items"].to<JsonArray>();
+    for (int i = 0; i < n; i++) {
+      JsonObject o = a.add<JsonObject>();
+      o["id"] = it[i].id;
+      o["title"] = it[i].title;
+      o["sub"] = it[i].sub;
+      o["kind"] = it[i].kind;
+      o["dur"] = it[i].dur;
+    }
+    json(200, d);
+  });
+  on("/api/music/play", HTTP_POST, []() {
+    if (!authed()) return;
+    JsonDocument d;
+    if (!body(d)) return msg("Ungültige Anfrage", 400);
+    static music::Item* it = nullptr;
+    if (!it) it = (music::Item*)heap_caps_calloc(80, sizeof(music::Item), MALLOC_CAP_SPIRAM);
+    int n = 0;
+    for (JsonObject o : d["items"].as<JsonArray>()) {
+      if (n >= 80) break;
+      music::Item& x = it[n++];
+      x.kind = o["kind"] | 0;
+      x.dur = o["dur"] | 0;
+      snprintf(x.id, sizeof(x.id), "%s", (const char*)(o["id"] | ""));
+      snprintf(x.title, sizeof(x.title), "%s", (const char*)(o["title"] | ""));
+      snprintf(x.sub, sizeof(x.sub), "%s", (const char*)(o["sub"] | ""));
+    }
+    music::playList(it, n, d["index"] | 0, true);
+    msg("Läuft auf der Uhr");
+  });
+  on("/api/music/ctl", HTTP_POST, []() {
+    if (!authed()) return;
+    JsonDocument d;
+    if (!body(d)) return msg("Ungültige Anfrage", 400);
+    const char* c = d["cmd"] | "";
+    if (!strcmp(c, "toggle")) music::toggle();
+    else if (!strcmp(c, "next")) music::next();
+    else if (!strcmp(c, "prev")) music::prev();
+    else if (!strcmp(c, "stop")) music::stop();
+    if (d["volume"].is<int>()) { ui::volumeSet(d["volume"].as<int>()); settingsSave(); }
+    if (d["sleep"].is<int>()) music::sleepSet(d["sleep"].as<int>());
+    msg("OK");
+  });
+  on("/api/routines", HTTP_POST, []() {
+    if (!authed()) return;
+    routines::setConfig(srv->arg("plain"));
+    msg("Routinen gespeichert");
+  });
+  on("/api/routines/reset", HTTP_POST, []() {
+    if (!authed()) return;
+    routines::resetStars();
+    msg("Sterne zurückgesetzt");
+  });
+  on("/api/backup", HTTP_GET, []() {
+    if (!authed()) return;
+    srv->sendHeader("Content-Disposition", "attachment; filename=taschenfunk-sicherung.json");
+    srv->send(200, "application/json", backup::make(srv->arg("secrets") == "1"));
+  });
+  on("/api/restore", HTTP_POST, []() {
+    if (!authed()) return;
+    String err;
+    if (!backup::restore(srv->arg("plain"), err)) return msg(err.c_str(), 400);
+    msg("Übernommen – die Uhr startet neu");
+    delay(600);
+    ESP.restart();
+  });
+  on("/api/find", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     body(d);
     ui::findMe(d["on"] | true, d["volume"] | 70);
     msg(d["on"] | true ? "Die Uhr klingelt 30 Sekunden" : "Beendet");
   });
-  srv->on("/api/power", HTTP_POST, []() {
+  on("/api/power", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d)) return msg("Ungültige Anfrage", 400);
     pwr::setMode((pwr::Mode)(d["mode"] | 1));
     msg("Gespeichert");
   });
-  srv->on("/api/models", HTTP_GET, []() {
+  on("/api/models", HTTP_GET, []() {
     if (!authed()) return;
     String err, m = assist::models(err);
     if (!m.length()) { JsonDocument d; d["err"] = err; return json(200, d); }
     srv->send(200, "application/json", m);
   });
-  srv->on("/api/n8n/list", HTTP_GET, []() {
+  on("/api/n8n/list", HTTP_GET, []() {
     if (!authed()) return;
     String err, list = n8n::listAll(err);
     if (!list.length()) { JsonDocument d; d["err"] = err; return json(200, d); }
     srv->send(200, "application/json", "{\"items\":" + list + "}");
   });
-  srv->on("/api/n8n/allow", HTTP_POST, []() {
+  on("/api/n8n/allow", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d)) return msg("Ungültige Anfrage", 400);
@@ -530,7 +835,7 @@ void begin() {
     n8n::setAllowed(s);
     msg("Freigabe gespeichert");
   });
-  srv->on("/api/name", HTTP_POST, []() {
+  on("/api/name", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     const char* n = body(d) ? (d["name"] | "") : "";
@@ -540,7 +845,7 @@ void begin() {
     radio::nameChanged();
     msg("Name gespeichert");
   });
-  srv->on("/api/wifi", HTTP_POST, []() {
+  on("/api/wifi", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d) || !(d["ssid"] | "")[0]) return msg("SSID fehlt", 400);
@@ -549,13 +854,13 @@ void begin() {
     msg("Netz gespeichert");
     netConnect(d["ssid"], d["pass"] | "");
   });
-  srv->on("/api/wifi/forget", HTTP_POST, []() {
+  on("/api/wifi/forget", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     if (body(d)) { knownForget(d["ssid"] | ""); settingsSave(); }
     msg("Netz vergessen");
   });
-  srv->on("/api/keys", HTTP_POST, []() {
+  on("/api/keys", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d)) return msg("Ungültige Anfrage", 400);
@@ -563,23 +868,27 @@ void begin() {
     if (g[0]) keys::set(g);
     msg("Schlüssel gespeichert");
   });
-  srv->on("/api/fav/remove", HTTP_POST, []() {
+  on("/api/fav/remove", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;
     if (body(d) && favs::has(d["path"] | "")) favs::toggle(d["path"] | "", "", "");
     msg("Favorit entfernt");
   });
-  srv->on("/api/restart", HTTP_POST, []() {
+  on("/api/restart", HTTP_POST, []() {
     if (!authed()) return;
     msg("Startet neu …");
     delay(300);
     ESP.restart();
   });
-  srv->begin();
 }
 
 void poll() {
-  if (srv) srv->handleClient();
+  if (web80) web80->handleClient();
+  if (req.state != 1) return;
+  req.state = 2;
+  req.fn();
+  if (!req.code) msg("Keine Antwort", 500);
+  req.state = 0;
 }
 
 }  // namespace webui

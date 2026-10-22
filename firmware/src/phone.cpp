@@ -10,16 +10,38 @@
 #include "kids.h"
 #include "net.h"
 #include "settings.h"
+#include "webui.h"
 
 namespace phone {
 
 static httpd_handle_t srv = nullptr;
 static volatile uint32_t lastAudio = 0;
 static volatile bool open_ = false;
+static volatile int clientFd = -1;
+static volatile uint32_t lastSeen = 0;
+static volatile bool up = false;  // Uhr spricht ans Handy
 static String cert, key;
 
 bool talking() { return open_ && millis() - lastAudio < 600; }
-String url() { return srv ? "https://" + netIp() + "/" : ""; }
+bool connected() { return srv && clientFd >= 0 && millis() - lastSeen < 15000; }
+
+static void sendText(const char* t) {
+  if (!connected()) return;
+  httpd_ws_frame_t f = {};
+  f.type = HTTPD_WS_TYPE_TEXT;
+  f.payload = (uint8_t*)t;
+  f.len = strlen(t);
+  httpd_ws_send_frame_async(srv, clientFd, &f);
+}
+
+void talk(bool on) {
+  if (on == up) return;
+  if (on && !connected()) return;
+  up = on;
+  if (on) audio::micStart(); else audio::micStop();
+  sendText(on ? "talk:1" : "talk:0");
+}
+String url() { return srv ? "https://" + netIp() + "/funk" : ""; }
 
 // ------------------------------------------------------------------ Zertifikat (einmal erzeugt, im NVS)
 
@@ -82,16 +104,26 @@ background:#0d0d0f;color:#f4f1ea;font:17px -apple-system,system-ui,sans-serif;-w
 #b{width:220px;height:220px;border-radius:50%;border:0;background:#3ddc97;color:#000;font-size:22px;font-weight:600;touch-action:none}
 #b.on{background:#ff453a;color:#fff;transform:scale(1.06)}#s{color:#8e8a82;min-height:1.4em;text-align:center;padding:0 20px}
 a{color:#e0b25e}</style></head><body><h2 id="n">Funk</h2><button id="b">Halten<br>und sprechen</button><div id="s">Verbinde …</div>
-<a href="http://__IP__/">zurück zur Weboberfläche</a>
+<div id="u" style="color:#3ddc97;min-height:1.4em"></div><a href="/">zurück zur Weboberfläche</a>
 <script>
-let ws,ctx,src,proc,on=false,pin='';try{pin=localStorage.getItem('pin')||''}catch(e){}
+let ws,ctx,src,proc,on=false,pin='',playAt=0;
+function audio(){if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)();if(ctx.state=='suspended')ctx.resume()}
+document.addEventListener('pointerdown',audio,{once:true});
+setInterval(()=>{if(ws&&ws.readyState==1)ws.send('ping')},5000);
+// Stimme von der Uhr (16 kHz) abspielen
+function play(buf){if(!ctx)return;const x=new Int16Array(buf),b=ctx.createBuffer(1,x.length,16000),c=b.getChannelData(0);
+ for(let i=0;i<x.length;i++)c[i]=x[i]/32768;const s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);
+ playAt=Math.max(playAt,ctx.currentTime+0.05);s.start(playAt);playAt+=b.duration}try{pin=localStorage.getItem('pin')||''}catch(e){}
 const s=t=>document.getElementById('s').textContent=t,b=document.getElementById('b');
 function connect(){ws=new WebSocket('wss://'+location.host+'/ws');ws.binaryType='arraybuffer';
  ws.onopen=()=>{ws.send('pin:'+pin);s('Bereit')};ws.onclose=()=>{s('Getrennt – verbinde neu …');setTimeout(connect,1500)};
- ws.onmessage=e=>{if(e.data=='pin?'){pin=prompt('Eltern-PIN')||'';try{localStorage.setItem('pin',pin)}catch(x){}ws.send('pin:'+pin)}}}
+ ws.onmessage=e=>{if(typeof e.data!='string')return play(e.data);
+  if(e.data=='talk:1')document.getElementById('u').textContent=ctx?'Die Uhr spricht …':'Die Uhr spricht – einmal tippen, um sie zu hören';
+  if(e.data=='talk:0')document.getElementById('u').textContent='';
+  if(e.data=='pin?'){pin=prompt('Eltern-PIN')||'';try{localStorage.setItem('pin',pin)}catch(x){}ws.send('pin:'+pin)}}}
 connect();
 async function mic(){if(proc)return;const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
- ctx=new (window.AudioContext||window.webkitAudioContext)();src=ctx.createMediaStreamSource(st);proc=ctx.createScriptProcessor(2048,1,1);
+ audio();src=ctx.createMediaStreamSource(st);proc=ctx.createScriptProcessor(2048,1,1);
  let ph=0;const r=ctx.sampleRate/16000;
  proc.onaudioprocess=e=>{if(!on||ws.readyState!=1)return;const x=e.inputBuffer.getChannelData(0),out=new Int16Array(Math.floor(x.length/r)+1);let k=0;
   for(;ph<x.length;ph+=r){const v=Math.max(-1,Math.min(1,x[Math.floor(ph)]));out[k++]=v*32767}ph-=x.length;ws.send(out.subarray(0,k).buffer)};
@@ -103,16 +135,21 @@ b.addEventListener('pointerdown',down);['pointerup','pointercancel','pointerleav
 </script></body></html>)HTML";
 
 static esp_err_t pageHandler(httpd_req_t* r) {
-  String p = PAGE;
-  p.replace("__IP__", netIp());
   httpd_resp_set_type(r, "text/html; charset=utf-8");
-  return httpd_resp_send(r, p.c_str(), p.length());
+  return httpd_resp_send(r, PAGE, HTTPD_RESP_USE_STRLEN);
 }
 
 static bool authed = false;
 
 static esp_err_t wsHandler(httpd_req_t* r) {
-  if (r->method == HTTP_GET) { authed = !kids::cfg().pin[0]; return ESP_OK; }  // Handshake
+  if (r->method == HTTP_GET) {  // Handshake: dieses Handy ist jetzt der Gesprächspartner
+    authed = !kids::cfg().pin[0];
+    clientFd = httpd_req_to_sockfd(r);
+    lastSeen = millis();
+    return ESP_OK;
+  }
+  lastSeen = millis();
+  clientFd = httpd_req_to_sockfd(r);  // das Handy, das zuletzt etwas geschickt hat, ist der Gesprächspartner
   httpd_ws_frame_t f = {};
   if (httpd_ws_recv_frame(r, &f, 0) != ESP_OK || !f.len || f.len > 16384) return ESP_FAIL;
   uint8_t* buf = (uint8_t*)heap_caps_malloc(f.len + 1, MALLOC_CAP_SPIRAM);
@@ -149,6 +186,20 @@ static esp_err_t wsHandler(httpd_req_t* r) {
 }
 
 void poll() {
+  // Uhr spricht: Mikrofon in 40-ms-Paketen ans Handy
+  if (up) {
+    static int16_t mic[640];
+    static size_t have = 0;
+    have += audio::micRead(mic + have, 640 - have);
+    if (have == 640) {
+      httpd_ws_frame_t f = {};
+      f.type = HTTPD_WS_TYPE_BINARY;
+      f.payload = (uint8_t*)mic;
+      f.len = sizeof(mic);
+      if (!connected() || httpd_ws_send_frame_async(srv, clientFd, &f) != ESP_OK) talk(false);
+      have = 0;
+    }
+  }
   static uint32_t triedAt = 0;
   if (srv || !netOnline() || (triedAt && millis() - triedAt < 60000)) return;
   triedAt = millis();
@@ -158,14 +209,20 @@ void poll() {
   c.servercert_len = cert.length() + 1;
   c.prvtkey_pem = (const uint8_t*)key.c_str();
   c.prvtkey_len = key.length() + 1;
-  c.httpd.max_open_sockets = 3;
+  c.httpd.max_open_sockets = 5;
+  c.httpd.lru_purge_enable = true;
+  c.httpd.uri_match_fn = httpd_uri_match_wildcard;
   c.httpd.stack_size = 8192;
-  c.httpd.ctrl_port = 32769;  // der normale Webserver (Port 80) belegt den Standard
+  c.httpd.ctrl_port = 32769;  // der Umleitungs-Server auf Port 80 belegt den Standard
   if (httpd_ssl_start(&srv, &c) != ESP_OK) { srv = nullptr; Serial.println("Funk vom Handy: HTTPS-Start fehlgeschlagen"); return; }
-  httpd_uri_t page = {.uri = "/", .method = HTTP_GET, .handler = pageHandler, .user_ctx = nullptr};
+  httpd_uri_t page = {.uri = "/funk", .method = HTTP_GET, .handler = pageHandler, .user_ctx = nullptr};
   httpd_uri_t ws = {.uri = "/ws", .method = HTTP_GET, .handler = wsHandler, .user_ctx = nullptr, .is_websocket = true};
+  httpd_uri_t pg = {.uri = "/*", .method = HTTP_GET, .handler = webui::handle, .user_ctx = nullptr};  // Weboberfläche
+  httpd_uri_t pp = {.uri = "/*", .method = HTTP_POST, .handler = webui::handle, .user_ctx = nullptr};
   httpd_register_uri_handler(srv, &page);
   httpd_register_uri_handler(srv, &ws);
+  httpd_register_uri_handler(srv, &pg);
+  httpd_register_uri_handler(srv, &pp);
   Serial.printf("Funk vom Handy: %s\n", url().c_str());
 }
 

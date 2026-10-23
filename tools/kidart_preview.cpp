@@ -1,5 +1,6 @@
 // Vorschau des Kinder-Zifferblatts am Rechner: rendert jede Welt mit allen Szenen und der Abenteuer-Karte als PPM.
 //   sh tools/kidart_preview.sh   (baut, rendert und setzt die Bilder zu docs/screens/kinderwelten.png zusammen)
+#include <string>
 #include <stdio.h>
 #include "kidart.h"
 
@@ -41,12 +42,34 @@ int main(int argc, char** argv) {
         snprintf(path, sizeof(path), "%s/s%d_%d_%d.ppm", out, h, d, b);
         save(path, px);
       }
-  for (int o = 0; o < Q_OBJS; o++) {  // Rätsel: jede Art einmal
-    QuizBeat qb{(uint8_t)o, (uint8_t)(3 + o), (uint8_t)(o % Q_COLORS)};
-    drawBrushQuiz(px, o % 2 ? FIPS : LUNA, qb, o % 4, 3);
-    char path[256];
-    snprintf(path, sizeof(path), "%s/q%d.ppm", out, o);
-    save(path, px);
+  // Zahnputz-Spiel: die neun Abschnitte nach KAI, je mit Monstern beim Putzen und einmal ohne Putzen
+  struct { MouthView v; int area; } secs[9] = {{M_CHEW, 0}, {M_CHEW, 1}, {M_CHEW, 2}, {M_CHEW, 3}, {M_OUTER, 0},
+                                               {M_OUTER, 1}, {M_OUTER, 2}, {M_INNER, 0}, {M_INNER, 1}};
+  for (int i = 0; i < 9; i++)
+    for (int k = 0; k < 2; k++) {
+      drawBrushGame(px, i % 2 ? FIPS : LUNA, secs[i].v, secs[i].area, k ? 1 : 3, !k, 3);
+      char path[256];
+      snprintf(path, sizeof(path), "%s/g%d_%d.ppm", out, i, k);
+      save(path, px);
+    }
+  // Auswahl mit Kronen (7 Tage am Stück), Summ-Ballon, Album, Sticker groß
+  drawBrushPick(px, 1, 3);
+  save((std::string(out) + "/pick.ppm").c_str(), px);
+  BalloonObj o[4] = {{30, 10, 0}, {44, 22, 1}, {52, 6, 0}, {18, 30, 0}};
+  int bys[3] = {2, 10, 20};
+  for (int k = 0; k < 3; k++) {
+    drawBalloon(px, k == 1 ? FIPS : LUNA, bys[k], o, 4, k == 0 ? M_CHEW : k == 1 ? M_OUTER : M_INNER, k, k < 2, 5 + k * 9);
+    save((std::string(out) + "/b" + std::to_string(k) + ".ppm").c_str(), px);
+  }
+  for (int pg = 0; pg < 3; pg++) {
+    drawAlbum(px, 0x3FFFFFF, pg, 2);
+    save((std::string(out) + "/a" + std::to_string(pg) + ".ppm").c_str(), px);
+  }
+  drawAlbum(px, 0x0000A53, 0, 2);
+  save((std::string(out) + "/a3.ppm").c_str(), px);
+  for (int id : {11, STICKER_TROPHY, STICKER_TEAM}) {
+    drawSticker(px, id, 1);
+    save((std::string(out) + "/st" + std::to_string(id) + ".ppm").c_str(), px);
   }
   return 0;
 }

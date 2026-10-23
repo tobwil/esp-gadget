@@ -144,18 +144,29 @@ Seepferdchen.
 ![Zähneputzen](docs/screens/zahnputzen.png)
 
 Eine App (für Kinder und Erwachsene, in der Weboberfläche abschaltbar): erst **Pferd Luna oder Reh Fips** wählen,
-dann die Aufgabe. Zwei Minuten in vier Vierteln à 30 s – oben links, oben rechts, unten links, unten rechts; ein
-Gebiss im Bild leuchtet dort, wo gerade geputzt wird, und eine Zahnbürste zeigt darauf, beim Wechsel klingt ein Ton.
+dann das Spiel. Geputzt wird nach der **KAI-Methode**, zwei Minuten: erst die **K**auflächen (vier Ecken, hin und
+her), dann **A**ußen (Zähne aufeinander, kleine Kreise – rechts, vorne, links), dann **I**nnen (Mund weit auf, von
+Rot nach Weiß). Der Mund im Bild zeigt wie im Spiegel, wo gerade dran ist, Zahnmonster verschwinden nach und nach,
+und **Luna bzw. Fips sagen es an** – mit echten Stimmen, die Uhr kann ja gegenüber auf dem Tisch stehen.
 
-- **Geschichte:** Mit jedem Putzen geht es ein Kapitel weiter. Luna folgt einer Schatzkarte (Bach, Eule, Pilzpfad,
-  Gewitter, die Kiste mit goldenen Hufeisen), Fips hilft dem Glühwürmchen Lumi, seine Freunde zu finden (Igel,
-  Frösche, die Maus im alten Baum, Hängebrücke, Biber, Höhle). Jedes Mal gibt es ein Teil für die Sammlung.
-- **Rätsel:** In jedem Viertel tauchen Äpfel, Blumen, Schmetterlinge, Vögel, Pilze oder Sterne auf; danach kommen
-  Fragen zum Antippen. *Leicht* (ab 4): zählen bis 5 und Farben. *Knifflig* (ab 7): bis 12, zusammenrechnen,
-  „Was kam zuerst?“ – und kein Hinweis, worauf man achten soll. Jede richtige Antwort gibt einen Stern.
+- **Hörgeschichte:** Nach jeder Ansage erzählt die Figur ein Stück weiter, mit jedem Putzen ein Kapitel. Luna folgt
+  einer Schatzkarte (Bach, Eule, rote Pilze, Gewitter, das große X), Fips hilft dem Glühwürmchen Lumi (Igel und
+  Frösche, alter Baum, Hängebrücke, Biber, dunkle Höhle). Ein Satz darf noch ausklingen, bevor es weitergeht.
+- **Summ-Ballon:** Summen lässt den Ballon steigen – je höher der Ton, desto höher –, Stille lässt ihn sinken;
+  unterwegs Sterne einsammeln, Regenbogensterne zählen dreifach. Das Mikrofon prüft, ob es wirklich ein Ton ist
+  (Autokorrelation nach einem Tiefpass), das Rauschen der Zahnbürste zählt nicht. Ein kleiner Mund unten zeigt,
+  wo geputzt wird. Rekord in der Weboberfläche.
+- **Album:** Nach jedem Putzen ein neuer Sticker (24 Motive). Sieben Tage am Stück: ein Pokal, und Luna und Fips
+  tragen eine Krone.
+- **Zu zweit:** Putzen zwei Uhren gleichzeitig, melden sie sich über Funk („‹Name› putzt mit: Außen vorne“) – und beide
+  bekommen Team-Herzen fürs Album.
 
-Zum Schluss wird „Zähne putzen“ in der laufenden Routine abgehakt. Die Weboberfläche zeigt Kapitel und Sammlung.
+Zum Schluss: „Ausspucken, nicht ausspülen“, auf Wunsch „Jetzt putzt Mama oder Papa nach“ (Weboberfläche), und
+„Zähne putzen“ in der laufenden Routine wird abgehakt. Die Weboberfläche zeigt Kapitel, Serie, Ballon-Rekord und
+Album.
 
+Die Stimmen erzeugt `tools/brush_voice.py` einmalig mit Gemini-TTS (MP3, 16 kHz) als `firmware/brushvoice.bin`,
+die in die Firmware eingebettet wird.
 Die Szenen zeichnet `firmware/src/kidart.cpp` ohne LVGL – `sh tools/kidart_preview.sh` rendert sie am Rechner
 als Übersicht.
 

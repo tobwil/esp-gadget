@@ -38,7 +38,7 @@ void begin() {
   if (!p.getString("petname", c.petName, sizeof(c.petName))) snprintf(c.petName, sizeof(c.petName), "Mimi");
   c.adventure = p.getBool("adv", true);
   c.phases = p.getBool("phases", true);
-  c.brushHard = p.getBool("brushhard", false);
+  c.brushParent = p.getBool("brushpar", true);
   c.brushOn = p.getBool("brushon", true);
   String day = p.getString("day", "");
   p.end();
@@ -117,7 +117,7 @@ void set(const Cfg& n) {
   p.putString("petname", c.petName);
   p.putBool("adv", c.adventure);
   p.putBool("phases", c.phases);
-  p.putBool("brushhard", c.brushHard);
+  p.putBool("brushpar", c.brushParent);
   p.putBool("brushon", c.brushOn);
   p.end();
 }

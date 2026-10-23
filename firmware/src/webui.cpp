@@ -129,7 +129,8 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 <div class="tab sel" id="t-home">
  <section><h2>Uhr</h2><div class="kv" id="info"></div><button class="wide ghost" id="findgo">🔔 Uhr klingeln lassen</button>
   <button class="wide" id="phonego">🎙 Funk vom Handy</button><p class="note">Knopf halten und sprechen, die Uhr spielt deine Stimme ab. Antwort: auf der Uhr BOOT halten.</p></section>
- <section><h2>Akku</h2><div class="kv" id="batkv"></div><svg id="batchart" viewBox="0 0 360 90" style="width:100%;height:90px;margin-top:10px"></svg>
+ <section><h2>Akku</h2><div class="kv" id="batkv"></div><svg id="batchart" viewBox="0 0 360 140" style="width:100%;height:auto;margin-top:10px"></svg>
+  <div class="note" id="batleg"><span style="color:var(--acc)">━</span> entlädt &nbsp; <span style="color:var(--ok)">━</span> lädt &nbsp; <span style="color:var(--dim)">┄</span> Uhr aus / Tiefschlaf</div>
   <label class="f" for="pmode">Sparmodus</label><select id="pmode"><option value="1">Automatisch ab 20 %</option><option value="2">Immer an</option><option value="0">Aus</option></select>
   <p class="note">Sparmodus: Display höchstens 40 % und nach 10 s aus, kein Funk im Hintergrund, ohne Musik schläft das WLAN.</p></section>
  <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small id="kidsum"></small></div><label class="sw"><input type="checkbox" id="kon2"><span></span></label></div>
@@ -271,10 +272,7 @@ function render(){
   <span>Verbrauch</span><span>${pw.drain>0?pw.drain.toFixed(1)+' %/h':'–'}</span><span>Sparmodus</span><span>${pw.saving?'an':'aus'}</span>
   <span>Tiefschlaf</span><span>${pw.sleep||'–'}</span>`;
  if(document.activeElement!==$('pmode'))$('pmode').value=pw.mode;
- const h=pw.history;if(h.length>1){const mx=Math.max(...h.map(p=>p[0]))||1;
-  const pts=h.map(p=>`${(360-p[0]/mx*360).toFixed(1)},${(86-p[1]*0.82).toFixed(1)}`).join(' ');
-  $('batchart').innerHTML=`<polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2"/><text x="0" y="10" font-size="10" fill="var(--dim)">-${mx} min</text><text x="330" y="10" font-size="10" fill="var(--dim)">jetzt</text>`}
- else $('batchart').innerHTML='<text x="0" y="50" font-size="12" fill="var(--dim)">Verlauf: alle 2 Minuten ein Messpunkt</text>';
+ batChart(pw.history);
  const mu=s.music;$('np').innerHTML=mu.active?`<b>${mu.playing?'▶':'⏸'} ${esc(mu.title)}</b><br>${esc(mu.artist)}${mu.dur?' · '+Math.floor(mu.pos/60)+':'+String(Math.floor(mu.pos%60)).padStart(2,'0')+' / '+Math.floor(mu.dur/60)+':'+String(mu.dur%60).padStart(2,'0'):''}${mu.msg?'<br><span class="bad">'+esc(mu.msg)+'</span>':''}`:'Gerade läuft nichts.';
  if(document.activeElement!==$('mvol')){$('mvol').value=mu.volume;$('mvolv').textContent=mu.volume}
  if(document.activeElement!==$('msleep'))$('msleep').value=[0,15,30,45,60,90].reduce((a,v)=>Math.abs(v-mu.sleepMin)<Math.abs(a-mu.sleepMin)?v:a,0);
@@ -362,6 +360,22 @@ $('rst').onclick=()=>confirm('Uhr neu starten?')&&post('restart',{});
 const HASH={kinder:'kids',musik:'music',ki:'ai',geraet:'dev'};
 function fromHash(){const t=HASH[location.hash.slice(1)];const b=t&&document.querySelector(`nav button[data-t=${t}]`);if(b)b.click()}
 window.addEventListener('hashchange',fromHash);fromHash();
+// Akku-Verlauf: Prozent (0–100) über Uhrzeit; Entladen orange, Laden grün, Lücken (Uhr aus, Tiefschlaf) gestrichelt
+function batChart(hist){
+ const h=hist.slice().sort((a,b)=>b[0]-a[0]),el=$('batchart');
+ if(h.length<2){el.innerHTML='<text x="0" y="60" font-size="12" fill="var(--dim)">Verlauf: alle 2 Minuten ein Messpunkt</text>';return}
+ const span=Math.max(60,Math.ceil(h[0][0]/60)*60),X0=30,X1=350,Y0=8,Y1=118;
+ const X=m=>(X1-m/span*(X1-X0)).toFixed(1),Y=p=>(Y1-p/100*(Y1-Y0)).toFixed(1);
+ let g='';
+ for(const p of [0,25,50,75,100])g+=`<line x1="${X0}" x2="${X1}" y1="${Y(p)}" y2="${Y(p)}" stroke="var(--line)"/><text x="${X0-5}" y="${+Y(p)+3}" font-size="9" text-anchor="end" fill="var(--dim)">${p} %</text>`;
+ const now=Date.now(),step=span<=120?30:span<=240?60:120;
+ for(let m=0;m<=span;m++){const t=new Date(now-m*60000);if((t.getHours()*60+t.getMinutes())%step)continue;
+  g+=`<line x1="${X(m)}" x2="${X(m)}" y1="${Y0}" y2="${Y1}" stroke="var(--line)" stroke-dasharray="2 3"/><text x="${X(m)}" y="${Y1+14}" font-size="9" text-anchor="middle" fill="var(--dim)">${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}</text>`}
+ for(let i=1;i<h.length;i++){const a=h[i-1],b=h[i],gap=a[0]-b[0]>6;
+  g+=`<line x1="${X(a[0])}" y1="${Y(a[1])}" x2="${X(b[0])}" y2="${Y(b[1])}" stroke="${gap?'var(--dim)':b[3]?'var(--ok)':'var(--acc)'}" stroke-width="${gap?1.2:2.5}"${gap?' stroke-dasharray="3 3"':''} stroke-linecap="round"/>`}
+ const e=h[h.length-1];
+ g+=`<circle cx="${X(e[0])}" cy="${Y(e[1])}" r="3.5" fill="${e[3]?'var(--ok)':'var(--acc)'}"/><text x="${X(e[0])-6}" y="${+Y(e[1])-7}" font-size="10" text-anchor="end" fill="var(--text)">${e[1]} %</text>`;
+ el.innerHTML=g}
 load();setInterval(()=>{if(!document.hidden)load()},10000);
 </script></body></html>)HTML";
 

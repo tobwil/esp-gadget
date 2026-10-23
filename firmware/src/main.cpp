@@ -88,6 +88,7 @@ bool appCommand(const char* line) {
   else if (sscanf(line, "kidtime %99s", a) == 1) { int h = 0, m = 0; kidFaceTestMin = sscanf(a, "%d:%d", &h, &m) == 2 ? h * 60 + m : -1; }
   else if (!strcmp(line, "imu")) { imu::sleep(false); delay(50); float x, y; imu::gravity(x, y); Serial.printf("Neigung: x %.2f y %.2f\n", x, y); }
   else if (!strcmp(line, "poweroff")) {  // ausschalten; hängt USB dran und startet die PMU neu: Tiefschlaf
+    pwr::save();
     audio::shutdown();
     hwPowerOff();
     delay(1500);
@@ -168,6 +169,7 @@ static void power() {
   if (!hwScreenOn() && pwr::deepSleepMin() && !hwUsb() && hwBattery() >= 0 &&
       hwIdleMs() > (off + pwr::deepSleepMin() * 60UL) * 1000UL && !music::state().active && !cw::busy() &&
       !radio::transmitting() && !radio::receiving() && !kids::angry()) {
+    pwr::save();
     audio::shutdown();
     hwDeepSleep(cw::alarmInS());
   }

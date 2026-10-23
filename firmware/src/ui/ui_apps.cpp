@@ -21,7 +21,7 @@ static const App APPS[] = {
     {I_STOPWATCH, "Stoppuhr", C_WATCH, &PAGE_STOPWATCH, kids::A_STOPWATCH},
     {I_ALARM, "Wecker", C_ALARM, &PAGE_ALARM, kids::A_ALARM},
     {I_SUN, "Wetter", C_TIMER, &PAGE_TILES, kids::A_WEATHER},
-    {I_BOLT, "Balance", C_BRASS, &PAGE_GAME, kids::A_GAME},
+    {I_GAME, "Balance", C_BRASS, &PAGE_GAME, kids::A_GAME},
     {I_WATCH, "Zifferblatt", C_BRASS, &PAGE_FACES, 0},
     {I_SETTINGS, "Einstellungen", C_SET, &PAGE_SETTINGS, 0},
 };

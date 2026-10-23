@@ -184,7 +184,9 @@ eingetragen wird, speichert die Uhr im NVS.
 ## Akku und Sparmodus
 
 Die Weboberfläche zeigt Stand, Spannung, Verbrauch (%/h), eine geschätzte Restlaufzeit und den Verlauf der
-letzten sechs Stunden (alle 2 Minuten ein Messpunkt). Bei 10 % gibt es eine Warnung, bei 3 % schaltet die Uhr
+letzten sechs Stunden (alle 2 Minuten ein Messpunkt). Die Restlaufzeit steht auch auf der Uhr im
+Kontrollzentrum („noch ca. 5 h 20 min“). Geschätzt wird aus mindestens 20 Minuten ohne Laden; der Verlauf
+übersteht Neustarts, Updates und Tiefschlaf. Bei 10 % gibt es eine Warnung, bei 3 % schaltet die Uhr
 geordnet aus.
 
 **Sparmodus** (automatisch ab 20 %, oder immer): Display höchstens 40 % hell und nach 10 s aus, Zifferblätter

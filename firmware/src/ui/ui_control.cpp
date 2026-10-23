@@ -1,5 +1,5 @@
 // Kontrollzentrum wie bei Wear OS / watchOS: vom Zifferblatt herunterwischen, hochwischen schließt.
-// Oben Uhrzeit, Akku und WLAN, darunter sechs Schalter.
+// Oben Uhrzeit, Akku (mit geschätzter Restlaufzeit) und WLAN, darunter sechs Schalter.
 #include <time.h>
 #include "../kids.h"
 #include "../power.h"
@@ -9,7 +9,7 @@
 
 using namespace ui;
 
-static lv_obj_t *timeL, *statL, *hintL, *rxB, *brightB;
+static lv_obj_t *timeL, *statL, *remainL, *hintL, *rxB, *brightB;
 static lv_obj_t* torch = nullptr;
 static uint8_t torchBright = 0;
 
@@ -33,6 +33,8 @@ static void build(lv_obj_t* scr) {
   lv_obj_align(timeL, LV_ALIGN_TOP_MID, 0, 40);
   statL = label(scr, &font_text_20, C_DIM(), "");
   lv_obj_align(statL, LV_ALIGN_TOP_MID, 0, 74);
+  remainL = label(scr, &font_text_20, C_DIM(), "");
+  lv_obj_align(remainL, LV_ALIGN_TOP_MID, 0, 100);
 
   lv_obj_t* grid = lv_obj_create(scr);
   lv_obj_remove_style_all(grid);
@@ -110,6 +112,8 @@ static void update() {
   snprintf(b, sizeof(b), "%s%s   %s %s", batS, pwr::saving() ? " · Sparen" : "", netOnline() ? I_WIFI : I_WIFI_OFF,
            netOnline() ? netSsid() : "aus");
   if (strcmp(lv_label_get_text(statL), b)) lv_label_set_text(statL, b);
+  String r = pwr::remainingText();
+  if (strcmp(lv_label_get_text(remainL), r.c_str())) lv_label_set_text(remainL, r.c_str());
 }
 
 static void leave() { torchOff(); }

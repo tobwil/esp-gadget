@@ -10,6 +10,7 @@ enum Mode : uint8_t { M_OFF = 0, M_AUTO = 1, M_ON = 2 };  // Auto: ab 20 % bis z
 
 void begin();
 void poll();                 // aus der Hauptschleife
+void save();                 // Akku-Verlauf sichern (vor Tiefschlaf, Ausschalten, Neustart)
 Mode mode();
 void setMode(Mode m);
 bool saving();               // Sparmodus gerade aktiv
@@ -18,5 +19,6 @@ uint16_t deepSleepMin();
 int remainingMin();          // geschätzte Restlaufzeit, −1 = unbekannt
 float drainPerHour();        // Verbrauch in %/h (aus dem Verlauf), 0 = unbekannt
 String historyJson();        // [[Minuten vor jetzt, %, mV, lädt], …]
+String remainingText();      // „noch ca. 5 h 20 min“, „Restzeit wird gemessen“ bzw. "" am Kabel
 
 }  // namespace pwr

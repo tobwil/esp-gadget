@@ -7,6 +7,7 @@
 #include "hw.h"
 #include "kids.h"
 #include "music.h"
+#include "net.h"
 #include "settings.h"
 #include "ui/ui.h"
 
@@ -15,20 +16,39 @@ namespace pwr {
 static Mode m = M_AUTO;
 static bool active = false;
 
-// Verlauf: alle 2 Minuten ein Wert, 6 Stunden
+// Verlauf: alle 2 Minuten ein Wert, 6 Stunden. Mit Uhrzeit (Unix-Zeit), damit er Neustarts und Tiefschlaf
+// übersteht; gesichert wird alle 10 Minuten und vor Tiefschlaf/Ausschalten (schont den Flash).
 static const int HIST = 180;
-static const uint32_t STEP_MS = 120000;
-struct Sample { uint8_t pct; uint16_t mv; uint8_t chg; };
+static const uint32_t STEP_S = 120;
+struct Sample { uint32_t t; uint8_t pct; uint8_t chg; uint16_t mv; };
 static Sample* hist = nullptr;
-static int hN = 0, hHead = 0;
-static uint32_t lastSample = 0;
+static int hN = 0, hHead = 0, unsaved = 0;
+
+void save();
 
 void begin() {
   Preferences p;
   p.begin("power", true);
   m = (Mode)p.getUChar("mode", M_AUTO);
-  p.end();
   hist = (Sample*)heap_caps_calloc(HIST, sizeof(Sample), MALLOC_CAP_SPIRAM);
+  if (hist && p.getBytesLength("hist") == HIST * sizeof(Sample)) {
+    p.getBytes("hist", hist, HIST * sizeof(Sample));
+    hN = min<int>(p.getUShort("hN", 0), HIST);
+    hHead = p.getUShort("hHead", 0) % HIST;
+  }
+  p.end();
+  esp_register_shutdown_handler([]() { save(); });  // auch vor jedem Neustart (Update, Einstellungen)
+}
+
+void save() {
+  if (!hist || !unsaved) return;
+  Preferences p;
+  p.begin("power", false);
+  p.putBytes("hist", hist, HIST * sizeof(Sample));
+  p.putUShort("hN", hN);
+  p.putUShort("hHead", hHead);
+  p.end();
+  unsaved = 0;
 }
 
 Mode mode() { return m; }
@@ -50,13 +70,15 @@ uint16_t deepSleepMin() { return active ? 3 : DEEP_SLEEP_MIN; }
 static const Sample& at(int back) { return hist[(hHead - 1 - back + HIST) % HIST]; }
 
 float drainPerHour() {
-  // jüngster zusammenhängender Abschnitt ohne Laden, mindestens 20 Minuten
-  if (!hist || hN < 2) return 0;
+  // jüngster zusammenhängender Abschnitt ohne Laden, mindestens 20 Minuten; eine Lücke über 3 Stunden
+  // (Uhr war aus) beendet ihn – Tiefschlaf zählt mit, er gehört zum normalen Tag
+  if (!hist || hN < 2 || at(0).chg) return 0;
   int k = 0;
-  while (k + 1 < hN && !at(k + 1).chg && !at(0).chg) k++;
-  if (k * STEP_MS < 20 * 60000UL) return 0;
+  while (k + 1 < hN && !at(k + 1).chg && at(k).t - at(k + 1).t < 3 * 3600) k++;
+  uint32_t span = at(0).t - at(k).t;
+  if (span < 20 * 60) return 0;
   float d = at(k).pct - at(0).pct;
-  return d > 0 ? d * 60000.0f * 60 / (k * STEP_MS) : 0;
+  return d > 0 ? d * 3600.0f / span : 0;
 }
 
 int remainingMin() {
@@ -66,11 +88,21 @@ int remainingMin() {
   return (int)(pct / d * 60);
 }
 
+String remainingText() {
+  if (hwBattery() < 0 || hwUsb()) return "";
+  int m = remainingMin();
+  if (m < 0) return "Restzeit wird gemessen";
+  if (m < 60) return "noch ca. " + String(max(m, 1)) + " min";
+  m = (m + 5) / 10 * 10;  // auf 10 Minuten – genauer ist die Schätzung nicht
+  return "noch ca. " + String(m / 60) + " h" + (m % 60 ? " " + String(m % 60) + " min" : "");
+}
+
 String historyJson() {
+  uint32_t now = time(nullptr);
   String s = "[";
   for (int i = hN - 1; i >= 0; i--) {
     const Sample& x = at(i);
-    s += "[" + String(i * STEP_MS / 60000) + "," + x.pct + "," + x.mv + "," + x.chg + "]";
+    s += "[" + String((now - x.t) / 60) + "," + x.pct + "," + x.mv + "," + x.chg + "]";
     if (i) s += ",";
   }
   return s + "]";
@@ -84,12 +116,13 @@ void poll() {
   int pct = hwBattery();
   bool usb = hwUsb();
 
-  // Verlauf
-  if (hist && pct >= 0 && (!lastSample || now - lastSample >= STEP_MS)) {
-    lastSample = now;
-    hist[hHead] = {(uint8_t)pct, (uint16_t)hwBatteryMv(), (uint8_t)(hwCharging() || usb)};
+  // Verlauf (erst, wenn die Uhrzeit stimmt)
+  uint32_t t = time(nullptr);
+  if (hist && pct >= 0 && timeValid() && (!hN || t - at(0).t >= STEP_S || t < at(0).t)) {
+    hist[hHead] = {t, (uint8_t)pct, (uint8_t)(hwCharging() || usb), (uint16_t)hwBatteryMv()};
     hHead = (hHead + 1) % HIST;
     if (hN < HIST) hN++;
+    if (++unsaved >= 5) save();
   }
 
   // Sparmodus an/aus (Auto: ab 20 %, aus über 25 % oder am Kabel)
@@ -110,6 +143,7 @@ void poll() {
       if (now - lowSince > 20000) {  // 20 s lang wirklich leer: geordnet ausschalten
         Serial.println("Akku: leer, schalte aus");
         settingsSave();
+        save();
         audio::shutdown();
         hwPowerOff();
       }

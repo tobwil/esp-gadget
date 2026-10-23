@@ -38,6 +38,7 @@ ICON_NAMES = {
     "SUN": 0xE430, "CLOUD": 0xE42D, "RAIN": 0xF1AD, "SNOW": 0xEB3B, "STORM": 0xEBDB, "DROP": 0xE798,
     "NIGHT": 0xEA46, "WIND": 0xEFD8, "LOCATION": 0xE0C8, "TORCH": 0xF00B, "SCREEN_OFF": 0xE51C, "APPS": 0xE5C3,
     "BRIGHT_LOW": 0xE1AD, "BATTERY_LOW": 0xE19C, "HEARING": 0xE023, "HEARING_OFF": 0xF104, "FOG": 0xE3EA,
+    "GAME": 0xEA28,
 }
 ICON_RANGE = ",".join(hex(c) for c in sorted(set(ICON_NAMES.values())))
 

@@ -90,48 +90,121 @@ static const char PAGE[] PROGMEM = R"HTML(<!doctype html>
 <meta name="theme-color" content="#0d0d0f">
 <title>Taschenfunk</title>
 <style>
-:root{--bg:#f4f2ee;--card:#fff;--text:#1d1c1a;--dim:#77736c;--line:#e6e2da;--acc:#c98a2b;--kid:#e0562e;--ok:#1f9d6b;--bad:#d64541}
-@media (prefers-color-scheme:dark){:root{--bg:#0d0d0f;--card:#18181c;--text:#f4f1ea;--dim:#8e8a82;--line:#2a2a30;--acc:#e0b25e;--kid:#ff8a5c;--ok:#3ddc97;--bad:#ff6b5f}}
+:root{color-scheme:light dark;--bg:#f2f0eb;--card:#fff;--fill:#f0ede7;--fill2:#e4e0d8;--text:#16151a;--dim:#7a766e;--line:#e8e4dc;
+--acc:#c98a2b;--acc2:#e9b862;--kid:#ec6436;--kid2:#ff9a6a;--ok:#159b67;--bad:#e0483e;--warn:#d98c12;--glass:rgba(250,248,244,.78);
+--shadow:0 1px 2px rgba(30,24,12,.05),0 12px 32px -14px rgba(30,24,12,.22);--r:24px}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#121214;--fill:#1d1d20;--fill2:#2a2a2e;--text:#f6f3ec;--dim:#8f8b84;--line:#242428;
+--acc:#e8b660;--acc2:#f6d08a;--kid:#ff7a4a;--kid2:#ffa985;--ok:#34d399;--bad:#ff6b5f;--warn:#fbbf24;--glass:rgba(18,18,20,.74);
+--shadow:0 0 0 1px rgba(255,255,255,.06)}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 -apple-system,system-ui,Inter,sans-serif}
-header{position:sticky;top:0;z-index:2;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line)}
-header h1{font-size:20px;margin:0}header p{margin:0;color:var(--dim);font-size:14px}
-.badge[hidden]{display:none}h2+.row{border-top:0}.badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--kid);color:#fff;margin-left:6px;vertical-align:middle}
-main{max-width:560px;margin:0 auto;padding:14px 12px calc(90px + env(safe-area-inset-bottom))}
-section{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin-bottom:12px}
-h2{font-size:15px;margin:0 0 6px;color:var(--acc);font-weight:650}.kidc h2{color:var(--kid)}
-p.note{color:var(--dim);font-size:14px;margin:6px 0}
-label.f{display:block;font-size:13px;color:var(--dim);margin:12px 0 4px}
-textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:16px;resize:vertical}
-input,select{width:100%;min-height:46px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:16px}
-button{font:inherit;font-weight:600;border:0;border-radius:12px;min-height:46px;padding:10px 16px;background:var(--acc);color:#000;cursor:pointer}
-button.wide{width:100%;margin-top:12px}button.ghost{background:transparent;color:var(--text);border:1px solid var(--line);min-height:40px;padding:6px 12px;font-weight:500}
-button.on{background:var(--ok);color:#fff;border-color:var(--ok)}.drow{display:grid;grid-template-columns:110px 1fr 44px;gap:6px;padding:8px 0;border-top:1px solid var(--line)}.drow input:last-child{grid-column:1/-1}.bt{display:flex;gap:6px;flex-shrink:0}button.kid{background:var(--kid);color:#fff}
-.row{display:flex;align-items:center;gap:10px;min-height:56px;padding:6px 0;border-top:1px solid var(--line)}
-.row:first-child{border-top:0}.row .t{flex:1;min-width:0}.row .t b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row small{color:var(--dim);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sw{position:relative;width:52px;height:32px;flex:none}.sw input{opacity:0;position:absolute;inset:0;margin:0;min-height:0;z-index:1;cursor:pointer}
-.sw span{position:absolute;inset:0;border-radius:99px;background:var(--line);transition:.2s}.sw span:after{content:"";position:absolute;left:3px;top:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px #0004}
-.sw input:checked+span{background:var(--kid)}.angry .sw input:checked+span{background:#d63a2e}.sw input:checked+span:after{transform:translateX(20px)}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px;margin-top:10px}
-.seg button{flex:1;background:transparent;color:var(--dim);min-height:38px;padding:4px}.seg button.sel{background:var(--card);color:var(--text);box-shadow:0 1px 3px #0002}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:15px}.kv span:nth-child(odd){color:var(--dim)}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+header{position:sticky;top:0;z-index:5;padding:calc(14px + env(safe-area-inset-top)) 20px 12px;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
+header h1{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0;font-size:28px;line-height:1.15;font-weight:780;letter-spacing:-.025em}
+#stat{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;background:var(--fill);color:var(--dim);font-size:13px;font-weight:650;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.chip.g{color:var(--ok)}.chip.y{color:var(--warn)}.chip.r{color:var(--bad)}
+.badge{padding:4px 11px;border-radius:99px;background:linear-gradient(135deg,var(--kid2),var(--kid));color:#fff;font-size:12px;font-weight:750;letter-spacing:.02em}
+.badge[hidden]{display:none}
+main{max-width:600px;margin:0 auto;padding:16px 16px calc(112px + env(safe-area-inset-bottom))}
+section{margin:0 0 14px;padding:18px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow)}
+h2{display:flex;align-items:center;gap:8px;margin:0 0 10px;color:var(--dim);font-size:12.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase}
+h2:before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--acc2),var(--acc))}
+.kidc h2:before{background:linear-gradient(135deg,var(--kid2),var(--kid))}
+p.note,.note{margin:8px 0;color:var(--dim);font-size:14px;line-height:1.45}
+label.f{display:block;margin:16px 0 6px;color:var(--dim);font-size:13px;font-weight:650}
+input,select,textarea{display:block;width:100%;min-width:0;max-width:100%;min-height:48px;margin:0;padding:12px 14px;border:1px solid transparent;border-radius:14px;outline:0;background:var(--fill);color:var(--text);font:inherit;font-size:16px;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 4px rgba(201,138,43,.18)}
+.kidc input:focus,.kidc select:focus,.kidc textarea:focus{border-color:var(--kid);box-shadow:0 0 0 4px rgba(236,100,54,.16)}
+input[type=time]{font-variant-numeric:tabular-nums;text-align:left}
+input[type=time]::-webkit-date-and-time-value{text-align:left}
+input::placeholder,textarea::placeholder{color:var(--dim);opacity:.8}
+select{padding-right:40px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238f8b84' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 14px center;background-size:16px}
+textarea{resize:vertical;line-height:1.5}
+input[type=file]{padding:12px;font-size:14px}
+button{min-height:48px;padding:12px 18px;border:0;border-radius:14px;background:linear-gradient(135deg,var(--acc2),var(--acc));color:#1d1404;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 8px 18px -10px rgba(201,138,43,.9);transition:transform .12s,filter .15s}
+button:active{transform:scale(.97);filter:brightness(.96)}
+button.wide{display:block;width:100%;margin-top:12px}
+button.ghost{min-height:42px;padding:8px 14px;background:var(--fill);color:var(--text);font-weight:650;box-shadow:none}
+button.on{background:linear-gradient(135deg,#43e3a5,var(--ok));color:#fff;box-shadow:none}
+button.kid{background:linear-gradient(135deg,var(--kid2),var(--kid));color:#fff;box-shadow:0 8px 18px -10px rgba(236,100,54,.9)}
+.bt{display:flex;flex:none;gap:6px}
+.row{display:flex;align-items:center;gap:12px;min-height:58px;padding:8px 0;border-top:1px solid var(--line)}
+.row:first-child,h2+.row{border-top:0}
+.row .t{flex:1;min-width:0}.row .t b{display:block;overflow:hidden;font-weight:650;white-space:nowrap;text-overflow:ellipsis}
+.row small{display:block;overflow:hidden;color:var(--dim);font-size:13px;white-space:nowrap;text-overflow:ellipsis}
+.sw{position:relative;flex:none;width:51px;height:31px}
+.sw input{position:absolute;inset:0;z-index:1;min-height:0;margin:0;opacity:0;cursor:pointer}
+.sw span{position:absolute;inset:0;border-radius:99px;background:var(--fill2);transition:background .25s}
+.sw span:after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.28);transition:transform .3s cubic-bezier(.3,1.5,.5,1)}
+.sw input:checked+span{background:linear-gradient(135deg,var(--acc2),var(--acc))}
+.kidc .sw input:checked+span{background:linear-gradient(135deg,var(--kid2),var(--kid))}
+.angry .sw input:checked+span{background:linear-gradient(135deg,#ff7a6e,#c9271d)}
+.sw input:checked+span:after{transform:translateX(20px)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.two>*{min-width:0}
+.seg{display:flex;gap:2px;margin-top:12px;padding:4px;border-radius:14px;background:var(--fill)}
+.seg button{flex:1;min-width:0;min-height:38px;padding:6px 4px;font-size:14.5px;letter-spacing:-.01em;overflow:hidden;border-radius:10px;background:transparent;color:var(--dim);font-weight:650;white-space:nowrap;text-overflow:ellipsis;box-shadow:none}
+.seg button.sel{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.1),0 4px 12px -4px rgba(0,0,0,.18)}
+@media (prefers-color-scheme:dark){.seg button.sel{background:var(--fill2)}}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px 16px;font-size:15px}.kv span{min-width:0;overflow-wrap:anywhere}.kv span:nth-child(odd){color:var(--dim)}
 .ok{color:var(--ok)}.bad{color:var(--bad)}
-input[type=range]{padding:0;border:0;background:none;accent-color:var(--kid)}
-nav{position:fixed;left:0;right:0;bottom:0;z-index:3;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;background:none;color:var(--dim);border-radius:0;min-height:62px;font-size:12px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color:var(--acc)}nav button.sel.k{color:var(--kid)}
-.tab{display:none}.tab.sel{display:block}
-#msg{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;display:none;z-index:4;max-width:90vw}
-#lock{position:fixed;inset:0;background:var(--bg);z-index:9;display:none;flex-direction:column;justify-content:center;padding:24px;max-width:420px;margin:0 auto}
-@media (min-width:760px){nav{position:sticky;top:0;max-width:560px;margin:0 auto;border:1px solid var(--line);border-radius:16px}main{padding-bottom:40px}}
+input[type=range]{height:30px;min-height:30px;padding:0;border:0;background:transparent;box-shadow:none}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:var(--fill2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-10px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3),0 0 0 4px var(--acc)}
+.kidc input[type=range]::-webkit-slider-thumb{box-shadow:0 2px 8px rgba(0,0,0,.3),0 0 0 4px var(--kid)}
+input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:var(--fill2)}
+input[type=range]::-moz-range-thumb{width:22px;height:22px;border:4px solid var(--acc);border-radius:50%;background:#fff}
+nav{position:fixed;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));left:12px;z-index:6;display:flex;max-width:560px;margin:0 auto;padding:6px;border-radius:28px;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);box-shadow:0 0 0 1px var(--line),0 14px 34px -12px rgba(0,0,0,.4)}
+nav button{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:56px;padding:6px 2px;border-radius:22px;background:none;color:var(--dim);font-size:11px;font-weight:650;box-shadow:none}
+nav svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.sel{background:rgba(201,138,43,.15);color:var(--acc)}nav button.sel.k{background:rgba(236,100,54,.14);color:var(--kid)}
+.tab{display:none}.tab.sel{display:block;animation:tin .28s ease}
+@keyframes tin{from{opacity:.6;transform:translateY(8px)}}
+#msg{position:fixed;bottom:calc(96px + env(safe-area-inset-bottom));left:50%;z-index:8;display:none;max-width:90vw;padding:12px 18px;border-radius:16px;background:var(--text);color:var(--bg);font-weight:650;transform:translateX(-50%);box-shadow:0 12px 30px -10px rgba(0,0,0,.45)}
+#lock{position:fixed;inset:0;z-index:9;display:none;flex-direction:column;justify-content:center;max-width:420px;margin:0 auto;padding:24px;background:var(--bg)}
+#lock h1{margin:0 0 4px;font-size:30px;letter-spacing:-.02em}
+/* Player */
+#np{min-height:44px;color:var(--text);font-size:15px}#np b{display:block;font-size:18px;letter-spacing:-.01em}
+.ctl{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:16px}
+.ctl button{display:grid;place-items:center;width:52px;height:52px;min-height:52px;padding:0;border-radius:50%;background:var(--fill);color:var(--text);box-shadow:none}
+.ctl svg{width:22px;height:22px;fill:currentColor;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.ctl #mtog{width:70px;height:70px;background:linear-gradient(135deg,var(--acc2),var(--acc));color:#1d1404;box-shadow:0 10px 22px -10px rgba(201,138,43,.9)}
+.ctl #mtog svg{width:28px;height:28px}
+/* Übersicht: Akku-Ring und Kacheln */
+.hero{display:flex;align-items:center;gap:18px}
+.ring{position:relative;flex:none;width:92px;height:92px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:23px;font-weight:780;letter-spacing:-.03em}
+.hero .t{min-width:0}.hero .t b{display:block;font-size:19px;font-weight:720;letter-spacing:-.01em}.hero .t small{display:block;margin-top:2px;color:var(--dim);font-size:14px}
+.tiles{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:18px}
+.tiles button{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:10px;min-height:92px;margin:0;padding:14px 16px;border-radius:20px;text-align:left;line-height:1.25}
+.tiles button i{font-size:24px;font-style:normal}
+/* Tagesablauf als Zeitleiste: Uhrzeit · Punkt · Karte (Szene, ✕, eigener Name) */
+.tl{position:relative;margin-top:14px}
+.tl:before{content:"";position:absolute;top:24px;bottom:24px;left:70px;width:2px;border-radius:2px;background:linear-gradient(var(--kid2),var(--kid))}
+.dr{position:relative;display:grid;grid-template-columns:62px minmax(0,1fr);align-items:start;gap:0 20px;padding:5px 0}
+.dr:after{content:"";position:absolute;top:19px;left:64px;width:14px;height:14px;border:3px solid var(--kid);border-radius:50%;background:var(--card)}
+.dr.fix:after{background:var(--kid)}
+.dr input[type=time]{min-height:42px;padding:8px 2px;font-size:15px;font-weight:720;text-align:center}
+.dr input[type=time]::-webkit-date-and-time-value{text-align:center}
+.dr input[type=time]::-webkit-calendar-picker-indicator{display:none}
+.dr .tm{display:block;padding-top:10px;font-weight:720;text-align:center;font-variant-numeric:tabular-nums}
+.dc{display:grid;grid-template-columns:minmax(0,1fr) 34px;align-items:center;gap:2px 6px;min-width:0;padding:4px;border-radius:16px;background:var(--fill)}
+.dr.fix .dc{background:none;padding-left:0}
+.dc b{display:block;padding:6px 0 6px 4px;font-weight:650}
+.dc select{min-height:34px;padding:4px 26px 4px 6px;background-color:transparent;background-position:right 4px center;font-size:15px;font-weight:600}
+.dc .x{width:34px;min-height:34px;padding:0;border-radius:10px;background:none;color:var(--dim);font-size:14px;box-shadow:none}
+.dc input.nm{grid-column:1/-1;min-height:28px;padding:2px 8px 6px;border:0;background:transparent;color:var(--dim);font-size:13px}
+.dc input.nm:focus{color:var(--text);box-shadow:none}
+@media (min-width:760px){main{padding-top:24px}}
 </style></head><body>
-<header><h1><span id="name">Taschenfunk</span><span class="badge" id="kidb" hidden>Kindermodus</span></h1><p id="stat">verbinde …</p></header>
+<header><h1><span id="name">Taschenfunk</span><span class="badge" id="kidb" hidden>Kindermodus</span></h1><div id="stat"><span class="chip">verbinde …</span></div></header>
 <main>
 <div class="tab sel" id="t-home">
- <section><h2>Uhr</h2><div class="kv" id="info"></div><button class="wide ghost" id="findgo">🔔 Uhr klingeln lassen</button>
-  <button class="wide" id="phonego">🎙 Funk vom Handy</button><p class="note">Knopf halten und sprechen, die Uhr spielt deine Stimme ab. Antwort: auf der Uhr BOOT halten.</p></section>
+ <section><div class="hero" id="hero"></div>
+  <div class="tiles"><button id="phonego"><i>🎙</i>Funk vom Handy</button><button class="ghost" id="findgo"><i>🔔</i>Uhr klingeln lassen</button></div>
+  <p class="note">Funk: Knopf halten und sprechen, die Uhr spielt deine Stimme ab. Antwort: auf der Uhr BOOT halten.</p></section>
+ <section><h2>Uhr</h2><div class="kv" id="info"></div></section>
  <section><h2>Akku</h2><div class="kv" id="batkv"></div><svg id="batchart" viewBox="0 0 360 140" style="width:100%;height:auto;margin-top:10px"></svg>
   <div class="note" id="batleg"><span style="color:var(--acc)">━</span> entlädt &nbsp; <span style="color:var(--ok)">━</span> lädt &nbsp; <span style="color:var(--dim)">┄</span> Uhr aus / Tiefschlaf</div>
   <label class="f" for="pmode">Sparmodus</label><select id="pmode"><option value="1">Automatisch ab 20 %</option><option value="2">Immer an</option><option value="0">Aus</option></select>
@@ -147,9 +220,9 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 </div>
 
 <div class="tab" id="t-kids">
- <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small>Auf der Uhr keine freie Auswahl mehr</small></div><label class="sw"><input type="checkbox" id="kon"><span></span></label></div></section>
- <section class="kidc angry"><div class="row"><div class="t"><b>Wutmodus</b><small id="angst"></small></div><label class="sw"><input type="checkbox" id="kangry"><span></span></label></div>
-  <p class="note">Auf der Uhr gibt es dann nur noch das Wut-Glas: ganz fest schütteln, bis alle roten Funken rausgeflogen sind, danach sinkt ruhiger Glitzer und ein Kreis atmet vor. Wischen und Tasten tun nichts, Musik und Funk sind aus.</p></section>
+ <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small>Auf der Uhr keine freie Auswahl mehr</small></div><label class="sw"><input type="checkbox" id="kon"><span></span></label></div>
+  <div class="row angry"><div class="t"><b>Wutmodus</b><small id="angst"></small></div><label class="sw"><input type="checkbox" id="kangry"><span></span></label></div>
+  <p class="note">Wutmodus: Auf der Uhr gibt es nur noch das Wut-Glas – kräftig schütteln, bis alle roten Funken draußen sind, dann wird es ruhig und ein Kreis atmet vor.</p></section>
  <section class="kidc"><h2>Tagesablauf</h2><p class="note">Das Zifferblatt zeigt den Tag als Pixel-Geschichte.</p>
   <div class="two"><div><label class="f" for="kw">Aufstehen</label><input type="time" id="kw"></div><div><label class="f" for="kb">Ins Bett</label><input type="time" id="kb"></div></div>
   <div class="seg" id="kplace"><button data-v="0">Kita</button><button data-v="1">Schule</button></div>
@@ -157,7 +230,7 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
   <div class="seg" id="dday"><button data-v="weekday" class="sel">Mo–Fr</button><button data-v="weekend">Sa &amp; So</button></div>
   <div id="dlist"></div>
   <button class="wide ghost" id="dadd">+ Abschnitt</button><button class="wide kid" id="dsave">Ablauf speichern</button><button class="wide ghost" id="dreset">Standard wiederherstellen</button>
-  <p class="note">Aufstehen und Schlafenszeit kommen aus den Zeiten oben. Jeder Abschnitt zeigt eine Szene der Pixel-Geschichte; der Name ist frei, z. B. „Schwimmkurs“ mit der Szene „Draußen spielen“.</p>
+  <p class="note">Aufstehen und Schlafenszeit kommen aus den Zeiten oben. Jeder Abschnitt zeigt eine Szene der Pixel-Geschichte („Kita/Schule“ wird am Wochenende zu „Spielen“); der Name ist frei, z. B. „Schwimmkurs“ mit der Szene „Draußen spielen“.</p>
  </section>
  <section class="kidc"><h2>Routinen mit Sternen</h2><p class="note" id="rst2"></p><div id="rnow"></div>
   <label class="f" for="rmorn">Morgens (ab dem Aufstehen, eine Aufgabe pro Zeile)</label><textarea id="rmorn" rows="4"></textarea>
@@ -181,14 +254,14 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 
 <div class="tab" id="t-music">
  <section><h2>Läuft auf der Uhr</h2><div id="np" class="note">Nichts</div>
-  <div class="seg" style="margin-top:12px"><button id="mprev">⏮</button><button id="mtog">⏯</button><button id="mnext">⏭</button><button id="mstop">⏹</button></div>
+  <div class="ctl"><button id="mstop" aria-label="Stopp"><svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg></button><button id="mprev" aria-label="Zurück"><svg viewBox="0 0 24 24"><path d="M18 6v12l-8.5-6zM6 6v12"/></svg></button><button id="mtog" aria-label="Wiedergabe/Pause"><svg viewBox="0 0 24 24"><path d="M7 5v14l7-7zM16 6v12M20 6v12"/></svg></button><button id="mnext" aria-label="Weiter"><svg viewBox="0 0 24 24"><path d="M6 6v12l8.5-6zM18 6v12"/></svg></button></div>
   <label class="f" for="mvol">Lautstärke <span id="mvolv"></span> %</label><input type="range" id="mvol" min="0" max="100" step="5">
   <label class="f" for="msleep">Sleep-Timer</label><select id="msleep"><option value="0">aus</option><option value="15">15 Min.</option><option value="30">30 Min.</option><option value="45">45 Min.</option><option value="60">60 Min.</option><option value="90">90 Min.</option></select></section>
  <section><h2>Abspielen</h2>
   <div class="seg" id="msrc"><button data-v="kids" class="sel">Freigegeben</button><button data-v="favs">Favoriten</button><button data-v="search">Suche</button></div>
   <div id="msearch" hidden><div class="seg" id="mss"><button data-v="radio" class="sel">Radio</button><button data-v="ard">Audiothek</button><button data-v="podcast">Podcasts</button></div>
    <input id="mq" type="search" placeholder="Sender, Sendung, Podcast" enterkeyhint="search" style="margin-top:10px"></div>
-  <p class="note">🧸 + gibt einen Sender, eine Sendung oder einen Podcast für die Kinder frei (🧸 ✓ = freigegeben, nochmal tippen entfernt). Freigegebenes steht oben unter „Freigegeben“ und im Reiter Kinder.</p>
+  <p class="note">🧸 + gibt Sender, Sendungen und Podcasts für die Kinder frei, 🧸 ✓ heißt freigegeben.</p>
   <p class="note" id="mpath"></p><div id="mlist"></div></section>
  <section><h2>Favoriten</h2><div id="favs"></div></section>
 </div>
@@ -232,7 +305,7 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
  <section><button class="wide ghost" id="rst">Uhr neu starten</button></section>
 </div>
 </main>
-<nav id="nav"><button data-t="home" class="sel"><i>⌚</i>Übersicht</button><button data-t="kids" class="k"><i>🧸</i>Kinder</button><button data-t="music"><i>♪</i>Musik</button><button data-t="ai"><i>✦</i>KI</button><button data-t="dev"><i>⚙</i>Gerät</button></nav>
+<nav id="nav"><button data-t="home" class="sel"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="4"/><path d="M9 6l1-3h4l1 3M9 18l1 3h4l1-3M12 9.5V12l1.6 1.2"/></svg>Übersicht</button><button data-t="kids" class="k"><svg viewBox="0 0 24 24"><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="6.5" r="2.5"/><circle cx="12" cy="13.5" r="7"/><path d="M9.5 15.5c1.4 1.2 3.6 1.2 5 0"/><path d="M9.5 11.5h.01M14.5 11.5h.01" stroke-width="2.6"/></svg>Kinder</button><button data-t="music"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>Musik</button><button data-t="ai"><svg viewBox="0 0 24 24"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>KI</button><button data-t="dev"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Gerät</button></nav>
 <div id="msg"></div>
 <div id="lock"><h1>Eltern-PIN</h1><p class="note">Diese Uhr ist geschützt.</p><input id="lpin" type="password" inputmode="numeric" autocomplete="off"><button class="wide" id="lgo">Entsperren</button></div>
 <script>
@@ -257,7 +330,11 @@ function kids(p){post('kids',p,true)}
 function render(){
  const s=S,k=s.kids;
  $('name').textContent=s.name;$('kidb').hidden=!k.on;
- $('stat').textContent=`${s.battery<0?'USB':s.battery+' %'}${s.charging?' ⚡':''} · ${s.ssid||'offline'} · ${s.host}.local`;
+ const bc=s.battery<0||s.charging?'g':s.battery<=20?'r':s.battery<=40?'y':'g';
+ $('stat').innerHTML=`<span class="chip ${bc}">${s.battery<0?'USB':s.battery+' %'}${s.charging?' ⚡':''}</span><span class="chip">${s.ssid?esc(s.ssid):'offline'}</span>`;
+ const pr=s.power||{},rm=pr.remainMin,ring=s.battery<0?100:s.battery,rc=bc=='r'?'var(--bad)':bc=='y'?'var(--warn)':'var(--ok)';
+ $('hero').innerHTML=`<div class="ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--fill2)" stroke-width="10"/><circle cx="50" cy="50" r="42" fill="none" stroke="${rc}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(ring*2.639).toFixed(1)} 264"/></svg><b>${s.battery<0?'USB':s.battery+'%'}</b></div>
+  <div class="t"><b>${s.charging?'Lädt':rm>=0?'noch ca. '+(rm>=60?Math.floor(rm/60)+' h '+String(rm%60).padStart(2,'0')+' min':rm+' min'):'Akku'}</b><small>${esc(pr.sleep||'')}</small><small>${esc(s.name)} · ${s.peers} Funk-Nachbar${s.peers==1?'':'n'}</small></div>`;
  $('info').innerHTML=`<span>Akku</span><span>${s.battery<0?'kein Akku':s.battery+' %'}${s.charging?' · lädt':''}</span><span>WLAN</span><span>${esc(s.ssid||'–')}${s.rssi?' ('+s.rssi+' dBm)':''}</span>
   <span>Adresse</span><span>${esc(s.ip)}</span><span>Funk-Nachbarn</span><span>${s.peers}</span><span>Version</span><span>${esc(s.version)}</span>`;
  $('kon').checked=$('kon2').checked=k.on;$('kangry').checked=$('kangry2').checked=k.angry&&k.on;
@@ -351,10 +428,11 @@ $('mvol').oninput=e=>$('mvolv').textContent=e.target.value;$('mvol').onchange=e=
 $('msleep').onchange=e=>ctl({sleep:+e.target.value});
 document.querySelector('nav button[data-t=music]').addEventListener('click',()=>{if(!mStack.length)mStart()});
 // Tagesablauf: Plan für Mo–Fr und Sa/So bearbeiten (bleibt beim automatischen Neuladen stehen, bis gespeichert)
-const SC=[[2,'Frühstück'],[3,'Kita/Schule (Wochenende: Spielen)'],[4,'Mittagessen'],[5,'Mittagsruhe'],[6,'Draußen spielen'],[7,'Abendessen'],[8,'Baden & Zähne putzen'],[9,'Gute-Nacht-Geschichte']];
+const SC=[[2,'🥣 Frühstück'],[3,'🏫 Kita/Schule'],[4,'🍝 Mittagessen'],[5,'😴 Mittagsruhe'],[6,'🛝 Draußen spielen'],[7,'🍲 Abendessen'],[8,'🛁 Baden & Zähne putzen'],[9,'📖 Gute-Nacht-Geschichte']];
 let dPlan=null,dDay='weekday',dDirty=false;
-function dRender(){if(!dPlan)return;const L=dPlan[dDay];
- $('dlist').innerHTML=L.map((e,i)=>`<div class="drow"><input type="time" value="${hm(e.t)}" onchange="dSet(${i},'t',mins(this.value))"><select onchange="dSet(${i},'a',+this.value)">${SC.map(([v,l])=>`<option value="${v}"${v==e.a?' selected':''}>${l}</option>`).join('')}</select><button class="ghost" onclick="dDel(${i})">✕</button><input placeholder="eigener Name (optional)" maxlength="23" value="${esc(e.n||'')}" oninput="dSet(${i},'n',this.value)"></div>`).join('')||'<p class="note">Keine Abschnitte – nur Aufstehen und Schlafenszeit.</p>'}
+function dRender(){if(!dPlan||!S)return;const L=dPlan[dDay],k=S.kids;
+ const fix=(t,n)=>`<div class="dr fix"><span class="tm">${hm(t)}</span><div class="dc"><b>${n}</b></div></div>`;
+ $('dlist').innerHTML='<div class="tl">'+fix(k.wake,'☀️ Aufstehen')+L.map((e,i)=>`<div class="dr"><input type="time" value="${hm(e.t)}" aria-label="Uhrzeit" onchange="dSet(${i},'t',mins(this.value))"><div class="dc"><select aria-label="Szene" onchange="dSet(${i},'a',+this.value)">${SC.map(([v,l])=>`<option value="${v}"${v==e.a?' selected':''}>${l}</option>`).join('')}</select><button class="x" aria-label="Entfernen" onclick="dDel(${i})">✕</button><input class="nm" placeholder="✎ eigener Name" maxlength="23" value="${esc(e.n||'')}" oninput="dSet(${i},'n',this.value)"></div></div>`).join('')+fix(k.bed,'🌙 Schlafenszeit')+'</div>'}
 function dSet(i,k,v){dPlan[dDay][i][k]=v;dDirty=true;if(k=='t'){dPlan[dDay].sort((a,b)=>a.t-b.t);dRender()}}
 function dDel(i){dPlan[dDay].splice(i,1);dDirty=true;dRender()}
 $('dadd').onclick=()=>{const L=dPlan[dDay];L.push({t:L.length?Math.min(L[L.length-1].t+60,23*60):12*60,a:6,n:''});dDirty=true;dRender()};

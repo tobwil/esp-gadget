@@ -201,10 +201,33 @@ static void touchRead(lv_indev_t*, lv_indev_data_t* data) {
     return;
   }
   int16_t x[2], y[2];
-  bool pressed = touchOk && touch.getPoint(x, y, 1) > 0;
+  int n = touchOk ? touch.getPoint(x, y, 2) : 0;
+  bool pressed = n > 0;
   if (pressed) { lx = constrain(x[0] - PANEL_X, 0, LCD_W - 1); ly = constrain(y[0] - PANEL_Y, 0, LCD_H - 1); }
-  // Bei dunklem Display weckt die Berührung nur und wird nicht an die Oberfläche weitergegeben
-  if (!screenOn && pressed) { wakeReq = true; swallow = true; }
+  // Bei dunklem Display weckt nur ein Doppeltipp: zwei kurze Tipps kurz nacheinander an etwa derselben Stelle.
+  // Stoff in der Hosentasche oder eine Hand am Gehäuse berühren lang, flächig oder wandernd – das zählt nicht,
+  // und es hält die Uhr auch nicht vom Tiefschlaf ab. Die Berührung geht nicht an die Oberfläche.
+  static bool was = false, spoiled = false;
+  static uint32_t downAt = 0, tapAt = 0;
+  static int16_t sx, sy, tx, ty;
+  if (!screenOn) {
+    uint32_t now = millis();
+    if (pressed && !was) { downAt = now; sx = lx; sy = ly; spoiled = false; }
+    if (pressed && (n > 1 || abs(lx - sx) + abs(ly - sy) > 40)) spoiled = true;
+    if (!pressed && was) {
+      bool tap = !spoiled && now - downAt < 250;
+      if (tap && tapAt && now - tapAt < 500 && abs(sx - tx) + abs(sy - ty) < 80) { wakeReq = true; tapAt = 0; }
+      else if (tap) { tapAt = now; tx = sx; ty = sy; }
+      else tapAt = 0;
+    }
+    was = pressed;
+    swallow = pressed;
+    data->point.x = lx;
+    data->point.y = ly;
+    data->state = LV_INDEV_STATE_RELEASED;
+    return;
+  }
+  was = false;
   if (swallow && !pressed) swallow = false;
   data->point.x = lx;
   data->point.y = ly;
@@ -390,7 +413,8 @@ void hwDeepSleep(uint32_t wakeInS) {
   gpio_deep_sleep_hold_en();
   rtc_gpio_pullup_en((gpio_num_t)BTN_BOOT);
   rtc_gpio_pulldown_dis((gpio_num_t)BTN_BOOT);
-  esp_sleep_enable_ext1_wakeup((1ULL << BTN_BOOT) | (1ULL << TP_INT), ESP_EXT1_WAKEUP_ANY_LOW);
+  // nur die Taste weckt – Berührungen in der Tasche würden die Uhr sonst jedes Mal komplett hochfahren
+  esp_sleep_enable_ext1_wakeup(1ULL << BTN_BOOT, ESP_EXT1_WAKEUP_ANY_LOW);
   if (wakeInS) esp_sleep_enable_timer_wakeup((uint64_t)wakeInS * 1000000ULL);
   Serial.println("Tiefschlaf …");
   Serial.flush();

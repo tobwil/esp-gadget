@@ -44,6 +44,8 @@ Wie bei Pixel Watch und Apple Watch ist das Zifferblatt die Mitte:
 | überall | **BOOT** kurz (wie die Krone) | Zifferblatt: Apps · sonst: zurück zum Zifferblatt |
 | überall | **BOOT** halten | Funk an alle (Push-to-Talk); in KIra: sprechen |
 | überall | **PWR** kurz / lang | Display an/aus · Ausschalten/Neustart |
+| dunkles Display | **Doppeltipp** | Display an (ein einzelner Tipp, Wischen oder Stoff in der Tasche wecken nicht) |
+| Tiefschlaf | **BOOT** kurz | aufwecken (Berührung weckt hier nicht) |
 
 ## Musik, Radio, ARD Audiothek
 

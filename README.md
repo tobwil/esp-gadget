@@ -94,7 +94,9 @@ Anlegen, Ändern oder Löschen in n8n kann sie nicht.
 Uhr neigen, Kugel rollen lassen. **Ins Ziel**: eine Kugel ins goldene Loch. Die Stufen wechseln reihum –
 **Mauern** (Slalom um Querwände), **Labyrinth** (Ringe mit je einer Öffnung, Ziel in der Mitte; später mit Sperren
 und drittem Ring) und **Blockaden** (verstreute Hindernisse). Rote Löcher sind Fallen, aber nur wenige; jede Stufe
-hat ein eigenes Thema. **Alle Kugeln**: drei Kugeln in drei Löcher, auf Zeit, mit zwei Mauern dazwischen.
+hat ein eigenes Thema. **Alle Kugeln**: drei Kugeln in drei Löcher, auf Zeit, mit zwei Mauern dazwischen. Oben stehen
+Stufe bzw. laufende Zeit und der Rekord; die Rekorde zeigt auch die Weboberfläche (Reiter Kinder), nur dort
+lassen sie sich zurücksetzen.
 
 ## Kindermodus
 
@@ -105,7 +107,8 @@ Ein- und ausgeschaltet wird **nur über die Weboberfläche** (Reiter „Kinder�
 - **Zifferblatt:** eine Pixel-Geschichte durch den Tag – ein Mädchen steht auf, frühstückt, geht in die Kita
   (am Wochenende: spielen), isst zu Mittag, ruht, spielt draußen, isst zu Abend, badet, hört eine
   Gute-Nacht-Geschichte und schläft. Der Ring zeigt den ganzen Tag vom Aufstehen bis zur Bettzeit; was vorbei
-  ist, ist dunkler. Aufstehen und Bettzeit sind einstellbar (Standard 6:30 und 20:30).
+  ist, ist dunkler. Aufstehen und Bettzeit sind einstellbar (Standard 6:30 und 20:30), der Ablauf dazwischen
+  auch – getrennt für Mo–Fr und Sa & So: Uhrzeit, Szene und auf Wunsch ein eigener Name („Schwimmkurs“).
 - **Musik:** nur, was die Eltern freigegeben haben – Radiosender, Audiothek-Sendungen, Podcasts.
 - **Apps:** Musik ist immer da; Funk, Timer, Stoppuhr, Balance, Wecker, Wetter einzeln erlaubt. Keine
   Einstellungen, keine Zifferblatt-Wahl, keine KI.

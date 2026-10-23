@@ -58,6 +58,11 @@ String make(bool secrets) {
   ko["on"] = k.on;
   ko["wake"] = k.wake;
   ko["bed"] = k.bed;
+  {
+    JsonDocument dd;
+    deserializeJson(dd, kids::dayJson());
+    if (dd["custom"]) ko["day"] = dd;  // nur ein eigener Ablauf
+  }
   ko["maxVol"] = k.maxVol;
   ko["apps"] = k.apps;
   ko["school"] = k.school;
@@ -130,6 +135,11 @@ bool restore(const String& json, String& err) {
     k.storyMin = ko["storyMin"] | k.storyMin;
     if (ko["pin"].is<const char*>()) snprintf(k.pin, sizeof(k.pin), "%s", (const char*)ko["pin"]);
     kids::set(k);
+    if (ko["day"]) {
+      String day, err;
+      serializeJson(ko["day"], day);
+      kids::setDay(day, err);
+    }
     for (JsonObject r : ko["released"].as<JsonArray>()) kids::release(r["path"] | "", r["title"] | "", r["sub"] | "", true);
   }
   if (d["routines"]) {

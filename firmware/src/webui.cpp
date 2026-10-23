@@ -106,7 +106,7 @@ textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--
 input,select{width:100%;min-height:46px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:16px}
 button{font:inherit;font-weight:600;border:0;border-radius:12px;min-height:46px;padding:10px 16px;background:var(--acc);color:#000;cursor:pointer}
 button.wide{width:100%;margin-top:12px}button.ghost{background:transparent;color:var(--text);border:1px solid var(--line);min-height:40px;padding:6px 12px;font-weight:500}
-button.on{background:var(--ok);color:#fff;border-color:var(--ok)}.bt{display:flex;gap:6px;flex-shrink:0}button.kid{background:var(--kid);color:#fff}
+button.on{background:var(--ok);color:#fff;border-color:var(--ok)}.drow{display:grid;grid-template-columns:110px 1fr 44px;gap:6px;padding:8px 0;border-top:1px solid var(--line)}.drow input:last-child{grid-column:1/-1}.bt{display:flex;gap:6px;flex-shrink:0}button.kid{background:var(--kid);color:#fff}
 .row{display:flex;align-items:center;gap:10px;min-height:56px;padding:6px 0;border-top:1px solid var(--line)}
 .row:first-child{border-top:0}.row .t{flex:1;min-width:0}.row .t b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row small{color:var(--dim);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -149,7 +149,11 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
  <section class="kidc"><h2>Tagesablauf</h2><p class="note">Das Zifferblatt zeigt den Tag als Pixel-Geschichte.</p>
   <div class="two"><div><label class="f" for="kw">Aufstehen</label><input type="time" id="kw"></div><div><label class="f" for="kb">Ins Bett</label><input type="time" id="kb"></div></div>
   <div class="seg" id="kplace"><button data-v="0">Kita</button><button data-v="1">Schule</button></div>
-  <div class="row" style="margin-top:6px"><div class="t"><b>Mittagsruhe</b><small>12:45 bis 14:00</small></div><label class="sw"><input type="checkbox" id="knap"><span></span></label></div>
+  <label class="f">Ablauf <span class="note" id="dst"></span></label>
+  <div class="seg" id="dday"><button data-v="weekday" class="sel">Mo–Fr</button><button data-v="weekend">Sa &amp; So</button></div>
+  <div id="dlist"></div>
+  <button class="wide ghost" id="dadd">+ Abschnitt</button><button class="wide kid" id="dsave">Ablauf speichern</button><button class="wide ghost" id="dreset">Standard wiederherstellen</button>
+  <p class="note">Aufstehen und Schlafenszeit kommen aus den Zeiten oben. Jeder Abschnitt zeigt eine Szene der Pixel-Geschichte; der Name ist frei, z. B. „Schwimmkurs“ mit der Szene „Draußen spielen“.</p>
  </section>
  <section class="kidc"><h2>Routinen mit Sternen</h2><p class="note" id="rst2"></p><div id="rnow"></div>
   <label class="f" for="rmorn">Morgens (ab dem Aufstehen, eine Aufgabe pro Zeile)</label><textarea id="rmorn" rows="4"></textarea>
@@ -261,7 +265,7 @@ function render(){
  $('rnow').innerHTML=[['Morgens',r.morning],['Abends',r.evening]].map(([n,l])=>`<p class="note">${n}: `+l.map(i=>(i.done?'✅ ':'⬜ ')+esc(i.text)).join(' · ')+'</p>').join('');
  if(document.activeElement!==$('rmorn'))$('rmorn').value=r.morning.map(i=>i.text).join('\n');
  if(document.activeElement!==$('reve'))$('reve').value=r.evening.map(i=>i.text).join('\n');
- $('knap').checked=k.nap;$('knight').checked=k.nightLock;if(document.activeElement!==$('kstory'))$('kstory').value=k.storyMin;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
+ if(!dDirty&&k.day){dPlan=JSON.parse(JSON.stringify(k.day));dRender()}$('dst').textContent=k.day&&k.day.custom?'· eigener':'· Standard';$('knight').checked=k.nightLock;if(document.activeElement!==$('kstory'))$('kstory').value=k.storyMin;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
  $('kapps').innerHTML=APPS.map(([b,n,d])=>row(n,d,`<label class="sw"><input type="checkbox" ${k.apps&b?'checked':''} onchange="kids({apps:this.checked?S.kids.apps|${b}:S.kids.apps&~${b}})"><span></span></label>`)).join('');
  $('krel').innerHTML=k.released.map(r=>row(r.title,r.sub,btn('Entfernen',`rel(${J(r)},false)`))).join('')||'<p class="note">Noch nichts – unten suchen oder einen Favoriten freigeben.</p>';
  $('pinst').innerHTML=k.pin?'<span class="ok">PIN ist gesetzt</span> – die Weboberfläche fragt danach.':'Keine PIN – jeder im WLAN kann die Uhr einstellen.';
@@ -335,7 +339,17 @@ $('mprev').onclick=()=>ctl({cmd:'prev'});$('mtog').onclick=()=>ctl({cmd:'toggle'
 $('mvol').oninput=e=>$('mvolv').textContent=e.target.value;$('mvol').onchange=e=>ctl({volume:+e.target.value});
 $('msleep').onchange=e=>ctl({sleep:+e.target.value});
 document.querySelector('nav button[data-t=music]').addEventListener('click',()=>{if(!mStack.length)mStart()});
-$('knap').onchange=e=>kids({nap:e.target.checked});
+// Tagesablauf: Plan für Mo–Fr und Sa/So bearbeiten (bleibt beim automatischen Neuladen stehen, bis gespeichert)
+const SC=[[2,'Frühstück'],[3,'Kita/Schule (Wochenende: Spielen)'],[4,'Mittagessen'],[5,'Mittagsruhe'],[6,'Draußen spielen'],[7,'Abendessen'],[8,'Baden & Zähne putzen'],[9,'Gute-Nacht-Geschichte']];
+let dPlan=null,dDay='weekday',dDirty=false;
+function dRender(){if(!dPlan)return;const L=dPlan[dDay];
+ $('dlist').innerHTML=L.map((e,i)=>`<div class="drow"><input type="time" value="${hm(e.t)}" onchange="dSet(${i},'t',mins(this.value))"><select onchange="dSet(${i},'a',+this.value)">${SC.map(([v,l])=>`<option value="${v}"${v==e.a?' selected':''}>${l}</option>`).join('')}</select><button class="ghost" onclick="dDel(${i})">✕</button><input placeholder="eigener Name (optional)" maxlength="23" value="${esc(e.n||'')}" oninput="dSet(${i},'n',this.value)"></div>`).join('')||'<p class="note">Keine Abschnitte – nur Aufstehen und Schlafenszeit.</p>'}
+function dSet(i,k,v){dPlan[dDay][i][k]=v;dDirty=true;if(k=='t'){dPlan[dDay].sort((a,b)=>a.t-b.t);dRender()}}
+function dDel(i){dPlan[dDay].splice(i,1);dDirty=true;dRender()}
+$('dadd').onclick=()=>{const L=dPlan[dDay];L.push({t:L.length?Math.min(L[L.length-1].t+60,23*60):12*60,a:6,n:''});dDirty=true;dRender()};
+$('dday').onclick=e=>{if(!e.target.dataset.v)return;dDay=e.target.dataset.v;[...$('dday').children].forEach(b=>b.classList.toggle('sel',b==e.target));dRender()};
+$('dsave').onclick=()=>{dDirty=false;post('kids/day',{weekday:dPlan.weekday,weekend:dPlan.weekend})};
+$('dreset').onclick=()=>{if(!confirm('Eigenen Ablauf verwerfen und den Standard nehmen?'))return;dDirty=false;post('kids/day',{reset:true})};
 $('knight').onchange=e=>kids({nightLock:e.target.checked});$('kstory').onchange=e=>kids({storyMin:+e.target.value});
 $('kv').oninput=e=>$('kvv').textContent=e.target.value;$('kv').onchange=e=>kids({maxVol:+e.target.value});
 $('ssrc').onclick=e=>{if(!e.target.dataset.v)return;src=e.target.dataset.v;[...$('ssrc').children].forEach(b=>b.classList.toggle('sel',b==e.target));if(val('sq'))search()};
@@ -602,6 +616,9 @@ static void state() {
   ko["nap"] = kc.nap;
   ko["nightLock"] = kc.nightLock;
   ko["storyMin"] = kc.storyMin;
+  JsonDocument dd;
+  deserializeJson(dd, kids::dayJson());
+  ko["day"] = dd;
   ko["night"] = kids::night();
   ko["pin"] = kc.pin[0] != 0;  // nie die PIN selbst
   ko["angry"] = kc.angry;
@@ -750,6 +767,12 @@ void begin() {
   on("/api/update", HTTP_POST, []() {});  // otaReceive
   on("/api/search", HTTP_GET, search);
   on("/api/kids", HTTP_POST, setKids);
+  on("/api/kids/day", HTTP_POST, []() {
+    if (!authed()) return;
+    String err;
+    if (!kids::setDay(srv->arg("plain"), err)) return msg(err.c_str(), 400);
+    msg("Ablauf gespeichert");
+  });
   on("/api/kids/release", HTTP_POST, []() {
     if (!authed()) return;
     JsonDocument d;

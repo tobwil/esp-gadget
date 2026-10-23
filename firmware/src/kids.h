@@ -50,8 +50,15 @@ int list(music::Item* out, int max);
 
 // Tagesablauf für das Zifferblatt
 enum Act : uint8_t { SLEEP, WAKE, BREAKFAST, DAYCARE, LUNCH, NAP, PLAY, DINNER, BATH, STORY, ACTS };
-struct Slot { Act act; uint16_t start; };  // Minuten nach Mitternacht
-int schedule(Slot* out, bool weekend);     // Abschnitte des Tages in zeitlicher Reihenfolge
+struct Slot { Act act; uint16_t start; const char* name; };  // Minuten nach Mitternacht; name: eigener Text oder nullptr
+static const int SLOTS_MAX = 16;
+int schedule(Slot* out, bool weekend);     // Abschnitte des Tages in zeitlicher Reihenfolge (höchstens SLOTS_MAX)
 const char* actName(Act a, bool weekend);
+const char* slotName(const Slot& s, bool weekend);  // eigener Name oder der der Szene
+
+// Eigener Tagesablauf (Weboberfläche): je ein Plan für Mo–Fr und Sa/So, zwischen Aufstehen und Bettzeit.
+// {"custom":bool, "weekday":[{"t":Minuten,"a":Szene,"n":"Name"}, …], "weekend":[…]} – ohne eigenen Plan der Standard
+String dayJson();
+bool setDay(const String& json, String& err);  // "" oder {"reset":true} = zurück zum Standard
 
 }  // namespace kids

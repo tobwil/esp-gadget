@@ -174,11 +174,20 @@ static void addBall(float x, float y) {
   place(b.o, x, y, BALL_R);
 }
 
+// Anzeige oben: Stufe bzw. Kugeln und laufende Zeit, darunter der Rekord
 static void setHud() {
-  char t[48];
-  if (mode == 1) snprintf(t, sizeof(t), "Stufe %d · %s", level, gtheme::name(theme));
-  else snprintf(t, sizeof(t), "%d von %d", [] { int k = 0; for (int i = 0; i < nb; i++) k += balls[i].in; return k; }(), nb);
-  lv_label_set_text(hud, t);
+  char t[80], r[32] = "";
+  if (mode == 1) {
+    if (bestLevel) snprintf(r, sizeof(r), "\nRekord: Stufe %d", bestLevel);
+    snprintf(t, sizeof(t), "Stufe %d · %s%s", level, gtheme::name(theme), r);
+  } else {
+    int in = 0;
+    for (int i = 0; i < nb; i++) in += balls[i].in;
+    uint32_t ms = millis() - t0;  // nach dem Ziel ruht die Anzeige (das Ergebnis liegt darüber)
+    if (bestMs) snprintf(r, sizeof(r), "\nRekord: %u,%u s", (unsigned)(bestMs / 1000), (unsigned)(bestMs / 100 % 10));
+    snprintf(t, sizeof(t), "%d von %d · %u,%u s%s", in, nb, (unsigned)(ms / 1000), (unsigned)(ms / 100 % 10), r);
+  }
+  if (strcmp(lv_label_get_text(hud), t)) lv_label_set_text(hud, t);
 }
 
 static void newRound() {
@@ -313,6 +322,7 @@ static void step(lv_timer_t*) {
   hwActivity();  // Display bleibt beim Spielen an
   float gx = 0, gy = 0;
   imu::gravity(gx, gy);
+  if (mode == 2) setHud();  // laufende Zeit
 
   if (resetAt && now > resetAt) {  // nach einem Fehler: Kugel zurück zum Start
     resetAt = 0;
@@ -470,6 +480,7 @@ static void build(lv_obj_t* scr) {
   lv_obj_set_size(field, W, H);
   lv_obj_remove_flag(field, (lv_obj_flag_t)(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
   hud = label(scr, &font_text_20, C_TEXT(), "");
+  lv_obj_set_style_text_align(hud, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_bg_color(hud, C_BG(), 0);  // dunkles Schild, damit es auf jedem Untergrund lesbar ist
   lv_obj_set_style_bg_opa(hud, LV_OPA_70, 0);
   lv_obj_set_style_radius(hud, 14, 0);

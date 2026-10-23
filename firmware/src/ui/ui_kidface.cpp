@@ -455,7 +455,7 @@ void render(int f) {
   if (kidFaceTestMin >= 0) { valid = true; t.tm_hour = kidFaceTestMin / 60; t.tm_min = kidFaceTestMin % 60; t.tm_wday = 3; }
   int now = valid ? t.tm_hour * 60 + t.tm_min : kids::cfg().wake + 120;
   bool weekend = valid && (t.tm_wday == 0 || t.tm_wday == 6);
-  kids::Slot sl[12];
+  kids::Slot sl[kids::SLOTS_MAX];
   int n = kids::schedule(sl, weekend);
   bool awake = now >= sl[0].start && now < sl[n - 1].start;
   int k = n - 1;  // SLEEP
@@ -476,7 +476,7 @@ void render(int f) {
   if (music::state().playing) note(58 + tw / 2 + 4, 13 + f % 2);
 
   // Beschriftung: was gerade dran ist und bis wann
-  const char* name = kids::actName(act, weekend);
+  const char* name = awake ? kids::slotName(sl[k], weekend) : kids::actName(act, weekend);
   if (strcmp(lv_label_get_text(actL), name)) {
     lv_obj_set_style_text_font(actL, strlen(name) > 14 ? &font_text_20 : &font_text_24, 0);
     lv_label_set_text(actL, name);

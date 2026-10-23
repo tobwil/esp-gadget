@@ -1,5 +1,7 @@
 #include "kids.h"
+#include <ArduinoJson.h>
 #include <Preferences.h>
+#include <algorithm>
 #include <time.h>
 #include "favs.h"
 #include "hw.h"
@@ -9,6 +11,13 @@ namespace kids {
 
 static Cfg c;
 static favs::Store store("kids");
+
+// eigener Tagesablauf: [0] = Mo–Fr, [1] = Sa/So; 0 Einträge = Standard
+struct Entry { uint16_t t; uint8_t a; char n[24]; };
+static const int PLAN_MAX = 14;
+static Entry plan[2][PLAN_MAX];
+static int planN[2] = {0, 0};
+static void loadDay(const String& json);
 
 void begin() {
   Preferences p;
@@ -24,8 +33,10 @@ void begin() {
   c.angry = p.getBool("angry", false);
   c.nightLock = p.getBool("night", true);
   c.storyMin = p.getUChar("story", 30);
+  String day = p.getString("day", "");
   p.end();
   store.begin();
+  loadDay(day);
 }
 
 const Cfg& cfg() { return c; }
@@ -104,12 +115,18 @@ int list(music::Item* out, int max) { return store.list(out, max); }
 // Der Tag hängt an Aufstehen und Bettzeit: morgens ab dem Aufstehen, abends rückwärts von der Bettzeit.
 int schedule(Slot* out, bool weekend) {
   int w = c.wake, b = c.bed, n = 0;
-  auto add = [&](Act a, int start) {
+  auto add = [&](Act a, int start, const char* name = nullptr) {
     if (n && start <= out[n - 1].start) return;  // zu kurzer Tag: Abschnitt fällt weg
-    if (start >= b) return;
-    out[n++] = {a, (uint16_t)start};
+    if (start >= b || n >= SLOTS_MAX - 1) return;
+    out[n++] = {a, (uint16_t)start, name};
   };
   add(WAKE, w);
+  int pi = weekend ? 1 : 0;
+  if (planN[pi]) {  // eigener Plan
+    for (int i = 0; i < planN[pi]; i++) add((Act)plan[pi][i].a, plan[pi][i].t, plan[pi][i].n[0] ? plan[pi][i].n : nullptr);
+    out[n++] = {SLEEP, (uint16_t)b, nullptr};
+    return n;
+  }
   add(BREAKFAST, w + 30);
   add(DAYCARE, w + 60);  // am Wochenende: spielen
   add(LUNCH, 12 * 60);
@@ -118,9 +135,77 @@ int schedule(Slot* out, bool weekend) {
   add(DINNER, b - 150);
   add(BATH, b - 90);
   add(STORY, b - 45);
-  out[n++] = {SLEEP, (uint16_t)b};
-  (void)weekend;
+  out[n++] = {SLEEP, (uint16_t)b, nullptr};
   return n;
+}
+
+const char* slotName(const Slot& s, bool weekend) { return s.name ? s.name : actName(s.act, weekend); }
+
+static void loadDay(const String& json) {
+  planN[0] = planN[1] = 0;
+  JsonDocument d;
+  if (!json.length() || deserializeJson(d, json)) return;
+  const char* key[2] = {"weekday", "weekend"};
+  for (int k = 0; k < 2; k++) {
+    for (JsonObject e : d[key[k]].as<JsonArray>()) {
+      int t = e["t"] | -1, a = e["a"] | -1;
+      if (t < 0 || t >= 24 * 60 || a <= WAKE || a >= ACTS || planN[k] >= PLAN_MAX) continue;
+      Entry& x = plan[k][planN[k]++];
+      x.t = t;
+      x.a = a;
+      snprintf(x.n, sizeof(x.n), "%s", (const char*)(e["n"] | ""));
+    }
+    // nach Uhrzeit sortieren
+    std::sort(plan[k], plan[k] + planN[k], [](const Entry& p, const Entry& q) { return p.t < q.t; });
+  }
+}
+
+String dayJson() {
+  JsonDocument d;
+  d["custom"] = planN[0] || planN[1];
+  const char* key[2] = {"weekday", "weekend"};
+  for (int k = 0; k < 2; k++) {
+    JsonArray a = d[key[k]].to<JsonArray>();
+    Slot sl[SLOTS_MAX];
+    int n = schedule(sl, k == 1);
+    for (int i = 0; i < n; i++) {  // Aufstehen und Schlafenszeit kommen aus den Zeiten oben
+      if (sl[i].act == WAKE || sl[i].act == SLEEP) continue;
+      JsonObject e = a.add<JsonObject>();
+      e["t"] = sl[i].start;
+      e["a"] = (int)sl[i].act;
+      e["n"] = sl[i].name ? sl[i].name : "";
+    }
+  }
+  String s;
+  serializeJson(d, s);
+  return s;
+}
+
+bool setDay(const String& json, String& err) {
+  JsonDocument d;
+  if (json.length() && deserializeJson(d, json)) { err = "Ungültiger Ablauf"; return false; }
+  String store = (!json.length() || d["reset"]) ? "" : json;
+  loadDay(store);
+  if (store.length()) {  // so speichern, wie es verstanden wurde (geprüft und sortiert)
+    JsonDocument o;
+    const char* key[2] = {"weekday", "weekend"};
+    for (int k = 0; k < 2; k++) {
+      JsonArray a = o[key[k]].to<JsonArray>();
+      for (int i = 0; i < planN[k]; i++) {
+        JsonObject e = a.add<JsonObject>();
+        e["t"] = plan[k][i].t;
+        e["a"] = plan[k][i].a;
+        if (plan[k][i].n[0]) e["n"] = plan[k][i].n;
+      }
+    }
+    store = "";
+    serializeJson(o, store);
+  }
+  Preferences p;
+  p.begin("kids", false);
+  p.putString("day", store);
+  p.end();
+  return true;
 }
 
 const char* actName(Act a, bool weekend) {

@@ -222,7 +222,8 @@ static void newRound() {
         float side = frand() < 0.5f ? 1 : -1;
         for (int i = 0; i < n; i++) {
           float t = (i + 1.0f) / (n + 1), x = startX + (gx - startX) * t, y = startY + (gy - startY) * t;
-          addCross(x, y, dx, dy, side * -FIELD_R, side * (FIELD_R * 0.55f - BALL_R * 2.6f - level * 2));
+          // höhere Stufe: längere Wände, engerer Durchlass (bis Stufe 16)
+          addCross(x, y, dx, dy, side * -FIELD_R, side * (FIELD_R * 0.55f - BALL_R * 2.6f + min(level, 16) * 3));
           side = -side;
         }
         traps = min(3, level / 3);

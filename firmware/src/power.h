@@ -19,6 +19,8 @@ uint16_t deepSleepMin();
 int remainingMin();          // geschätzte Restlaufzeit, −1 = unbekannt
 float drainPerHour();        // Verbrauch in %/h (aus dem Verlauf), 0 = unbekannt
 String historyJson();        // [[Minuten vor jetzt, %, mV, lädt], …]
+void sleepInfo(const char* why, long leftS);  // aus main: was den Tiefschlaf aufhält bzw. wann er kommt
+String sleepText();          // „Tiefschlaf in 7 min“ / „wach: Musik läuft“
 String remainingText();      // „noch ca. 5 h 20 min“, „Restzeit wird gemessen“ bzw. "" am Kabel
 
 }  // namespace pwr

@@ -189,6 +189,12 @@ Kontrollzentrum („noch ca. 5 h 20 min“). Geschätzt wird aus mindestens 20 M
 übersteht Neustarts, Updates und Tiefschlaf. Bei 10 % gibt es eine Warnung, bei 3 % schaltet die Uhr
 geordnet aus.
 
+**Immer:** Wird nichts gestreamt, schläft das WLAN-Funkmodul zwischen den Beacons des Routers (Funk mit
+anderen Uhren läuft im WLAN per Multicast weiter). Bei dunklem Display läuft der Prozessor mit 80 MHz, die
+Oberfläche zeichnet nichts, und der Audio-Teil hält 3 s nach dem letzten Ton an. Nach 10 Minuten mit dunklem
+Display geht die Uhr in den Tiefschlaf (BOOT weckt), außer Musik spielt, ein Timer läuft oder gefunkt wird –
+eine pausierte Wiedergabe hält sie nicht mehr wach. Die Weboberfläche zeigt, was sie gerade wach hält.
+
 **Sparmodus** (automatisch ab 20 %, oder immer): Display höchstens 40 % hell und nach 10 s aus, Zifferblätter
 nur noch einmal pro Sekunde, kein Funk im Hintergrund, ohne laufende Musik WLAN im Stromsparbetrieb und
 Prozessor auf 80 MHz, Tiefschlaf schon nach 3 statt 10 Minuten.

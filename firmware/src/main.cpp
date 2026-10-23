@@ -165,10 +165,20 @@ static void power() {
   uint32_t off = pwr::screenOffS();
   if (hwScreenOn() && off && hwIdleMs() > off * 1000UL && !cw::ringing() && !radio::transmitting())
     hwScreen(false);
-  // Tiefschlaf im Akkubetrieb, wenn nichts mehr läuft
-  if (!hwScreenOn() && pwr::deepSleepMin() && !hwUsb() && hwBattery() >= 0 &&
-      hwIdleMs() > (off + pwr::deepSleepMin() * 60UL) * 1000UL && !music::state().active && !cw::busy() &&
-      !radio::transmitting() && !radio::receiving() && !kids::angry()) {
+  // Tiefschlaf im Akkubetrieb, wenn nichts mehr läuft (pausierte Musik hält die Uhr nicht wach);
+  // der Grund, warum sie (noch) wach ist, steht in der Weboberfläche
+  const char* why = nullptr;
+  if (hwScreenOn()) why = "Display an";
+  else if (!pwr::deepSleepMin()) why = "abgeschaltet";
+  else if (hwUsb() || hwBattery() < 0) why = "am Kabel";
+  else if (music::state().playing) why = "Musik läuft";
+  else if (cw::busy()) why = "Timer, Stoppuhr oder Wecker";
+  else if (radio::transmitting() || radio::receiving() || phone::connected()) why = "Funk";
+  else if (kids::angry()) why = "Wutmodus";
+  long left = why ? -1 : ((long)(off + pwr::deepSleepMin() * 60UL) * 1000L - (long)hwIdleMs()) / 1000;
+  pwr::sleepInfo(why, left);
+  if (!why && left <= 0) {
+    if (music::state().active) music::stop();  // merkt sich die Stelle
     pwr::save();
     audio::shutdown();
     hwDeepSleep(cw::alarmInS());
@@ -223,5 +233,5 @@ void loop() {
   static uint32_t worst = 0, perfAt = 0;
   if (dt > worst) worst = dt;
   if (perfLog && millis() - perfAt > 2000) { perfAt = millis(); Serial.printf("UI: längster Durchlauf %u ms\n", worst / 1000); worst = 0; }
-  delay(min<uint32_t>(next, 5));
+  delay(min<uint32_t>(next, hwScreenOn() ? 5 : 15));  // dunkel: seltener aufwachen (Doppeltipp reicht das)
 }

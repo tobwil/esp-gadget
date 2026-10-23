@@ -268,7 +268,8 @@ function render(){
  const pw=s.power;
  $('batkv').innerHTML=`<span>Stand</span><span>${s.battery<0?'kein Akku':s.battery+' %'}${pw.mv?' · '+(pw.mv/1000).toFixed(2)+' V':''}${s.charging?' · lädt':''}</span>
   <span>Restlaufzeit</span><span>${pw.remainMin>=0?Math.floor(pw.remainMin/60)+' h '+pw.remainMin%60+' min':'wird gemessen …'}</span>
-  <span>Verbrauch</span><span>${pw.drain>0?pw.drain.toFixed(1)+' %/h':'–'}</span><span>Sparmodus</span><span>${pw.saving?'an':'aus'}</span>`;
+  <span>Verbrauch</span><span>${pw.drain>0?pw.drain.toFixed(1)+' %/h':'–'}</span><span>Sparmodus</span><span>${pw.saving?'an':'aus'}</span>
+  <span>Tiefschlaf</span><span>${pw.sleep||'–'}</span>`;
  if(document.activeElement!==$('pmode'))$('pmode').value=pw.mode;
  const h=pw.history;if(h.length>1){const mx=Math.max(...h.map(p=>p[0]))||1;
   const pts=h.map(p=>`${(360-p[0]/mx*360).toFixed(1)},${(86-p[1]*0.82).toFixed(1)}`).join(' ');
@@ -531,6 +532,7 @@ static void state() {
   pw["saving"] = pwr::saving();
   pw["mv"] = hwBatteryMv();
   pw["remainMin"] = pwr::remainingMin();
+  pw["sleep"] = pwr::sleepText();
   pw["drain"] = pwr::drainPerHour();
   JsonDocument hd;
   deserializeJson(hd, pwr::historyJson());

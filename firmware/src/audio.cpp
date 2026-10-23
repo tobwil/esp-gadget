@@ -146,7 +146,8 @@ static void setPa(bool on) {
 static void task(void*) {
   static int16_t out[BLOCK * 2], in[BLOCK * 2];
   float duck = 1;
-  uint32_t quietSince = millis();
+  uint32_t quietSince = millis(), idleSince = millis();
+  bool paused = false;
   int16_t vPrev = 0, vCur = 0;
   float vPhase = 1;  // Stimme: Lage zwischen vPrev und vCur
   float mAcc = 0, mPhase = 0;  // Mikrofon: Mittelwert bis zum nächsten 16-kHz-Wert
@@ -162,6 +163,24 @@ static void task(void*) {
     }
     if (musicFlushReq) { music.tail = music.head; played = 0; musicFlushReq = false; }
     if (voiceFlushReq) { voice.tail = voice.head; voiceFlushReq = false; }
+
+    // Nichts zu hören und kein Mikrofon: nach 3 s I2S anhalten (die Codecs bekommen keinen Takt mehr,
+    // der Prozessor hat Ruhe), bis wieder etwas kommt – das dauert nur einen Durchlauf
+    bool want = micOn || voice.used() || (!musicPaused && music.used()) || fxActive();
+    if (want) idleSince = millis();
+    if (!paused && !want && millis() - idleSince > 3000) {
+      setPa(false);
+      i2s_channel_disable(tx);
+      i2s_channel_disable(rx);
+      paused = true;
+      outLvl = micLvl = 0;
+    }
+    if (paused) {
+      if (!want) { vTaskDelay(pdMS_TO_TICKS(10)); continue; }
+      i2s_channel_enable(tx);
+      i2s_channel_enable(rx);
+      paused = false;
+    }
 
     bool voiceOn = voice.used() > 0;
     bool musicOn = !musicPaused && music.used() > 0;

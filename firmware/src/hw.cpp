@@ -148,6 +148,8 @@ void hwBrightnessCap(uint8_t pct) {
 void hwScreen(bool on) {
   if (on == screenOn) return;
   screenOn = on;
+  // dunkel: LVGL zeichnet nichts mehr (Zeiger, Animationen) – spart Rechenzeit; Berührungen werden weiter gelesen
+  lv_display_enable_invalidation(disp, on);
   if (on) {
     gfx->displayOn();
     lv_obj_invalidate(lv_screen_active());

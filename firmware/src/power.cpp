@@ -8,6 +8,9 @@
 #include "kids.h"
 #include "music.h"
 #include "net.h"
+#include "phone.h"
+#include "radio.h"
+#include "voice.h"
 #include "settings.h"
 #include "ui/ui.h"
 
@@ -88,6 +91,14 @@ int remainingMin() {
   return (int)(pct / d * 60);
 }
 
+static const char* sleepWhy = "";
+static long sleepLeft = -1;
+void sleepInfo(const char* why, long leftS) { sleepWhy = why ? why : ""; sleepLeft = leftS; }
+String sleepText() {
+  if (sleepWhy[0]) return String("wach: ") + sleepWhy;
+  return "Tiefschlaf in " + String(max(1L, (sleepLeft + 59) / 60)) + " min";
+}
+
 String remainingText() {
   if (hwBattery() < 0 || hwUsb()) return "";
   int m = remainingMin();
@@ -155,14 +166,18 @@ void poll() {
   // Helligkeit: Obergrenze nachts (Kindermodus) und im Sparmodus
   hwBrightnessCap(kids::night() ? 20 : active ? 40 : 100);
 
-  // Ohne laufende Musik und ohne Assistentin: WLAN schlafen lassen, Prozessor langsamer
-  bool idle = active && !hwScreenOn() && !music::state().active && assist::phase() == assist::OFF;
-  static bool slow = false;
-  if (idle != slow) {
-    slow = idle;
-    WiFi.setSleep(idle);
-    setCpuFrequencyMhz(idle ? 80 : 240);
-  }
+  // Strom sparen, sobald nichts gestreamt wird: das WLAN-Funkmodul hört dann nur zu den Beacons des Routers
+  // hin (Modem-Schlaf; Funk mit anderen Uhren läuft im WLAN per Multicast weiter), bei dunklem Display
+  // läuft der Prozessor mit 80 statt 240 MHz. Ohne Router (nur ESP-NOW) bleibt das Funkmodul wach.
+  bool streaming = music::state().playing || assist::phase() != assist::OFF || voice::phase() == voice::LISTENING ||
+                   voice::phase() == voice::THINKING || phone::connected() || radio::transmitting() ||
+                   radio::receiving() || radio::screenOpen;
+  bool modemSleep = netOnline() && !streaming;
+  static int ps = -1;
+  if (modemSleep != ps) { ps = modemSleep; WiFi.setSleep(modemSleep); }
+  bool slowCpu = !hwScreenOn() && !streaming;
+  static int cpu = -1;
+  if (slowCpu != cpu) { cpu = slowCpu; setCpuFrequencyMhz(slowCpu ? 80 : 240); }
 }
 
 }  // namespace pwr

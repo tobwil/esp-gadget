@@ -16,6 +16,7 @@ static const App APPS[] = {
     // kid: im Kindermodus nur mit diesem App-Bit (0xFF = immer, 0 = nie)
     {"KI", assistName, C_TEXT, &PAGE_ASSIST, 0},  // nie im Kindermodus
     {I_CHECK, "Aufgaben", C_BRASS, &PAGE_ROUTINE, 0xFE},  // nur im Kindermodus
+    {I_BRUSH, "Zähneputzen", C_WATCH, &PAGE_BRUSH, 0xFF},
     {I_MUSIC, "Musik", C_MUSIC, &PAGE_MUSIC, 0xFF},
     {I_RADIO, "Funk", C_RADIO, &PAGE_RADIO, kids::A_RADIO},
     {I_HOURGLASS, "Timer", C_TIMER, &PAGE_TIMER, kids::A_TIMER},
@@ -37,6 +38,7 @@ static void build(lv_obj_t* scr) {
   snprintf(assistName, sizeof(assistName), "%s", assist::name().c_str());
   for (int i = 0; i < N; i++) {
     if (APPS[i].page == &PAGE_ASSIST && !assist::available()) continue;
+    if (APPS[i].page == &PAGE_BRUSH && !kids::cfg().brushOn) continue;  // in der Weboberfläche abgeschaltet
     if (APPS[i].kid == 0xFE ? !kids::on() || !routines::enabled() : kids::on() && APPS[i].kid != 0xFF && !kids::allowed((kids::App)APPS[i].kid)) continue;
     if (kids::night() && (APPS[i].page != &PAGE_MUSIC || kids::musicLocked())) continue;  // Schlafenszeit
     lv_color_t c = APPS[i].color();

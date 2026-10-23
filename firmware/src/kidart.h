@@ -35,4 +35,20 @@ const char* worldName(World w);
 const char* petName(Pet p);
 const char* chapter(World w, int day);    // Titel des Kapitels (Montag … Sonntag)
 
+// Zähneputzen mit Pferd Luna oder Reh Fips: vier Bilder à 30 s, je ein Viertel des Gebisses
+enum Hero : uint8_t { LUNA, FIPS };
+const char* heroName(Hero h);
+const char* brushChapter(Hero h, int day);         // Fortsetzungsgeschichte: Kapitel des Tages (0 = Montag)
+const char* brushText(Hero h, int day, int beat);  // ein Satz je Bild (beat 0 … 3)
+void drawBrushStory(uint16_t* px, Hero h, int day, int beat, float prog, int frame);  // beat 4 = Schlussbild
+void drawBrushPick(uint16_t* px, int frame);       // beide Figuren zur Auswahl
+// Rätsel: in jedem Viertel tauchen Dinge auf (zählen, Farbe merken), danach Fragen
+enum QuizObj : uint8_t { Q_APPLE, Q_FLOWER, Q_BUTTERFLY, Q_BIRD, Q_MUSHROOM, Q_STAR, Q_OBJS };
+constexpr int Q_COLORS = 4;
+struct QuizBeat { uint8_t obj, count, color; };
+const char* quizName(QuizObj o, bool plural);  // „Apfel“ / „Äpfel“
+const char* quizColor(int c);                   // „rot“, „blau“, „gelb“, „lila“
+uint32_t quizColorRgb(int c);
+void drawBrushQuiz(uint16_t* px, Hero h, const QuizBeat& b, int beat, int frame);
+
 }  // namespace kidart

@@ -33,5 +33,20 @@ int main(int argc, char** argv) {
       snprintf(path, sizeof(path), "%s/w%d_%s.ppm", out, w, s.name);
       save(path, px);
     }
+  for (int h = 0; h < 2; h++)  // Zahnputz-Geschichten: Luna und Fips, je sieben Kapitel à vier Bilder
+    for (int d = 0; d < 7; d++)
+      for (int b = 0; b < 4; b++) {
+        drawBrushStory(px, (Hero)h, d, b, 0.6f, 3);
+        char path[256];
+        snprintf(path, sizeof(path), "%s/s%d_%d_%d.ppm", out, h, d, b);
+        save(path, px);
+      }
+  for (int o = 0; o < Q_OBJS; o++) {  // Rätsel: jede Art einmal
+    QuizBeat qb{(uint8_t)o, (uint8_t)(3 + o), (uint8_t)(o % Q_COLORS)};
+    drawBrushQuiz(px, o % 2 ? FIPS : LUNA, qb, o % 4, 3);
+    char path[256];
+    snprintf(path, sizeof(path), "%s/q%d.ppm", out, o);
+    save(path, px);
+  }
   return 0;
 }

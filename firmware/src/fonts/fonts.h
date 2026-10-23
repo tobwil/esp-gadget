@@ -92,3 +92,4 @@ LV_FONT_DECLARE(font_icon_64);
 #define I_HEARING_OFF "\xEF\x84\x84"
 #define I_FOG "\xEE\x8F\xAA"
 #define I_GAME "\xEE\xA8\xA8"
+#define I_BRUSH "\xEE\x8E\xAE"

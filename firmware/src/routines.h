@@ -22,6 +22,8 @@ bool done(Which w, int i);
 int check(Which w, int i, bool on);  // Haken setzen/entfernen; liefert neue Sterne (0, 1 oder 3 bei „fertig“)
 bool complete(Which w);
 int starsToday();
+void addStars(int n);                // Bonus-Sterne (z. B. Rätsel beim Zähneputzen)
+int checkMatching(const char* text); // Aufgabe der laufenden Routine abhaken, die text enthält; liefert neue Sterne
 int starsWeek();
 int starsTotal();
 void resetStars();

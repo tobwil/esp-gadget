@@ -88,7 +88,7 @@ void fmtTime(char* out, size_t n, uint32_t ms, bool tenths);  // mm:ss(.d) bzw. 
 
 // Seiten (in den einzelnen Dateien)
 extern const ui::Page PAGE_WATCH, PAGE_APPS, PAGE_MUSIC, PAGE_BROWSE, PAGE_TIMER, PAGE_STOPWATCH, PAGE_ALARM,
-    PAGE_RADIO, PAGE_SETTINGS, PAGE_FACES, PAGE_TILES, PAGE_CONTROL, PAGE_GAME, PAGE_ASSIST, PAGE_ROUTINE;
+    PAGE_RADIO, PAGE_SETTINGS, PAGE_FACES, PAGE_TILES, PAGE_CONTROL, PAGE_GAME, PAGE_ASSIST, PAGE_ROUTINE, PAGE_BRUSH;
 void kidFaceBuild(lv_obj_t* scr);  // Zifferblatt im Kindermodus (ui_kidface.cpp)
 void kidFaceUpdate();
 void angryBuild(lv_obj_t* scr);    // Wutmodus: das Wut-Glas (ui_angry.cpp)
@@ -97,6 +97,7 @@ extern int kidFaceTestMin;          // Testzeit für Bildschirmfotos (−1 = ech
 void gameTestLevel(int level);     // Balance: Stufe direkt zeigen (Bildschirmfotos)
 void gameRecords(int& lvl, uint32_t& ms);  // Balance-Rekorde: höchste Stufe, schnellste Zeit „Alle Kugeln“ (0 = keine)
 void gameResetRecords();
+void brushStats(int& lunaChapter, int& lunaShoes, int& fipsChapter, int& fipsFlies);  // Zähneputzen (ui_brush.cpp)
 void browseOpen(const char* path);  // Musik-Liste öffnen (Pfad der Brücke)
 void tilesOpen(int idx);            // Kacheln ab Kachel idx (0 Musik, 1 Wetter, 2 Timer, 3 Funk)
 uint32_t radioTarget();             // gewählter Empfänger auf der Funk-Seite (0 = alle)

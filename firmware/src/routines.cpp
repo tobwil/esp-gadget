@@ -154,6 +154,25 @@ int check(Which w, int i, bool on) {
 }
 
 int starsToday() { rollDay(); return today; }
+
+void addStars(int n) {
+  if (n <= 0) return;
+  rollDay();
+  today += n;
+  total += n;
+  time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+  week[t.tm_wday] += n;
+  save();
+}
+
+int checkMatching(const char* text) {
+  Which w = active();
+  for (int i = 0; w && i < n[w]; i++)
+    if (!done(w, i) && strstr(items[w][i].c_str(), text)) return check(w, i, true);
+  return 0;
+}
 int starsWeek() { int s = 0; for (int i = 0; i < 7; i++) s += week[i]; return s; }
 int starsTotal() { return total; }
 

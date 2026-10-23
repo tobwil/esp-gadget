@@ -135,6 +135,27 @@ jeden Tag ein Kapitel („Der rote Mars“, „Die Regenbogenbrücke“ …), di
 Wer es ruhiger mag, schaltet den **Tagesablauf** aus: Dann spielt die Figur tagsüber, schläft nachts, und unten
 stehen Wochentag und Datum.
 
+Im Zifferblatt tauchen außerdem **Pferd Luna** und **Reh Fips** auf: Fips schaut morgens durchs Fenster, auf der
+Wiese grast Luna und Fips hüpft herum, auf dem Bauernhof steht Luna auf der Koppel, unter Wasser schwimmt ein
+Seepferdchen.
+
+### Zähneputzen
+
+![Zähneputzen](docs/screens/zahnputzen.png)
+
+Eine App (für Kinder und Erwachsene, in der Weboberfläche abschaltbar): erst **Pferd Luna oder Reh Fips** wählen,
+dann die Aufgabe. Zwei Minuten in vier Vierteln à 30 s – oben links, oben rechts, unten links, unten rechts; ein
+Gebiss im Bild leuchtet dort, wo gerade geputzt wird, und eine Zahnbürste zeigt darauf, beim Wechsel klingt ein Ton.
+
+- **Geschichte:** Mit jedem Putzen geht es ein Kapitel weiter. Luna folgt einer Schatzkarte (Bach, Eule, Pilzpfad,
+  Gewitter, die Kiste mit goldenen Hufeisen), Fips hilft dem Glühwürmchen Lumi, seine Freunde zu finden (Igel,
+  Frösche, die Maus im alten Baum, Hängebrücke, Biber, Höhle). Jedes Mal gibt es ein Teil für die Sammlung.
+- **Rätsel:** In jedem Viertel tauchen Äpfel, Blumen, Schmetterlinge, Vögel, Pilze oder Sterne auf; danach kommen
+  Fragen zum Antippen. *Leicht* (ab 4): zählen bis 5 und Farben. *Knifflig* (ab 7): bis 12, zusammenrechnen,
+  „Was kam zuerst?“ – und kein Hinweis, worauf man achten soll. Jede richtige Antwort gibt einen Stern.
+
+Zum Schluss wird „Zähne putzen“ in der laufenden Routine abgehakt. Die Weboberfläche zeigt Kapitel und Sammlung.
+
 Die Szenen zeichnet `firmware/src/kidart.cpp` ohne LVGL – `sh tools/kidart_preview.sh` rendert sie am Rechner
 als Übersicht.
 

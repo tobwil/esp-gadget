@@ -87,6 +87,7 @@ bool appCommand(const char* line) {
   }
   else if (sscanf(line, "kidtime %99s", a) == 1) { int h = 0, m = 0; kidFaceTestMin = sscanf(a, "%d:%d", &h, &m) == 2 ? h * 60 + m : -1; }
   else if (!strcmp(line, "imu")) { imu::sleep(false); delay(50); float x, y; imu::gravity(x, y); Serial.printf("Neigung: x %.2f y %.2f\n", x, y); }
+  else if (!strncmp(line, "lightsleep usb ", 15)) { pwr::lightSleepOnUsb(!strcmp(line + 15, "on")); Serial.println("ok"); }
   else if (!strcmp(line, "poweroff")) {  // ausschalten; hängt USB dran und startet die PMU neu: Tiefschlaf
     pwr::save();
     audio::shutdown();
@@ -233,5 +234,5 @@ void loop() {
   static uint32_t worst = 0, perfAt = 0;
   if (dt > worst) worst = dt;
   if (perfLog && millis() - perfAt > 2000) { perfAt = millis(); Serial.printf("UI: längster Durchlauf %u ms\n", worst / 1000); worst = 0; }
-  delay(min<uint32_t>(next, hwScreenOn() ? 5 : 15));  // dunkel: seltener aufwachen (Doppeltipp reicht das)
+  delay(min<uint32_t>(next, hwScreenOn() ? 5 : 20));  // dunkel: seltener aufwachen (für den Doppeltipp reicht das)
 }

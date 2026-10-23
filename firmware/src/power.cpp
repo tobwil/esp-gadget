@@ -1,6 +1,7 @@
 #include "power.h"
 #include <Preferences.h>
 #include <WiFi.h>
+#include <esp_pm.h>
 #include "assist.h"
 #include "audio.h"
 #include "config.h"
@@ -29,7 +30,34 @@ static int hN = 0, hHead = 0, unsaved = 0;
 
 void save();
 
+// Automatischer Leichtschlaf (esp_pm): Ohne Sperren schläft der Prozessor zwischen allen Aufgaben (80 MHz, das WLAN
+// bleibt über den Modem-Schlaf verbunden). Bei hellem Display, beim Streamen und am Kabel halten zwei Sperren ihn wach
+// und auf 240 MHz.
+static esp_pm_lock_handle_t lockAwake = nullptr, lockFast = nullptr;
+static volatile bool doze = false;
+static bool streamingNow = true, sleepOnUsb = false;
+bool dozing() { return doze; }
+void lightSleepOnUsb(bool on) { sleepOnUsb = on; }
+
+static void pmBegin() {
+  esp_pm_config_t c = {.max_freq_mhz = 240, .min_freq_mhz = 80, .light_sleep_enable = true};
+  if (esp_pm_configure(&c) != ESP_OK) { Serial.println("Akku: Leichtschlaf nicht verfügbar"); return; }
+  esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "awake", &lockAwake);
+  esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "fast", &lockFast);
+  esp_pm_lock_acquire(lockAwake);
+  esp_pm_lock_acquire(lockFast);
+}
+
+static void pmUpdate() {
+  bool d = !hwScreenOn() && !streamingNow && (!hwUsb() || sleepOnUsb);
+  if (d == doze || !lockAwake) return;
+  doze = d;
+  if (d) { esp_pm_lock_release(lockFast); esp_pm_lock_release(lockAwake); }
+  else { esp_pm_lock_acquire(lockAwake); esp_pm_lock_acquire(lockFast); }
+}
+
 void begin() {
+  pmBegin();
   Preferences p;
   p.begin("power", true);
   m = (Mode)p.getUChar("mode", M_AUTO);
@@ -120,6 +148,7 @@ String historyJson() {
 }
 
 void poll() {
+  pmUpdate();  // jede Runde: nach einem Doppeltipp sofort wieder volle Geschwindigkeit
   static uint32_t at1s = 0;
   uint32_t now = millis();
   if (now - at1s < 1000) return;
@@ -171,16 +200,14 @@ void poll() {
 
   // Strom sparen, sobald nichts gestreamt wird: das WLAN-Funkmodul hört dann nur zu den Beacons des Routers
   // hin (Modem-Schlaf; Funk mit anderen Uhren läuft im WLAN per Multicast weiter), bei dunklem Display
-  // läuft der Prozessor mit 80 statt 240 MHz. Ohne Router (nur ESP-NOW) bleibt das Funkmodul wach.
+  // schläft der Prozessor zwischen den Aufgaben (pmUpdate). Ohne Router (nur ESP-NOW) bleibt das Funkmodul wach.
   bool streaming = music::state().playing || assist::phase() != assist::OFF || voice::phase() == voice::LISTENING ||
                    voice::phase() == voice::THINKING || phone::connected() || radio::transmitting() ||
                    radio::receiving() || radio::screenOpen;
   bool modemSleep = netOnline() && !streaming;
   static int ps = -1;
   if (modemSleep != ps) { ps = modemSleep; WiFi.setSleep(modemSleep); }
-  bool slowCpu = !hwScreenOn() && !streaming;
-  static int cpu = -1;
-  if (slowCpu != cpu) { cpu = slowCpu; setCpuFrequencyMhz(slowCpu ? 80 : 240); }
+  streamingNow = streaming;
 }
 
 }  // namespace pwr

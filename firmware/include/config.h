@@ -14,8 +14,9 @@
 // Display aus nach so vielen Sekunden ohne Bedienung (am Gerät änderbar)
 #define SCREEN_TIMEOUT_S 30
 // Tiefschlaf nach so vielen Minuten mit dunklem Display (nur im Akkubetrieb, nicht bei Musik/Timer/Funk-Empfang).
+// Bis dahin schläft der Prozessor automatisch leicht (Doppeltipp weckt sofort), danach weckt nur BOOT.
 // 0 = nie
-#define DEEP_SLEEP_MIN 10
+#define DEEP_SLEEP_MIN 30
 
 #define VOLUME_DEFAULT 60      // %
 #define BRIGHTNESS_DEFAULT 80  // %

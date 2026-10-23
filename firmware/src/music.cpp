@@ -1,4 +1,5 @@
 #include "music.h"
+#include "power.h"
 #include "art.h"
 #include "favs.h"
 #include "kids.h"
@@ -142,7 +143,7 @@ static void worker(void*) {
       qWanted = false;
       qDone = true;
     }
-    if (!wanted) { vTaskDelay(pdMS_TO_TICKS(30)); continue; }
+    if (!wanted) { vTaskDelay(pdMS_TO_TICKS(pwr::dozing() ? 250 : 30)); continue; }
     char path[240], title[72] = "", err[64] = "";
     xSemaphoreTake(mtx, portMAX_DELAY);
     ucopy(path, sizeof(path), want);

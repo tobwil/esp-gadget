@@ -11,6 +11,8 @@ enum Mode : uint8_t { M_OFF = 0, M_AUTO = 1, M_ON = 2 };  // Auto: ab 20 % bis z
 void begin();
 void poll();                 // aus der Hauptschleife
 void save();                 // Akku-Verlauf sichern (vor Tiefschlaf, Ausschalten, Neustart)
+bool dozing();               // Display dunkel, nichts läuft: Prozessor im Leichtschlaf – Tasks dürfen seltener aufwachen
+void lightSleepOnUsb(bool on);  // zum Testen: Leichtschlaf auch am Kabel (USB-Konsole fällt dann zeitweise aus)
 Mode mode();
 void setMode(Mode m);
 bool saving();               // Sparmodus gerade aktiv

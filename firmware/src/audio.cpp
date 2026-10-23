@@ -1,4 +1,5 @@
 #include "audio.h"
+#include "power.h"
 #include <Wire.h>
 #include <driver/i2s_std.h>
 #include "config.h"
@@ -176,7 +177,7 @@ static void task(void*) {
       outLvl = micLvl = 0;
     }
     if (paused) {
-      if (!want) { vTaskDelay(pdMS_TO_TICKS(10)); continue; }
+      if (!want) { vTaskDelay(pdMS_TO_TICKS(pwr::dozing() ? 50 : 10)); continue; }
       i2s_channel_enable(tx);
       i2s_channel_enable(rx);
       paused = false;

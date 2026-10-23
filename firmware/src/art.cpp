@@ -1,4 +1,5 @@
 #include "art.h"
+#include "power.h"
 #include <jpeg_decoder.h>
 #include <math.h>
 #include "web.h"
@@ -71,7 +72,7 @@ static bool decode(const String& jpg, uint16_t* out) {
 
 static void task(void*) {
   for (;;) {
-    if (!wanted) { vTaskDelay(pdMS_TO_TICKS(50)); continue; }
+    if (!wanted) { vTaskDelay(pdMS_TO_TICKS(pwr::dozing() ? 250 : 50)); continue; }
     char url[200];
     xSemaphoreTake(mtx, portMAX_DELAY);
     snprintf(url, sizeof(url), "%s", want);

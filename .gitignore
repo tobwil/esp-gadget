@@ -3,3 +3,9 @@
 .DS_Store
 __pycache__/
 firmware/include/secrets.h
+
+# vom ESP-IDF-Build (custom_sdkconfig) erzeugt
+firmware/.dummy/
+firmware/managed_components/
+firmware/sdkconfig.*
+firmware/dependencies.lock

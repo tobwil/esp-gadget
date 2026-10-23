@@ -26,6 +26,7 @@ struct Cfg {
   uint8_t pet;           // Tier-Begleiter (kidart::Pet), 0 = keins
   char petName[13];      // Name des Tiers
   bool adventure;        // Wochen-Abenteuer in der Spielzeit
+  bool phases;           // Tagesablauf auf dem Zifferblatt (sonst nur Tag und Nacht)
 };
 
 void begin();

@@ -61,7 +61,9 @@ int Store::list(music::Item* out, int max, const char* prefix) {
     if (n >= max) break;
     if (prefix && !f.path.startsWith(prefix)) continue;
     music::Item& o = out[n++];
-    o.kind = f.path.startsWith("radio:") ? music::K_TRACK : music::K_LIST;  // Sender sind direkt spielbar
+    // Sender und einzelne Folgen (Audiothek „ard:a:“, Podcast-Adresse) sind direkt spielbar, der Rest sind Listen
+    o.kind = f.path.startsWith("radio:") || f.path.startsWith("ard:a:") || f.path.startsWith("http") ? music::K_TRACK
+                                                                                                        : music::K_LIST;
     o.dur = 0;
     snprintf(o.id, sizeof(o.id), "%s", f.path.c_str());
     snprintf(o.title, sizeof(o.title), "%s", f.title.c_str());

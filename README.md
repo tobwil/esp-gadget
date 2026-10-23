@@ -58,6 +58,8 @@ Wie bei Pixel Watch und Apple Watch ist das Zifferblatt die Mitte:
   gemerkter Position, **alle ARD-Radiosender live** und **„Fußball live“** – die Sportschau-Übertragungen
   (Bundesliga-Konferenz und Einzelspiele, 2. Liga, Pokal, Europapokal), laufende und kommende.
 - **Podcasts** über die iTunes-Suche.
+- **Weiter hören:** Angefangene Folgen zeigen in den Listen „bei 12:34“; nach dem Stoppen steht die zuletzt gehörte
+  Folge oben in der Musik (und in der Weboberfläche) zum Weiterhören – bis sie zu Ende gehört ist.
 - **Favoriten:** auf der Wiedergabe-Seite das **Herz** antippen – gemerkt wird der Sender, die
   Audiothek-Sendung bzw. der Podcast, der gerade läuft. In Listen geht es auch: Sender lange drücken, bei
   Sendungen und Podcasts die oberste Zeile „Als Favorit merken“.
@@ -109,7 +111,8 @@ Ein- und ausgeschaltet wird **nur über die Weboberfläche** (Reiter „Kinder�
   Gute-Nacht-Geschichte und schläft. Der Ring zeigt den ganzen Tag vom Aufstehen bis zur Bettzeit; was vorbei
   ist, ist dunkler. Aufstehen und Bettzeit sind einstellbar (Standard 6:30 und 20:30), der Ablauf dazwischen
   auch – getrennt für Mo–Fr und Sa & So: Uhrzeit, Szene und auf Wunsch ein eigener Name („Schwimmkurs“).
-- **Musik:** nur, was die Eltern freigegeben haben – Radiosender, Audiothek-Sendungen, Podcasts.
+- **Musik:** nur, was die Eltern freigegeben haben – Radiosender, ganze Audiothek-Sendungen und Podcasts oder
+  einzelne Folgen.
 - **Apps:** Musik ist immer da; Funk, Timer, Stoppuhr, Balance, Wecker, Wetter einzeln erlaubt. Keine
   Einstellungen, keine Zifferblatt-Wahl, keine KI.
 - **Lautstärke** mit Obergrenze (Standard 60 %).
@@ -129,6 +132,8 @@ Meerjungfrauen-Schwanz oder Krone. Ein **Tier** (Katze, Hase, Hund oder Drache, 
 dabei und schläft nachts am Bettende; bei Sternen von heute freut es sich mit Herzchen, ab 20 Sternen trägt es
 ein Halstuch, ab 60 eine Krone. Mit dem **Wochen-Abenteuer** wird die Spielzeit zur Karte: sieben Stationen,
 jeden Tag ein Kapitel („Der rote Mars“, „Die Regenbogenbrücke“ …), die Figur wandert im Laufe der Zeit weiter.
+Wer es ruhiger mag, schaltet den **Tagesablauf** aus: Dann spielt die Figur tagsüber, schläft nachts, und unten
+stehen Wochentag und Datum.
 
 Die Szenen zeichnet `firmware/src/kidart.cpp` ohne LVGL – `sh tools/kidart_preview.sh` rendert sie am Rechner
 als Übersicht.
@@ -136,10 +141,12 @@ als Übersicht.
 ### Schlafenszeit
 
 Ab der Bettzeit bis zum Aufstehen ist die Uhr gesperrt: keine Apps, kein Funk, keine Kacheln, das Display
-gedimmt. Was beim Zubettgehen läuft, darf noch eine Einschlafzeit lang weiterlaufen (Standard 30 Minuten,
-in der Weboberfläche 0 – 60) und wird dann sanft ausgeblendet. Der Wecker funktioniert weiter.
+gedimmt. Nur die Musik bleibt noch eine Einschlafzeit lang (Kinder → Schlafenszeit → „Abends hören“: gar nicht
+bis 2 Stunden, Standard 30 Minuten) und wird dann sanft ausgeblendet. Der Wecker funktioniert weiter.
 
 ### Routinen mit Sternen
+
+*(abschaltbar: Kinder → Routinen → „Aufgaben auf der Uhr“)*
 
 Morgens (ab dem Aufstehen 2 Stunden) und abends (2 Stunden vor der Bettzeit) zeigt die App **Aufgaben** eine
 kurze Liste zum Abhaken – Anziehen, Zähne putzen, Schlafanzug an … Jeder Haken gibt einen **Stern**, eine ganz

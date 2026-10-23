@@ -12,6 +12,7 @@ static int n[3] = {0, 0, 0};
 static uint8_t doneBits[3] = {0, 0, 0};  // heute erledigt (Bit je Aufgabe)
 static int day = -1;                      // Tag (yday), für den doneBits gilt
 static int today = 0, total = 0;
+static bool en = true;
 static uint16_t week[7] = {0};            // Sterne der letzten 7 Tage (Index = Wochentag)
 
 static void defaults() {
@@ -32,6 +33,7 @@ static void load() {
   today = p.getUShort("today", 0);
   total = p.getUInt("total", 0);
   p.getBytes("week", week, sizeof(week));
+  en = p.getBool("on", true);
   p.end();
   if (!c.length()) { defaults(); return; }
   JsonDocument d;
@@ -71,6 +73,14 @@ static void rollDay() {
 }
 
 void begin() { load(); }
+bool enabled() { return en; }
+void setEnabled(bool on) {
+  en = on;
+  Preferences p;
+  p.begin("rout", false);
+  p.putBool("on", en);
+  p.end();
+}
 
 String configJson() {
   JsonDocument d;
@@ -102,7 +112,7 @@ static int nowMin() {
 }
 
 Which active() {
-  if (!kids::on() || time(nullptr) < 1700000000) return NONE;
+  if (!en || !kids::on() || time(nullptr) < 1700000000) return NONE;
   rollDay();
   int m = nowMin(), w = kids::cfg().wake, b = kids::cfg().bed;
   if (n[MORNING] && m >= w && m < w + 120) return MORNING;
@@ -156,6 +166,7 @@ void resetStars() {
 String stateJson() {
   rollDay();
   JsonDocument d;
+  d["on"] = en;
   d["active"] = (int)active();
   d["today"] = today;
   d["week"] = starsWeek();

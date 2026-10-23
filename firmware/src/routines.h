@@ -9,6 +9,8 @@ namespace routines {
 enum Which : uint8_t { NONE = 0, MORNING = 1, EVENING = 2 };
 
 void begin();
+bool enabled();                      // Aufgaben überhaupt anbieten (Weboberfläche)
+void setEnabled(bool on);
 String configJson();                 // {"morning":[…], "evening":[…]}
 void setConfig(const String& json);
 Which active();                      // laufende Routine (nur im Kindermodus), NONE = keine

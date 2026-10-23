@@ -149,12 +149,17 @@ void render(int f) {
   bool weekend = valid && (t.tm_wday == 0 || t.tm_wday == 6);
   kids::Slot sl[kids::SLOTS_MAX];
   int n = kids::schedule(sl, weekend);
+  const kids::Cfg& kc = kids::cfg();
+  if (!kc.phases) {  // ohne Tagesablauf: tagsüber spielen, nachts schlafen
+    n = 2;
+    sl[0] = {kids::PLAY, (uint16_t)kc.wake, nullptr};
+    sl[1] = {kids::SLEEP, (uint16_t)kc.bed, nullptr};
+  }
   bool awake = now >= sl[0].start && now < sl[n - 1].start;
   int k = n - 1;  // SLEEP
   if (awake) { k = 0; while (k + 1 < n && sl[k + 1].start <= now) k++; }
   kids::Act act = sl[k].act;
 
-  const kids::Cfg& kc = kids::cfg();
   int day = valid ? (t.tm_wday + 6) % 7 : 0;  // 0 = Montag
   int week = valid ? (t.tm_yday + 7 - day) / 7 : 0;
   kidart::Scene sc{};
@@ -184,7 +189,10 @@ void render(int f) {
   if (music::state().playing) note(58 + tw / 2 + 4, 13 + f % 2);
 
   // Beschriftung: was gerade dran ist und bis wann
-  const char* name = adv ? kidart::chapter(sc.world, day) : awake ? kids::slotName(sl[k], weekend) : kids::actName(act, weekend);
+  static const char* const DAYS[] = {"Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"};
+  static const char* const MON[] = {"Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"};
+  bool plain = !kc.phases && awake && !adv;  // ohne Tagesablauf: Wochentag und Datum
+  const char* name = adv ? kidart::chapter(sc.world, day) : plain ? DAYS[day] : awake ? kids::slotName(sl[k], weekend) : kids::actName(act, weekend);
   if (strcmp(lv_label_get_text(actL), name)) {
     lv_obj_set_style_text_font(actL, strlen(name) > 14 ? &font_text_20 : &font_text_24, 0);
     lv_label_set_text(actL, name);
@@ -193,6 +201,7 @@ void render(int f) {
   int until = awake ? (k + 1 < n ? sl[k + 1].start : sl[n - 1].start) : sl[0].start;
   char nb[40];
   if (adv) snprintf(nb, sizeof(nb), "Kapitel %d · bis %d:%02d", day + 1, until / 60, until % 60);
+  else if (plain) snprintf(nb, sizeof(nb), "%d. %s", t.tm_mday, MON[t.tm_mon]);
   else snprintf(nb, sizeof(nb), "bis %d:%02d", until / 60, until % 60);
   if (!valid) nb[0] = 0;
   if (strcmp(lv_label_get_text(nextL), nb)) lv_label_set_text(nextL, nb);
@@ -232,7 +241,7 @@ void kidFaceBuild(lv_obj_t* scr) {
   lv_obj_add_flag(touch, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(touch, [](lv_event_t*) {
     if (bezelMoved()) return;
-    if (routines::active()) push(&PAGE_ROUTINE);
+    if (routines::active()) push(&PAGE_ROUTINE);  // nur wenn Aufgaben an sind
     else if (music::state().active) push(&PAGE_MUSIC);
   }, LV_EVENT_SHORT_CLICKED, nullptr);
   bezel(touch, []() { return music::state().active; });

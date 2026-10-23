@@ -227,7 +227,8 @@ nav button.sel{background:rgba(201,138,43,.15);color:var(--acc)}nav button.sel.k
   <label class="f" for="kworld">Welt</label><select id="kworld"><option value="5">✨ Jede Woche eine andere</option><option value="0">🏠 Zuhause</option><option value="1">🚀 Weltraum</option><option value="2">🚜 Bauernhof</option><option value="3">🐠 Unterwasser</option><option value="4">🦄 Märchenland</option></select>
   <div class="two"><div><label class="f" for="kpet">Tier</label><select id="kpet"><option value="0">keins</option><option value="1">🐱 Katze</option><option value="2">🐰 Hase</option><option value="3">🐶 Hund</option><option value="4">🐉 Drache</option></select></div><div><label class="f" for="kpetn">Name</label><input id="kpetn" maxlength="12" autocomplete="off"></div></div>
   <p class="note" id="kpetst"></p>
-  <div class="row"><div class="t"><b>Wochen-Abenteuer</b><small>In der Spielzeit eine Karte, jeden Tag ein Kapitel</small></div><label class="sw"><input type="checkbox" id="kadv"><span></span></label></div></section>
+  <div class="row"><div class="t"><b>Wochen-Abenteuer</b><small>In der Spielzeit eine Karte, jeden Tag ein Kapitel</small></div><label class="sw"><input type="checkbox" id="kadv"><span></span></label></div>
+  <div class="row"><div class="t"><b>Tagesablauf zeigen</b><small>Aus: tagsüber spielen, nachts schlafen – mit Wochentag und Datum</small></div><label class="sw"><input type="checkbox" id="kphases"><span></span></label></div></section>
  <section class="kidc"><h2>Tagesablauf</h2><p class="note">Das Zifferblatt zeigt den Tag als Pixel-Geschichte.</p>
   <div class="two"><div><label class="f" for="kw">Aufstehen</label><input type="time" id="kw"></div><div><label class="f" for="kb">Ins Bett</label><input type="time" id="kb"></div></div>
   <div class="seg" id="kplace"><button data-v="0">Kita</button><button data-v="1">Schule</button></div>
@@ -237,15 +238,18 @@ nav button.sel{background:rgba(201,138,43,.15);color:var(--acc)}nav button.sel.k
   <button class="wide ghost" id="dadd">+ Abschnitt</button><button class="wide kid" id="dsave">Ablauf speichern</button><button class="wide ghost" id="dreset">Standard wiederherstellen</button>
   <p class="note">Aufstehen und Schlafenszeit kommen aus den Zeiten oben. Jeder Abschnitt zeigt eine Szene der Pixel-Geschichte („Kita/Schule“ wird am Wochenende zu „Spielen“); der Name ist frei, z. B. „Schwimmkurs“ mit der Szene „Draußen spielen“.</p>
  </section>
- <section class="kidc"><h2>Routinen mit Sternen</h2><p class="note" id="rst2"></p><div id="rnow"></div>
+ <section class="kidc"><h2>Routinen mit Sternen</h2>
+  <div class="row"><div class="t"><b>Aufgaben auf der Uhr</b><small>Morgens und abends abhaken, Sterne sammeln</small></div><label class="sw"><input type="checkbox" id="ron"><span></span></label></div>
+  <p class="note" id="rst2"></p><div id="rnow"></div>
   <label class="f" for="rmorn">Morgens (ab dem Aufstehen, eine Aufgabe pro Zeile)</label><textarea id="rmorn" rows="4"></textarea>
   <label class="f" for="reve">Abends (2 Stunden vor der Bettzeit)</label><textarea id="reve" rows="4"></textarea>
   <button class="wide kid" id="rgo">Routinen speichern</button><button class="wide ghost" id="rreset">Sterne zurücksetzen</button></section>
  <section class="kidc"><h2>Balance-Rekorde</h2><p class="note" id="grec"></p><button class="wide ghost" id="greset">Rekorde zurücksetzen</button></section>
  <section class="kidc"><h2>Schlafenszeit</h2>
   <div class="row"><div class="t"><b>Nachts sperren</b><small>Ab der Bettzeit bis zum Aufstehen: keine Apps, kein Funk, gedimmt</small></div><label class="sw"><input type="checkbox" id="knight"><span></span></label></div>
-  <label class="f" for="kstory">Einschlafmusik nach der Bettzeit</label>
-  <select id="kstory"><option value="0">keine</option><option value="15">15 Minuten</option><option value="30">30 Minuten</option><option value="45">45 Minuten</option><option value="60">60 Minuten</option></select></section>
+  <label class="f" for="kstory">Abends hören: so lange nach der Bettzeit</label>
+  <select id="kstory"><option value="0">gar nicht – Musik endet zur Bettzeit</option><option value="15">15 Minuten</option><option value="30">30 Minuten</option><option value="45">45 Minuten</option><option value="60">1 Stunde</option><option value="90">1,5 Stunden</option><option value="120">2 Stunden</option></select>
+  <p class="note" id="kstst"></p></section>
  <section class="kidc"><h2>Lautstärke</h2><div class="row"><div class="t"><b>Höchstens <span id="kvv"></span> %</b></div></div><input type="range" id="kv" min="10" max="100" step="5"></section>
  <section class="kidc"><h2>Erlaubte Apps</h2><p class="note">Musik ist immer dabei. Einstellungen und Zifferblätter sind gesperrt.</p><div id="kapps"></div></section>
  <section class="kidc"><h2>Freigegeben</h2><div id="krel"></div></section>
@@ -266,7 +270,7 @@ nav button.sel{background:rgba(201,138,43,.15);color:var(--acc)}nav button.sel.k
   <div class="seg" id="msrc"><button data-v="kids" class="sel">Freigegeben</button><button data-v="favs">Favoriten</button><button data-v="search">Suche</button></div>
   <div id="msearch" hidden><div class="seg" id="mss"><button data-v="radio" class="sel">Radio</button><button data-v="ard">Audiothek</button><button data-v="podcast">Podcasts</button></div>
    <input id="mq" type="search" placeholder="Sender, Sendung, Podcast" enterkeyhint="search" style="margin-top:10px"></div>
-  <p class="note">🧸 + gibt Sender, Sendungen und Podcasts für die Kinder frei, 🧸 ✓ heißt freigegeben.</p>
+  <p class="note">🧸 + gibt Sender, ganze Sendungen und Podcasts oder einzelne Folgen für die Kinder frei, 🧸 ✓ heißt freigegeben.</p>
   <p class="note" id="mpath"></p><div id="mlist"></div></section>
  <section><h2>Favoriten</h2><div id="favs"></div></section>
 </div>
@@ -357,7 +361,9 @@ function render(){
  if(!dDirty&&k.day){dPlan=JSON.parse(JSON.stringify(k.day));dRender()}$('dst').textContent=k.day&&k.day.custom?'· eigener':'· Standard';$('knight').checked=k.nightLock;
  if(document.activeElement!==$('kworld'))$('kworld').value=k.world;if(document.activeElement!==$('kpet'))$('kpet').value=k.pet;
  if(document.activeElement!==$('kpetn'))$('kpetn').value=k.petName;$('kadv').checked=k.adventure;
- {const st=s.routines?s.routines.total:0,nm=esc(k.petName||'Das Tier');$('kpetst').innerHTML=!k.pet?'':st>=60?`${nm} trägt Halstuch und Krone – ${st} Sterne insgesamt ⭐`:st>=20?`${nm} hat ein Halstuch. Noch <b>${60-st}</b> Sterne bis zur Krone.`:`Noch <b>${20-st}</b> Sterne, dann bekommt ${nm} ein Halstuch. Bei Sternen von heute freut sich ${nm} mit Herzchen.`;}if(document.activeElement!==$('kstory'))$('kstory').value=k.storyMin;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
+ {const st=s.routines?s.routines.total:0,nm=esc(k.petName||'Das Tier');$('kpetst').innerHTML=!k.pet?'':st>=60?`${nm} trägt Halstuch und Krone – ${st} Sterne insgesamt ⭐`:st>=20?`${nm} hat ein Halstuch. Noch <b>${60-st}</b> Sterne bis zur Krone.`:`Noch <b>${20-st}</b> Sterne, dann bekommt ${nm} ein Halstuch. Bei Sternen von heute freut sich ${nm} mit Herzchen.`;}if(document.activeElement!==$('kstory'))$('kstory').value=k.storyMin;
+ $('kstst').textContent=k.storyMin?`Tagsüber ohne Grenze. Ab ${hm(k.bed)} nur noch Musik, ab ${hm((k.bed+k.storyMin)%1440)} wird sie sanft ausgeblendet und ist bis ${hm(k.wake)} gesperrt.`:`Tagsüber ohne Grenze. Ab ${hm(k.bed)} wird Musik ausgeblendet und ist bis ${hm(k.wake)} gesperrt.`;
+ $('kphases').checked=k.phases;if(s.routines)$('ron').checked=s.routines.on;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
  $('kapps').innerHTML=APPS.map(([b,n,d])=>row(n,d,`<label class="sw"><input type="checkbox" ${k.apps&b?'checked':''} onchange="kids({apps:this.checked?S.kids.apps|${b}:S.kids.apps&~${b}})"><span></span></label>`)).join('');
  $('krel').innerHTML=k.released.map(r=>row(r.title,r.sub,btn('Entfernen',`rel(${J(r)},false)`))).join('')||'<p class="note">Noch nichts – unten suchen oder einen Favoriten freigeben.</p>';
  $('pinst').innerHTML=k.pin?'<span class="ok">PIN ist gesetzt</span> – die Weboberfläche fragt danach.':'Keine PIN – jeder im WLAN kann die Uhr einstellen.';
@@ -382,7 +388,7 @@ function render(){
  $('nkids').checked=pw.nightKids;$('nadult').checked=pw.nightAdult;
  if(document.activeElement!==$('nfrom'))$('nfrom').value=hm(pw.nightFrom);if(document.activeElement!==$('nto'))$('nto').value=hm(pw.nightTo);
  batChart(pw.history);
- const mu=s.music;$('np').innerHTML=mu.active?`<b>${mu.playing?'▶':'⏸'} ${esc(mu.title)}</b><br>${esc(mu.artist)}${mu.dur?' · '+Math.floor(mu.pos/60)+':'+String(Math.floor(mu.pos%60)).padStart(2,'0')+' / '+Math.floor(mu.dur/60)+':'+String(mu.dur%60).padStart(2,'0'):''}${mu.msg?'<br><span class="bad">'+esc(mu.msg)+'</span>':''}`:'Gerade läuft nichts.';
+ const mu=s.music;$('np').innerHTML=mu.active?`<b>${mu.playing?'▶':'⏸'} ${esc(mu.title)}</b><br>${esc(mu.artist)}${mu.dur?' · '+Math.floor(mu.pos/60)+':'+String(Math.floor(mu.pos%60)).padStart(2,'0')+' / '+Math.floor(mu.dur/60)+':'+String(mu.dur%60).padStart(2,'0'):''}${mu.msg?'<br><span class="bad">'+esc(mu.msg)+'</span>':''}`:mu.last?`<b>Zuletzt gehört</b>${esc(mu.last.title)}<br><span class="note">angehalten bei ${Math.floor(mu.last.pos/60)}:${String(mu.last.pos%60).padStart(2,'0')}${mu.last.dur?' von '+Math.floor(mu.last.dur/60)+':'+String(mu.last.dur%60).padStart(2,'0'):''}</span><br><button class="ghost" style="margin-top:8px" onclick="post('music/resume',{},true)">▶ Weiter hören</button> <button class="ghost" style="margin-top:8px" onclick="post('music/forget',{},true)">✕ Vergessen</button>`:'Gerade läuft nichts.';
  if(document.activeElement!==$('mvol')){$('mvol').value=mu.volume;$('mvolv').textContent=mu.volume}
  if(document.activeElement!==$('msleep'))$('msleep').value=[0,15,30,45,60,90].reduce((a,v)=>Math.abs(v-mu.sleepMin)<Math.abs(a-mu.sleepMin)?v:a,0);
  if($('t-music').classList.contains('sel')&&!mStack.length)mStart();
@@ -402,6 +408,7 @@ $('kw').onchange=()=>kids({wake:mins($('kw').value)});$('kb').onchange=()=>kids(
 $('kplace').onclick=e=>{if(e.target.dataset.v)kids({school:e.target.dataset.v=='1'})};
 $('kworld').onchange=e=>kids({world:+e.target.value});$('kpet').onchange=e=>kids({pet:+e.target.value});
 $('kpetn').onchange=e=>kids({petName:e.target.value.trim()});$('kadv').onchange=e=>kids({adventure:e.target.checked});
+$('kphases').onchange=e=>kids({phases:e.target.checked});$('ron').onchange=e=>post('routines/on',{on:e.target.checked});
 const lines=id=>$(id).value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,8);
 $('rgo').onclick=()=>post('routines',{morning:lines('rmorn'),evening:lines('reve')});
 $('greset').onclick=()=>confirm('Balance-Rekorde auf dieser Uhr löschen?')&&post('game/reset',{});
@@ -418,7 +425,7 @@ async function mOpen(path,title,push){$('mlist').innerHTML='<p class="note">Lade
  try{const j=await api('music/list?path='+encodeURIComponent(path));if(push)mStack.push({path,title});
   mTitle=title||j.title||'';mErr=j.err||'';mItems=j.items||[];mRender()}catch(e){$('mlist').innerHTML=''}}
 // Freigeben für den Kindermodus: Radiosender, Audiothek-Sendungen und Podcasts (nicht einzelne Folgen)
-const relOk=id=>/^(radio:|pc:feed:|ard:set:)/.test(id);
+const relOk=id=>/^(radio:|pc:feed:|ard:set:|ard:a:|https?:)/.test(id);  // Sender, Sendungen, Podcasts und einzelne Folgen
 function mRelBtn(path,title,sub){const on=released(path);return btn(on?'🧸 ✓':'🧸 +',`mRel(${J({path,title,sub})},${!on})`,on?'on':'')}
 function mRel(it,on){post('kids/release',{...it,on},true).then(()=>{toast(on?'Für die Kinder freigegeben':'Freigabe entfernt');mRender()})}
 function mRender(){const cur=mStack[mStack.length-1];
@@ -675,6 +682,16 @@ static void state() {
   mu["msg"] = ms.msg;
   mu["volume"] = cfg.volume;
   mu["sleepMin"] = (music::sleepLeftS() + 59) / 60;
+  {
+    music::Item li;
+    uint32_t ls;
+    if (!ms.active && music::last(li, ls)) {
+      JsonObject l = mu["last"].to<JsonObject>();
+      l["title"] = li.title;
+      l["pos"] = ls;
+      l["dur"] = li.dur;
+    }
+  }
   JsonDocument rd;
   deserializeJson(rd, routines::stateJson());
   d["routines"] = rd;
@@ -735,6 +752,7 @@ static void state() {
   ko["pet"] = kc.pet;
   ko["petName"] = kc.petName;
   ko["adventure"] = kc.adventure;
+  ko["phases"] = kc.phases;
   JsonDocument dd;
   deserializeJson(dd, kids::dayJson());
   ko["day"] = dd;
@@ -767,6 +785,7 @@ static void setKids() {
   c.pet = d["pet"] | c.pet;
   if (d["petName"].is<const char*>()) snprintf(c.petName, sizeof(c.petName), "%s", (const char*)d["petName"]);
   c.adventure = d["adventure"] | c.adventure;
+  c.phases = d["phases"] | c.phases;
   kids::set(c);
   if (kids::angry() && !wasAngry) music::stop();  // im Wutmodus läuft nichts anderes
   if (c.on) ui::volumeSet(cfg.volume);  // Obergrenze sofort anwenden
@@ -998,6 +1017,23 @@ void begin() {
     if (!authed()) return;
     gameResetRecords();
     msg("Rekorde zurückgesetzt");
+  });
+  on("/api/routines/on", HTTP_POST, []() {
+    if (!authed()) return;
+    JsonDocument d;
+    if (!body(d)) return msg("Ungültige Anfrage", 400);
+    routines::setEnabled(d["on"] | true);
+    msg(routines::enabled() ? "Aufgaben an" : "Aufgaben aus");
+  });
+  on("/api/music/forget", HTTP_POST, []() {
+    if (!authed()) return;
+    music::forgetLast();
+    msg("Vergessen");
+  });
+  on("/api/music/resume", HTTP_POST, []() {
+    if (!authed()) return;
+    music::resumeLast();
+    msg("Läuft auf der Uhr");
   });
   on("/api/routines/reset", HTTP_POST, []() {
     if (!authed()) return;

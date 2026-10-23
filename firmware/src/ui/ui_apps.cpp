@@ -4,6 +4,7 @@
 #include "../music.h"
 #include "../assist.h"
 #include "../kids.h"
+#include "../routines.h"
 #include "../net.h"
 #include "ui.h"
 
@@ -36,7 +37,7 @@ static void build(lv_obj_t* scr) {
   snprintf(assistName, sizeof(assistName), "%s", assist::name().c_str());
   for (int i = 0; i < N; i++) {
     if (APPS[i].page == &PAGE_ASSIST && !assist::available()) continue;
-    if (APPS[i].kid == 0xFE ? !kids::on() : kids::on() && APPS[i].kid != 0xFF && !kids::allowed((kids::App)APPS[i].kid)) continue;
+    if (APPS[i].kid == 0xFE ? !kids::on() || !routines::enabled() : kids::on() && APPS[i].kid != 0xFF && !kids::allowed((kids::App)APPS[i].kid)) continue;
     if (kids::night() && (APPS[i].page != &PAGE_MUSIC || kids::musicLocked())) continue;  // Schlafenszeit
     lv_color_t c = APPS[i].color();
     lv_obj_t* r = listRow(l, nullptr, c, APPS[i].name);

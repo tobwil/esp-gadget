@@ -69,6 +69,14 @@ static void loadPos(const char* url, uint32_t* bytes, uint32_t* sec) {
   *sec = v & 0xFFFFF;
 }
 
+uint32_t resumeSec(const char* id) {
+  String url = !strncmp(id, "ard:a:", 6) ? String(id + 6) : episodeUrl(id);
+  if (!url.length()) return 0;
+  uint32_t b, s;
+  loadPos(url.c_str(), &b, &s);
+  return b ? s : 0;
+}
+
 // ------------------------------------------------------------------ Feeds und Suche
 
 static String between(const String& s, const char* a, const char* b, int from = 0) {

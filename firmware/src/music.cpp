@@ -1,4 +1,5 @@
 #include "music.h"
+#include <Preferences.h>
 #include "power.h"
 #include "art.h"
 #include "favs.h"
@@ -63,6 +64,70 @@ static const char* favKind(const char* path) {
 
 static char lastTitle[72] = "";
 
+// zuletzt gehörte Folge (Audiothek, Podcast): „Weiter hören“ oben in der Musik, solange sie nicht zu Ende ist
+static Item lastItem;
+static bool lastKid = false;
+
+bool last(Item& out, uint32_t& posSec) {
+  if (!lastItem.id[0]) return false;
+  posSec = podcast::resumeSec(lastItem.id);
+  if (posSec < 30) return false;
+  out = lastItem;
+  return true;
+}
+
+static void addResume(Item* it, int* n, bool kid) {
+  Item li;
+  uint32_t sec;
+  if (*n >= BROWSE_MAX || !last(li, sec) || (kid && !lastKid)) return;
+  memmove(it + 1, it, *n * sizeof(Item));
+  (*n)++;
+  it[0] = li;
+  char t[72], sub[56];
+  snprintf(t, sizeof(t), "▶ %s", li.title);
+  snprintf(sub, sizeof(sub), "Weiter bei %u:%02u", (unsigned)(sec / 60), (unsigned)(sec % 60));
+  ucopy(it[0].title, sizeof(it[0].title), t);
+  ucopy(it[0].sub, sizeof(it[0].sub), sub);
+}
+
+// Folge merken für „Weiter hören“ (nur die Anzeige – die Stelle merkt sich der Spieler selbst)
+static void rememberLast(const Item& it) {
+  if (!strcmp(it.id, lastItem.id)) return;  // dieselbe Folge (auch über „Weiter hören“): Titel bleibt
+  lastItem = it;
+  lastKid = kids::on();
+  Preferences p;
+  p.begin("music", false);
+  p.putBytes("last", &lastItem, sizeof(lastItem));
+  p.putBool("lastkid", lastKid);
+  p.end();
+}
+
+void forgetLast() {
+  lastItem.id[0] = 0;
+  Preferences p;
+  p.begin("music", false);
+  p.remove("last");
+  p.end();
+}
+
+void resumeLast() {
+  Item li;
+  uint32_t sec;
+  if (last(li, sec)) playList(&li, 1, 0, false);
+}
+
+// angefangene Folgen: „· bei 12:34“ an den Untertitel
+static void markResume(Item* it, int n) {
+  for (int i = 0; i < n; i++) {
+    if (it[i].kind != K_TRACK || !strncmp(it[i].id, "radio:", 6)) continue;
+    uint32_t sec = podcast::resumeSec(it[i].id);
+    if (sec < 30) continue;
+    char sub[56];
+    snprintf(sub, sizeof(sub), "%s%sbei %u:%02u", it[i].sub, it[i].sub[0] ? " · " : "", (unsigned)(sec / 60), (unsigned)(sec % 60));
+    ucopy(it[i].sub, sizeof(it[i].sub), sub);
+  }
+}
+
 // Startmenü der Musik-App
 static void home(Item* it, int* n, char* title, size_t titleLen) {
   ucopy(title, titleLen, "Musik");
@@ -70,12 +135,15 @@ static void home(Item* it, int* n, char* title, size_t titleLen) {
   addList(it, n, "ard:home", "ARD Audiothek", "Hörspiele, Wissen, Kinder …");
   addList(it, n, "pc:subs", "Podcasts", "Meine Podcasts und Suche");
   addList(it, n, "favs", "Favoriten", "Gemerkte Sender, Sendungen, Podcasts");
+  addResume(it, n, false);
 }
 
 // Kindermodus: nur die freigegebenen Listen
 static void kidsHome(Item* it, int* n, char* title, size_t titleLen, char* err, size_t errLen) {
   ucopy(title, titleLen, "Musik");
   *n = kids::list(it, BROWSE_MAX);
+  markResume(it, *n);
+  addResume(it, n, true);
   if (!*n) ucopy(err, errLen, "Noch nichts freigegeben");
 }
 
@@ -140,6 +208,7 @@ static void worker(void*) {
     if (qWanted) {
       qTitle[0] = qErr[0] = 0;
       qCount = fetch(qPath, qItems, qTitle, sizeof(qTitle), qErr, sizeof(qErr));
+      markResume(qItems, qCount);
       qWanted = false;
       qDone = true;
     }
@@ -171,6 +240,7 @@ static void worker(void*) {
       n = favs::list(tmp, BROWSE_MAX);
       if (!n) ucopy(err, sizeof(err), "Noch keine – Sender lange drücken, Listen oben merken");
     } else n = fetch(path, tmp, title, sizeof(title), err, sizeof(err));
+    if (strcmp(path, "home")) markResume(tmp, n);
     // merkbare Listen: oben ein Eintrag zum Merken / Entfernen
     if (!kid && favKind(path)[0] && n > 0 && n < BROWSE_MAX) {
       memmove(tmp + 1, tmp, n * sizeof(Item));
@@ -227,6 +297,7 @@ void playList(const Item* list, int n, int start, bool force) {
     playStation(index);
     active = SRC_RADIO;
   } else if (!strncmp(id, "ard:a:", 6)) {
+    rememberLast(list[start]);
     String show, image, set;
     ard::meta(id + 6, show, image, set);
     favPath = set;
@@ -235,6 +306,7 @@ void playList(const Item* list, int n, int start, bool force) {
     podcast::playUrl(id + 6, list[start].title, show.c_str(), image.c_str(), list[start].dur, false);
     active = SRC_PODCAST;
   } else {
+    rememberLast(list[start]);
     podcast::play(list[start]);
     active = SRC_PODCAST;
     String feed;
@@ -333,6 +405,11 @@ void begin() {
   art::begin();
   favs::begin();
   podcast::begin();
+  Preferences p;
+  p.begin("music", true);
+  if (p.getBytesLength("last") == sizeof(lastItem)) p.getBytes("last", &lastItem, sizeof(lastItem));
+  lastKid = p.getBool("lastkid", false);
+  p.end();
   xTaskCreatePinnedToCore(worker, "browse", 12288, nullptr, 3, nullptr, 1);
 }
 

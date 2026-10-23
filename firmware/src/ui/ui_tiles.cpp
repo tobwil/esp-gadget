@@ -342,7 +342,31 @@ static void build(lv_obj_t* scr) {
   updateRadio();
 }
 
+// Zurück zum Zifferblatt: auf der ersten Kachel nach rechts wischen. LVGL meldet die Geste nicht zuverlässig,
+// wenn die Kachelleiste die Berührung zum Blättern übernimmt – deshalb hier selbst erkennen.
+static void swipeBack() {
+  lv_indev_t* in = lv_indev_get_next(nullptr);
+  if (!in) return;
+  static bool down = false;
+  static lv_point_t p0;
+  static int32_t sx0 = 0;
+  lv_point_t p;
+  lv_indev_get_point(in, &p);
+  bool pressed = lv_indev_get_state(in) == LV_INDEV_STATE_PRESSED;
+  if (pressed && !down) {
+    down = true;
+    p0 = p;
+    sx0 = lv_obj_get_scroll_x(pager);
+  } else if (!pressed && down) {
+    down = false;
+    int dx = p.x - p0.x, dy = p.y - p0.y;
+    if (sx0 <= 4 && dx > 70 && abs(dy) < dx && !fPressing) back();
+  }
+}
+
 static void update() {
+  swipeBack();
+  if (top() != &PAGE_TILES) return;
   updateMusic();
   updateTimer();
   updateRadio();

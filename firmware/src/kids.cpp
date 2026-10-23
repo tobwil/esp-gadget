@@ -37,6 +37,7 @@ void begin() {
   c.pet = p.getUChar("pet", 1);
   if (!p.getString("petname", c.petName, sizeof(c.petName))) snprintf(c.petName, sizeof(c.petName), "Mimi");
   c.adventure = p.getBool("adv", true);
+  c.phases = p.getBool("phases", true);
   String day = p.getString("day", "");
   p.end();
   store.begin();
@@ -113,6 +114,7 @@ void set(const Cfg& n) {
   p.putUChar("pet", c.pet);
   p.putString("petname", c.petName);
   p.putBool("adv", c.adventure);
+  p.putBool("phases", c.phases);
   p.end();
 }
 

@@ -1,6 +1,7 @@
 #include "power.h"
 #include <Preferences.h>
 #include <WiFi.h>
+#include <esp_now.h>
 #include <esp_pm.h>
 #include "assist.h"
 #include "audio.h"
@@ -206,7 +207,12 @@ void poll() {
                    radio::receiving() || radio::screenOpen;
   bool modemSleep = netOnline() && !streaming;
   static int ps = -1;
-  if (modemSleep != ps) { ps = modemSleep; WiFi.setSleep(modemSleep); }
+  if (modemSleep != ps) {
+    ps = modemSleep;
+    WiFi.setSleep(modemSleep);
+    // ESP-NOW hält das Funkmodul sonst ständig wach; im WLAN kommt der Funk ohnehin per Multicast
+    esp_now_set_wake_window(modemSleep ? 0 : 65535);
+  }
   streamingNow = streaming;
 }
 

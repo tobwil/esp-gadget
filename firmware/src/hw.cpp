@@ -8,7 +8,8 @@
 #include "config.h"
 #include "pins.h"
 
-static Arduino_DataBus* bus = new Arduino_ESP32QSPI(LCD_CS, LCD_SCLK, LCD_SDIO0, LCD_SDIO1, LCD_SDIO2, LCD_SDIO3);
+// „geteilt“: der Bus wird nur zum Zeichnen belegt – sonst hält er eine Sperre, die jeden Leichtschlaf verhindert
+static Arduino_DataBus* bus = new Arduino_ESP32QSPI(LCD_CS, LCD_SCLK, LCD_SDIO0, LCD_SDIO1, LCD_SDIO2, LCD_SDIO3, true);
 static Arduino_CO5300* gfx = new Arduino_CO5300(bus, LCD_RESET, 0, PANEL_W, PANEL_H, LCD_COL_OFS, 0, 0, 0);
 static TouchDrvCST92xx touch;
 static bool touchOk = false;
@@ -164,6 +165,7 @@ void hwScreen(bool on) {
 bool hwScreenOn() { return screenOn; }
 void hwActivity() { lastActivity = millis(); }
 uint32_t hwIdleMs() { return millis() - lastActivity; }
+void hwTouchPoll() { if (indev) lv_indev_read(indev); }
 bool hwWakeRequested() { bool w = wakeReq; wakeReq = false; return w; }
 
 static void flushCb(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
@@ -415,6 +417,8 @@ void hwDeepSleep(uint32_t wakeInS) {
   gpio_deep_sleep_hold_en();
   rtc_gpio_pullup_en((gpio_num_t)BTN_BOOT);
   rtc_gpio_pulldown_dis((gpio_num_t)BTN_BOOT);
+  // Der automatische Leichtschlaf hinterlässt einen Timer als Weckquelle – der würde den Tiefschlaf sofort beenden
+  esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
   // nur die Taste weckt – Berührungen in der Tasche würden die Uhr sonst jedes Mal komplett hochfahren
   esp_sleep_enable_ext1_wakeup(1ULL << BTN_BOOT, ESP_EXT1_WAKEUP_ANY_LOW);
   if (wakeInS) esp_sleep_enable_timer_wakeup((uint64_t)wakeInS * 1000000ULL);

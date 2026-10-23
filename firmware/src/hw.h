@@ -21,6 +21,7 @@ void hwBrightnessCap(uint8_t pct);  // Obergrenze (Sparmodus, Schlafenszeit); 10
 void hwScreen(bool on);        // Display an/aus (Touch weckt es wieder)
 bool hwScreenOn();
 void hwActivity();             // Bedienung: Zeit bis zum Abschalten neu starten
+void hwTouchPoll();  // Touch lesen ohne den Rest der Oberfläche (beim Dösen, für den Doppeltipp)
 uint32_t hwIdleMs();           // ms seit der letzten Bedienung
 bool hwWakeRequested();        // Touch bei dunklem Display
 

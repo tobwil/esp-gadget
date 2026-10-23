@@ -213,6 +213,17 @@ void loop() {
     }
   }
 
+  // Dösen (dunkel, nichts läuft): nur Tasten und Touch (Doppeltipp) alle 20 ms, der Rest alle 250 ms –
+  // so bleibt der Prozessor die meiste Zeit im Leichtschlaf
+  static uint32_t dozeAt = 0;
+  if (pwr::dozing() && millis() - dozeAt < 250) {
+    hwTouchPoll();
+    pwr::poll();
+    delay(20);
+    return;
+  }
+  dozeAt = millis();
+
   static uint32_t slow = 0;
   if (millis() - slow > 1000) {
     slow = millis();

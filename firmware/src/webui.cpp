@@ -1,6 +1,9 @@
 #include "webui.h"
 #include <ArduinoJson.h>
 #include <Update.h>
+#include <esp_pm.h>
+#include <esp_sleep.h>
+#include <esp_timer.h>
 #include <WebServer.h>
 #include "config.h"
 #include "favs.h"
@@ -706,6 +709,20 @@ void begin() {
   web80->begin();
   on("/", HTTP_GET, []() { srv->send_P(200, "text/html; charset=utf-8", PAGE); });
   on("/api/state", HTTP_GET, state);
+  // Diagnose Stromsparen: Zeit in den Schlafarten, gehaltene Sperren, Laufzeit, Grund des letzten Starts
+  on("/api/pm", HTTP_GET, []() {
+    if (!authed()) return;
+    char* buf = nullptr;
+    size_t len = 0;
+    FILE* f = open_memstream(&buf, &len);
+    fprintf(f, "uptime %llu s, reset %d, wakeup %d, dozing %d\n", esp_timer_get_time() / 1000000ULL,
+            (int)esp_reset_reason(), (int)esp_sleep_get_wakeup_cause(), (int)pwr::dozing());
+    esp_pm_dump_locks(f);
+    fclose(f);
+    String out(buf, len);
+    free(buf);
+    srv->send(200, "text/plain; charset=utf-8", out);
+  });
   on("/api/update", HTTP_POST, []() {});  // otaReceive
   on("/api/search", HTTP_GET, search);
   on("/api/kids", HTTP_POST, setKids);

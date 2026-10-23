@@ -19,6 +19,7 @@
 namespace pwr {
 
 static Mode m = M_AUTO;
+static uint8_t deepMin = DEEP_SLEEP_MIN;
 static bool active = false;
 
 // Verlauf: alle 2 Minuten ein Wert, 6 Stunden. Mit Uhrzeit (Unix-Zeit), damit er Neustarts und Tiefschlaf
@@ -62,6 +63,7 @@ void begin() {
   Preferences p;
   p.begin("power", true);
   m = (Mode)p.getUChar("mode", M_AUTO);
+  deepMin = p.getUChar("deep", DEEP_SLEEP_MIN);
   hist = (Sample*)heap_caps_calloc(HIST, sizeof(Sample), MALLOC_CAP_SPIRAM);
   if (hist && p.getBytesLength("hist") == HIST * sizeof(Sample)) {
     p.getBytes("hist", hist, HIST * sizeof(Sample));
@@ -97,7 +99,15 @@ uint16_t screenOffS() {
   if (!active) return cfg.screenOff;
   return cfg.screenOff && cfg.screenOff < 10 ? cfg.screenOff : 10;
 }
-uint16_t deepSleepMin() { return active ? 3 : DEEP_SLEEP_MIN; }
+uint16_t deepSleepMin() { return !deepMin ? 0 : active ? min<uint16_t>(deepMin, 3) : deepMin; }
+uint8_t deepSleepSetting() { return deepMin; }
+void setDeepSleep(uint8_t min) {
+  deepMin = min;
+  Preferences p;
+  p.begin("power", false);
+  p.putUChar("deep", deepMin);
+  p.end();
+}
 
 static const Sample& at(int back) { return hist[(hHead - 1 - back + HIST) % HIST]; }
 
@@ -124,6 +134,7 @@ static const char* sleepWhy = "";
 static long sleepLeft = -1;
 void sleepInfo(const char* why, long leftS) { sleepWhy = why ? why : ""; sleepLeft = leftS; }
 String sleepText() {
+  if (!strcmp(sleepWhy, "nie")) return doze ? "aus – döst, erreichbar" : "aus – immer erreichbar";
   if (sleepWhy[0]) return String("wach: ") + sleepWhy;
   return "Tiefschlaf in " + String(max(1L, (sleepLeft + 59) / 60)) + " min";
 }

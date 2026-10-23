@@ -135,7 +135,9 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
  <section><h2>Akku</h2><div class="kv" id="batkv"></div><svg id="batchart" viewBox="0 0 360 140" style="width:100%;height:auto;margin-top:10px"></svg>
   <div class="note" id="batleg"><span style="color:var(--acc)">━</span> entlädt &nbsp; <span style="color:var(--ok)">━</span> lädt &nbsp; <span style="color:var(--dim)">┄</span> Uhr aus / Tiefschlaf</div>
   <label class="f" for="pmode">Sparmodus</label><select id="pmode"><option value="1">Automatisch ab 20 %</option><option value="2">Immer an</option><option value="0">Aus</option></select>
-  <p class="note">Sparmodus: Display höchstens 40 % und nach 10 s aus, kein Funk im Hintergrund, ohne Musik schläft das WLAN.</p></section>
+  <p class="note">Sparmodus: Display höchstens 40 % und nach 10 s aus, kein Funk im Hintergrund, Tiefschlaf schon nach 3 Minuten.</p>
+  <label class="f" for="pdeep">Tiefschlaf</label><select id="pdeep"><option value="0">Nie – immer erreichbar</option><option value="10">Nach 10 Min. dunkel</option><option value="30">Nach 30 Min. dunkel</option><option value="60">Nach 1 Std. dunkel</option></select>
+  <p class="note">Mit dunklem Display döst die Uhr sparsam und bleibt für Funk und diese Seite erreichbar. Im Tiefschlaf hält der Akku am längsten, aber dann ist auch das WLAN aus: kein Funk, keine Weboberfläche, wecken nur mit BOOT.</p></section>
  <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small id="kidsum"></small></div><label class="sw"><input type="checkbox" id="kon2"><span></span></label></div>
   <div class="row"><div class="t"><b>Wutmodus</b><small>Nur das Wut-Glas</small></div><label class="sw"><input type="checkbox" id="kangry2"><span></span></label></div></section>
 </div>
@@ -275,6 +277,7 @@ function render(){
   <span>Verbrauch</span><span>${pw.drain>0?pw.drain.toFixed(1)+' %/h':'–'}</span><span>Sparmodus</span><span>${pw.saving?'an':'aus'}</span>
   <span>Tiefschlaf</span><span>${pw.sleep||'–'}</span>`;
  if(document.activeElement!==$('pmode'))$('pmode').value=pw.mode;
+ if(document.activeElement!==$('pdeep'))$('pdeep').value=pw.deep;
  batChart(pw.history);
  const mu=s.music;$('np').innerHTML=mu.active?`<b>${mu.playing?'▶':'⏸'} ${esc(mu.title)}</b><br>${esc(mu.artist)}${mu.dur?' · '+Math.floor(mu.pos/60)+':'+String(Math.floor(mu.pos%60)).padStart(2,'0')+' / '+Math.floor(mu.dur/60)+':'+String(mu.dur%60).padStart(2,'0'):''}${mu.msg?'<br><span class="bad">'+esc(mu.msg)+'</span>':''}`:'Gerade läuft nichts.';
  if(document.activeElement!==$('mvol')){$('mvol').value=mu.volume;$('mvolv').textContent=mu.volume}
@@ -353,6 +356,7 @@ function unallow(id){post('n8n/allow',{items:S.assist.allowed.filter(a=>a.id!=id
 $('phonego').onclick=()=>{location.href='/funk'};
 $('findgo').onclick=()=>post('find',{on:true});
 $('pmode').onchange=e=>post('power',{mode:+e.target.value});
+$('pdeep').onchange=e=>post('power',{deep:+e.target.value});
 $('fwgo').onclick=()=>{const f=$('fwfile').files[0];if(!f)return toast('Erst eine Datei wählen');
  const fd=new FormData();fd.append('file',f,f.name);const x=new XMLHttpRequest();x.open('POST','/api/update');x.setRequestHeader('X-Pin',pin);
  x.upload.onprogress=e=>{if(e.lengthComputable)$('fwprog').textContent='Übertrage … '+Math.round(e.loaded*100/e.total)+' %'};
@@ -550,6 +554,7 @@ static void state() {
   pw["mv"] = hwBatteryMv();
   pw["remainMin"] = pwr::remainingMin();
   pw["sleep"] = pwr::sleepText();
+  pw["deep"] = pwr::deepSleepSetting();
   pw["drain"] = pwr::drainPerHour();
   JsonDocument hd;
   deserializeJson(hd, pwr::historyJson());
@@ -844,7 +849,8 @@ void begin() {
     if (!authed()) return;
     JsonDocument d;
     if (!body(d)) return msg("Ungültige Anfrage", 400);
-    pwr::setMode((pwr::Mode)(d["mode"] | 1));
+    if (d["mode"].is<int>()) pwr::setMode((pwr::Mode)d["mode"].as<int>());
+    if (d["deep"].is<int>()) pwr::setDeepSleep(constrain(d["deep"].as<int>(), 0, 240));
     msg("Gespeichert");
   });
   on("/api/models", HTTP_GET, []() {

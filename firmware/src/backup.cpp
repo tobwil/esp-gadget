@@ -46,6 +46,7 @@ String make(bool secrets) {
   g["alarmSrc"] = cfg.alarmSrc;
   g["alarmName"] = cfg.alarmName;
   g["power"] = (int)pwr::mode();
+  g["deepSleep"] = pwr::deepSleepSetting();
   JsonArray w = d["wifi"].to<JsonArray>();
   for (int i = 0; i < knownCount; i++) {
     JsonObject o = w.add<JsonObject>();
@@ -107,6 +108,7 @@ bool restore(const String& json, String& err) {
     snprintf(cfg.alarmSrc, sizeof(cfg.alarmSrc), "%s", (const char*)(g["alarmSrc"] | cfg.alarmSrc));
     snprintf(cfg.alarmName, sizeof(cfg.alarmName), "%s", (const char*)(g["alarmName"] | cfg.alarmName));
     if (g["power"].is<int>()) pwr::setMode((pwr::Mode)g["power"].as<int>());
+    if (g["deepSleep"].is<int>()) pwr::setDeepSleep(g["deepSleep"].as<int>());
   }
   for (JsonObject o : d["wifi"].as<JsonArray>()) {  // nur Netze mit Passwort (oder offene) übernehmen
     const char* ss = o["ssid"] | "";

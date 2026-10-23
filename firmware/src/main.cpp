@@ -170,7 +170,7 @@ static void power() {
   // der Grund, warum sie (noch) wach ist, steht in der Weboberfläche
   const char* why = nullptr;
   if (hwScreenOn()) why = "Display an";
-  else if (!pwr::deepSleepMin()) why = "abgeschaltet";
+  else if (!pwr::deepSleepMin()) why = "nie";
   else if (hwUsb() || hwBattery() < 0) why = "am Kabel";
   else if (music::state().playing) why = "Musik läuft";
   else if (cw::busy()) why = "Timer, Stoppuhr oder Wecker";

@@ -106,7 +106,7 @@ textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--
 input,select{width:100%;min-height:46px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;font-size:16px}
 button{font:inherit;font-weight:600;border:0;border-radius:12px;min-height:46px;padding:10px 16px;background:var(--acc);color:#000;cursor:pointer}
 button.wide{width:100%;margin-top:12px}button.ghost{background:transparent;color:var(--text);border:1px solid var(--line);min-height:40px;padding:6px 12px;font-weight:500}
-button.on{background:var(--ok);color:#fff;border-color:var(--ok)}button.kid{background:var(--kid);color:#fff}
+button.on{background:var(--ok);color:#fff;border-color:var(--ok)}.bt{display:flex;gap:6px;flex-shrink:0}button.kid{background:var(--kid);color:#fff}
 .row{display:flex;align-items:center;gap:10px;min-height:56px;padding:6px 0;border-top:1px solid var(--line)}
 .row:first-child{border-top:0}.row .t{flex:1;min-width:0}.row .t b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row small{color:var(--dim);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -179,6 +179,7 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
   <div class="seg" id="msrc"><button data-v="kids" class="sel">Freigegeben</button><button data-v="favs">Favoriten</button><button data-v="search">Suche</button></div>
   <div id="msearch" hidden><div class="seg" id="mss"><button data-v="radio" class="sel">Radio</button><button data-v="ard">Audiothek</button><button data-v="podcast">Podcasts</button></div>
    <input id="mq" type="search" placeholder="Sender, Sendung, Podcast" enterkeyhint="search" style="margin-top:10px"></div>
+  <p class="note">🧸 + gibt einen Sender, eine Sendung oder einen Podcast für die Kinder frei (🧸 ✓ = freigegeben, nochmal tippen entfernt). Freigegebenes steht oben unter „Freigegeben“ und im Reiter Kinder.</p>
   <p class="note" id="mpath"></p><div id="mlist"></div></section>
  <section><h2>Favoriten</h2><div id="favs"></div></section>
 </div>
@@ -307,10 +308,19 @@ $('bload').onclick=async()=>{const f=$('bfile').files[0];if(!f)return toast('Ers
  if(!confirm('Einstellungen aus der Datei übernehmen und neu starten?'))return;post('restore',JSON.parse(await f.text()))};
 // ------------------------------------------------ Fernbedienung
 let mItems=[],mStack=[],mSrc='kids',mSs='radio';
+let mTitle='',mErr='';
 async function mOpen(path,title,push){$('mlist').innerHTML='<p class="note">Lade …</p>';
  try{const j=await api('music/list?path='+encodeURIComponent(path));if(push)mStack.push({path,title});
-  $('mpath').innerHTML=mStack.length>1?`<a href="#" onclick="mBack();return false">← zurück</a> · ${esc(title||j.title)}`:esc(j.title||'');
-  mItems=j.items||[];$('mlist').innerHTML=mItems.map((it,i)=>row(it.title,it.sub,it.kind==1?btn('Öffnen',`mOpen(${J(it.id)},${J(it.title)},true)`):btn('▶',`mPlay(${i})`))).join('')||'<p class="note">'+esc(j.err||'Nichts da')+'</p>'}catch(e){$('mlist').innerHTML=''}}
+  mTitle=title||j.title||'';mErr=j.err||'';mItems=j.items||[];mRender()}catch(e){$('mlist').innerHTML=''}}
+// Freigeben für den Kindermodus: Radiosender, Audiothek-Sendungen und Podcasts (nicht einzelne Folgen)
+const relOk=id=>/^(radio:|pc:feed:|ard:set:)/.test(id);
+function mRelBtn(path,title,sub){const on=released(path);return btn(on?'🧸 ✓':'🧸 +',`mRel(${J({path,title,sub})},${!on})`,on?'on':'')}
+function mRel(it,on){post('kids/release',{...it,on},true).then(()=>{toast(on?'Für die Kinder freigegeben':'Freigabe entfernt');mRender()})}
+function mRender(){const cur=mStack[mStack.length-1];
+  $('mpath').innerHTML=(mStack.length>1?`<a href="#" onclick="mBack();return false">← zurück</a> · `:'')+esc(mTitle)+
+   (cur&&relOk(cur.path)?' '+mRelBtn(cur.path,mTitle,''):'');
+  $('mlist').innerHTML=mItems.map((it,i)=>row(it.title,it.sub,'<span class="bt">'+(relOk(it.id)?mRelBtn(it.id,it.title,it.sub):'')+
+   (it.kind==1?btn('Öffnen',`mOpen(${J(it.id)},${J(it.title)},true)`):btn('▶',`mPlay(${i})`))+'</span>')).join('')||'<p class="note">'+esc(mErr||'Nichts da')+'</p>'}
 function mBack(){mStack.pop();const t=mStack.pop();if(t)mOpen(t.path,t.title,true)}
 function mPlay(i){post('music/play',{items:mItems,index:i},true).then(()=>toast('Läuft auf der Uhr'))}
 function mStart(){mStack=[];if(mSrc=='search'){if(val('mq'))mOpen((mSs=='radio'?'rlsearch:':mSs=='ard'?'ardsearch:':'pcsearch:')+val('mq'),'',true);else $('mlist').innerHTML=''}else mOpen(mSrc,'',true)}

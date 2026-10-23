@@ -47,6 +47,16 @@ String make(bool secrets) {
   g["alarmName"] = cfg.alarmName;
   g["power"] = (int)pwr::mode();
   g["deepSleep"] = pwr::deepSleepSetting();
+  {
+    bool k, a;
+    uint16_t f, t;
+    pwr::nightGet(k, a, f, t);
+    JsonObject n = g["night"].to<JsonObject>();
+    n["kids"] = k;
+    n["adult"] = a;
+    n["from"] = f;
+    n["to"] = t;
+  }
   JsonArray w = d["wifi"].to<JsonArray>();
   for (int i = 0; i < knownCount; i++) {
     JsonObject o = w.add<JsonObject>();
@@ -114,6 +124,10 @@ bool restore(const String& json, String& err) {
     snprintf(cfg.alarmName, sizeof(cfg.alarmName), "%s", (const char*)(g["alarmName"] | cfg.alarmName));
     if (g["power"].is<int>()) pwr::setMode((pwr::Mode)g["power"].as<int>());
     if (g["deepSleep"].is<int>()) pwr::setDeepSleep(g["deepSleep"].as<int>());
+    if (g["night"]) {
+      JsonObject n = g["night"];
+      pwr::nightSet(n["kids"] | true, n["adult"] | false, n["from"] | 23 * 60, n["to"] | 7 * 60);
+    }
   }
   for (JsonObject o : d["wifi"].as<JsonArray>()) {  // nur Netze mit Passwort (oder offene) übernehmen
     const char* ss = o["ssid"] | "";

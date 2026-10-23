@@ -303,7 +303,12 @@ static void task(void*) {
       }
     }
 
-    if (helloNow || millis() - helloAt > 3000) { helloNow = false; helloAt = millis(); sendHello(); }
+    // „Hallo“ an die anderen Uhren: alle 3 s, beim Dösen alle 30 s (jedes Senden weckt das Funkmodul);
+    // beim Aufwachen gleich eins, damit die anderen die Uhr sofort wieder sehen
+    static bool dozed = false;
+    if (dozed && !pwr::dozing()) helloNow = true;
+    dozed = pwr::dozing();
+    if (helloNow || millis() - helloAt > (dozed ? 30000UL : 3000UL)) { helloNow = false; helloAt = millis(); sendHello(); }
 
     // Senden: Mikrofon erst nach dem Start-Piep öffnen
     if (txOn && !micRunning) { txStart = millis(); micRunning = true; have = -1; }
@@ -340,7 +345,7 @@ int peers(Peer* out, int max) {
   xSemaphoreTake(lock, portMAX_DELAY);
   int n = 0;
   for (int i = 0; i < PEER_MAX && n < max; i++)
-    if (peerTab[i].id && millis() - peerTab[i].lastSeen < 12000) out[n++] = peerTab[i];
+    if (peerTab[i].id && millis() - peerTab[i].lastSeen < 75000) out[n++] = peerTab[i];  // dösende Uhren melden sich alle 30 s
   xSemaphoreGive(lock);
   for (int i = 0; i < n; i++)
     for (int j = i + 1; j < n; j++)

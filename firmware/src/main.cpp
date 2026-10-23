@@ -132,6 +132,8 @@ void setup() {
   webui::begin();
   ui::begin();
   lv_timer_handler();
+  // nach einer Etappe der Nachtruhe aufgewacht und es ist noch Nacht: dunkel bleiben (sie schläft gleich weiter)
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER && pwr::nightRest(nullptr) && !cw::ringing()) hwScreen(false);
   hwBrightness(cfg.brightness);
   Serial.printf("Taschenfunk %s bereit (%s)\n", FW_VERSION, cfg.name);
 }
@@ -167,6 +169,19 @@ static void power() {
   if (ui::funkDim()) off = off ? min<uint32_t>(off, 8) : 8;  // nur vom Funk geweckt: bald wieder dunkel
   if (hwScreenOn() && off && hwIdleMs() > off * 1000UL && !cw::ringing() && !radio::transmitting())
     hwScreen(false);
+  // Nachtruhe: Tiefschlaf bis zum Aufstehen, in Etappen von höchstens 2 h – dazwischen stellt sich die Uhr per
+  // WLAN nach, denn der Zeitgeber im Tiefschlaf geht ungenau. Der Wecker weckt pünktlich.
+  uint32_t nightLeft;
+  if (millis() > 30000 && !hwScreenOn() && !hwUsb() && hwBattery() >= 0 && pwr::nightRest(&nightLeft) &&
+      !music::state().playing && !cw::busy() && !radio::transmitting() && !radio::receiving() && !phone::connected() &&
+      !kids::angry()) {
+    uint32_t s = min<uint32_t>(nightLeft, 2 * 3600), al = cw::alarmInS();
+    if (al && al < s) s = al;
+    if (music::state().active) music::stop();
+    pwr::save();
+    audio::shutdown();
+    hwDeepSleep(max<uint32_t>(s, 30));
+  }
   // Tiefschlaf im Akkubetrieb, wenn nichts mehr läuft (pausierte Musik hält die Uhr nicht wach);
   // der Grund, warum sie (noch) wach ist, steht in der Weboberfläche
   const char* why = nullptr;

@@ -200,6 +200,12 @@ automatisch in den Leichtschlaf (ESP-IDF Power Management), die Oberfläche zeic
 hält 3 s nach dem letzten Ton an. Sie bleibt dabei im WLAN erreichbar – für Funk und die Weboberfläche – und
 wacht per Doppeltipp sofort auf. Ohne WLAN (nur ESP-NOW) bleibt das Funkmodul wach.
 
+**Nachtruhe** (Weboberfläche → Akku): Im Kindermodus schläft die Uhr von Bettzeit + Einschlafzeit bis zum
+Aufstehen im Tiefschlaf (Standard an), sonst auf Wunsch zwischen eigenen Zeiten. Sie schläft in Etappen von
+höchstens 2 Stunden und stellt dazwischen dunkel per WLAN ihre Uhr nach. Der Wecker klingelt pünktlich, BOOT
+weckt jederzeit; nachts ist sie aber nicht erreichbar. Beim Dösen meldet sie sich nur alle 30 s bei den anderen
+Uhren (sonst alle 3 s).
+
 **Tiefschlaf** (Weboberfläche → Akku): „nie“ (Standard, immer erreichbar) oder nach 10/30/60 Minuten mit
 dunklem Display. Im Tiefschlaf ist auch das WLAN aus: kein Funk, keine Weboberfläche, wecken nur mit BOOT.
 Musik, Timer und Funk halten die Uhr wach, eine pausierte Wiedergabe nicht. Die Weboberfläche zeigt, was sie

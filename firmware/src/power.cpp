@@ -20,6 +20,9 @@ namespace pwr {
 
 static Mode m = M_AUTO;
 static uint8_t deepMin = DEEP_SLEEP_MIN;
+// Nachtruhe: im Kindermodus von Bettzeit + Einschlafzeit bis zum Aufstehen, sonst (wenn gewünscht) eigene Zeiten
+static bool nightKids = true, nightAdult = false;
+static uint16_t nightFrom = 23 * 60, nightTo = 7 * 60;
 static bool active = false;
 
 // Verlauf: alle 2 Minuten ein Wert, 6 Stunden. Mit Uhrzeit (Unix-Zeit), damit er Neustarts und Tiefschlaf
@@ -54,6 +57,8 @@ static void pmUpdate() {
   bool d = !hwScreenOn() && !streamingNow && (!hwUsb() || sleepOnUsb);
   if (d == doze || !lockAwake) return;
   doze = d;
+  // Keine 80-MHz-Grenze beim Dösen: gemessen kaum sparsamer (der Prozessor rechnet länger und schläft weniger),
+  // aber HTTPS-Anfragen dauerten 1,5–3 s statt 0,4 s.
   if (d) { esp_pm_lock_release(lockFast); esp_pm_lock_release(lockAwake); }
   else { esp_pm_lock_acquire(lockAwake); esp_pm_lock_acquire(lockFast); }
 }
@@ -64,6 +69,10 @@ void begin() {
   p.begin("power", true);
   m = (Mode)p.getUChar("mode", M_AUTO);
   deepMin = p.getUChar("deep", DEEP_SLEEP_MIN);
+  nightKids = p.getBool("nkids", true);
+  nightAdult = p.getBool("nadult", false);
+  nightFrom = p.getUShort("nfrom", 23 * 60);
+  nightTo = p.getUShort("nto", 7 * 60);
   hist = (Sample*)heap_caps_calloc(HIST, sizeof(Sample), MALLOC_CAP_SPIRAM);
   if (hist && p.getBytesLength("hist") == HIST * sizeof(Sample)) {
     p.getBytes("hist", hist, HIST * sizeof(Sample));
@@ -101,6 +110,53 @@ uint16_t screenOffS() {
 }
 uint16_t deepSleepMin() { return !deepMin ? 0 : active ? min<uint16_t>(deepMin, 3) : deepMin; }
 uint8_t deepSleepSetting() { return deepMin; }
+
+void nightGet(bool& kidsOn, bool& adultOn, uint16_t& from, uint16_t& to) {
+  kidsOn = nightKids;
+  adultOn = nightAdult;
+  from = nightFrom;
+  to = nightTo;
+}
+
+void nightSet(bool kidsOn, bool adultOn, uint16_t from, uint16_t to) {
+  nightKids = kidsOn;
+  nightAdult = adultOn;
+  nightFrom = from % (24 * 60);
+  nightTo = to % (24 * 60);
+  Preferences p;
+  p.begin("power", false);
+  p.putBool("nkids", nightKids);
+  p.putBool("nadult", nightAdult);
+  p.putUShort("nfrom", nightFrom);
+  p.putUShort("nto", nightTo);
+  p.end();
+}
+
+bool nightRest(uint32_t* leftS) {
+  if (!timeValid()) return false;
+  int from, to;
+  if (kids::on()) {
+    if (!nightKids) return false;
+    from = (kids::cfg().bed + kids::cfg().storyMin) % (24 * 60);
+    to = kids::cfg().wake;
+  } else {
+    if (!nightAdult) return false;
+    from = nightFrom;
+    to = nightTo;
+  }
+  time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+  int nowS = (t.tm_hour * 60 + t.tm_min) * 60 + t.tm_sec, fromS = from * 60, toS = to * 60;
+  bool in = fromS <= toS ? nowS >= fromS && nowS < toS : nowS >= fromS || nowS < toS;
+  if (!in) return false;
+  if (leftS) {
+    int d = toS - nowS;
+    if (d <= 0) d += 86400;
+    *leftS = d;
+  }
+  return true;
+}
 void setDeepSleep(uint8_t min) {
   deepMin = min;
   Preferences p;
@@ -134,6 +190,8 @@ static const char* sleepWhy = "";
 static long sleepLeft = -1;
 void sleepInfo(const char* why, long leftS) { sleepWhy = why ? why : ""; sleepLeft = leftS; }
 String sleepText() {
+  uint32_t left;
+  if (nightRest(&left)) return "Nachtruhe – noch " + String(left / 3600) + " h " + String(left / 60 % 60) + " min";
   if (!strcmp(sleepWhy, "nie")) return doze ? "aus – döst, erreichbar" : "aus – immer erreichbar";
   if (sleepWhy[0]) return String("wach: ") + sleepWhy;
   return "Tiefschlaf in " + String(max(1L, (sleepLeft + 59) / 60)) + " min";

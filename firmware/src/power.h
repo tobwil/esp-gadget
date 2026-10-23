@@ -20,6 +20,11 @@ uint16_t screenOffS();       // Display-aus-Zeit unter Berücksichtigung des Spa
 uint16_t deepSleepMin();     // wirksam (Sparmodus kürzt auf 3), 0 = nie
 uint8_t deepSleepSetting();  // eingestellt: Minuten, 0 = nie (immer erreichbar)
 void setDeepSleep(uint8_t min);
+// Nachtruhe im Tiefschlaf: im Kindermodus von Bettzeit + Einschlafzeit bis zum Aufstehen (kidsOn),
+// sonst zwischen from und to (adultOn); Minuten nach Mitternacht
+void nightGet(bool& kidsOn, bool& adultOn, uint16_t& from, uint16_t& to);
+void nightSet(bool kidsOn, bool adultOn, uint16_t from, uint16_t to);
+bool nightRest(uint32_t* leftS);  // jetzt ist Nachtruhe; leftS = Sekunden bis zum Ende
 int remainingMin();          // geschätzte Restlaufzeit, −1 = unbekannt
 float drainPerHour();        // Verbrauch in %/h (aus dem Verlauf), 0 = unbekannt
 String historyJson();        // [[Minuten vor jetzt, %, mV, lädt], …]

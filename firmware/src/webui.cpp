@@ -137,6 +137,10 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
   <label class="f" for="pmode">Sparmodus</label><select id="pmode"><option value="1">Automatisch ab 20 %</option><option value="2">Immer an</option><option value="0">Aus</option></select>
   <p class="note">Sparmodus: Display höchstens 40 % und nach 10 s aus, kein Funk im Hintergrund, Tiefschlaf schon nach 3 Minuten.</p>
   <label class="f" for="pdeep">Tiefschlaf</label><select id="pdeep"><option value="0">Nie – immer erreichbar</option><option value="10">Nach 10 Min. dunkel</option><option value="30">Nach 30 Min. dunkel</option><option value="60">Nach 1 Std. dunkel</option></select>
+  <div class="row"><div class="t"><b>Nachtruhe im Kindermodus</b><small>Tiefschlaf von Bettzeit + Einschlafzeit bis zum Aufstehen</small></div><label class="sw"><input type="checkbox" id="nkids"><span></span></label></div>
+  <div class="row"><div class="t"><b>Nachtruhe sonst</b><small>Tiefschlaf zwischen diesen Zeiten</small></div><label class="sw"><input type="checkbox" id="nadult"><span></span></label></div>
+  <div class="two"><div><label class="f" for="nfrom">von</label><input type="time" id="nfrom"></div><div><label class="f" for="nto">bis</label><input type="time" id="nto"></div></div>
+  <p class="note">In der Nachtruhe spart die Uhr am meisten, ist aber nicht erreichbar (kein Funk, keine Weboberfläche). Der Wecker klingelt trotzdem, BOOT weckt sie jederzeit.</p>
   <p class="note">Mit dunklem Display döst die Uhr sparsam und bleibt für Funk und diese Seite erreichbar. Im Tiefschlaf hält der Akku am längsten, aber dann ist auch das WLAN aus: kein Funk, keine Weboberfläche, wecken nur mit BOOT.</p></section>
  <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small id="kidsum"></small></div><label class="sw"><input type="checkbox" id="kon2"><span></span></label></div>
   <div class="row"><div class="t"><b>Wutmodus</b><small>Nur das Wut-Glas</small></div><label class="sw"><input type="checkbox" id="kangry2"><span></span></label></div></section>
@@ -290,6 +294,8 @@ function render(){
  if(s.display&&document.activeElement!==$('dbr')){$('dbr').value=s.display.brightness;$('dbrv').textContent=s.display.brightness}
  if(s.display&&document.activeElement!==$('doff'))$('doff').value=[10,15,30,60,120,0].includes(s.display.screenOff)?s.display.screenOff:30;
  if(document.activeElement!==$('pdeep'))$('pdeep').value=pw.deep;
+ $('nkids').checked=pw.nightKids;$('nadult').checked=pw.nightAdult;
+ if(document.activeElement!==$('nfrom'))$('nfrom').value=hm(pw.nightFrom);if(document.activeElement!==$('nto'))$('nto').value=hm(pw.nightTo);
  batChart(pw.history);
  const mu=s.music;$('np').innerHTML=mu.active?`<b>${mu.playing?'▶':'⏸'} ${esc(mu.title)}</b><br>${esc(mu.artist)}${mu.dur?' · '+Math.floor(mu.pos/60)+':'+String(Math.floor(mu.pos%60)).padStart(2,'0')+' / '+Math.floor(mu.dur/60)+':'+String(mu.dur%60).padStart(2,'0'):''}${mu.msg?'<br><span class="bad">'+esc(mu.msg)+'</span>':''}`:'Gerade läuft nichts.';
  if(document.activeElement!==$('mvol')){$('mvol').value=mu.volume;$('mvolv').textContent=mu.volume}
@@ -391,6 +397,8 @@ $('pmode').onchange=e=>post('power',{mode:+e.target.value});
 $('dbr').oninput=e=>$('dbrv').textContent=e.target.value;$('dbr').onchange=e=>post('display',{brightness:+e.target.value},true);
 $('doff').onchange=e=>post('display',{screenOff:+e.target.value});
 $('pdeep').onchange=e=>post('power',{deep:+e.target.value});
+$('nkids').onchange=e=>post('power',{nightKids:e.target.checked});$('nadult').onchange=e=>post('power',{nightAdult:e.target.checked});
+$('nfrom').onchange=e=>post('power',{nightFrom:mins(e.target.value)});$('nto').onchange=e=>post('power',{nightTo:mins(e.target.value)});
 $('fwgo').onclick=()=>{const f=$('fwfile').files[0];if(!f)return toast('Erst eine Datei wählen');
  const fd=new FormData();fd.append('file',f,f.name);const x=new XMLHttpRequest();x.open('POST','/api/update');x.setRequestHeader('X-Pin',pin);
  x.upload.onprogress=e=>{if(e.lengthComputable)$('fwprog').textContent='Übertrage … '+Math.round(e.loaded*100/e.total)+' %'};
@@ -598,6 +606,15 @@ static void state() {
   pw["remainMin"] = pwr::remainingMin();
   pw["sleep"] = pwr::sleepText();
   pw["deep"] = pwr::deepSleepSetting();
+  {
+    bool k, a;
+    uint16_t f, t;
+    pwr::nightGet(k, a, f, t);
+    pw["nightKids"] = k;
+    pw["nightAdult"] = a;
+    pw["nightFrom"] = f;
+    pw["nightTo"] = t;
+  }
   pw["drain"] = pwr::drainPerHour();
   JsonDocument hd;
   deserializeJson(hd, pwr::historyJson());
@@ -917,6 +934,12 @@ void begin() {
     if (!body(d)) return msg("Ungültige Anfrage", 400);
     if (d["mode"].is<int>()) pwr::setMode((pwr::Mode)d["mode"].as<int>());
     if (d["deep"].is<int>()) pwr::setDeepSleep(constrain(d["deep"].as<int>(), 0, 240));
+    if (d["nightKids"].is<bool>() || d["nightAdult"].is<bool>() || d["nightFrom"].is<int>() || d["nightTo"].is<int>()) {
+      bool k, a;
+      uint16_t f, t;
+      pwr::nightGet(k, a, f, t);
+      pwr::nightSet(d["nightKids"] | k, d["nightAdult"] | a, d["nightFrom"] | f, d["nightTo"] | t);
+    }
     msg("Gespeichert");
   });
   on("/api/models", HTTP_GET, []() {

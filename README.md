@@ -9,7 +9,7 @@ selbst, eingerichtet wird vom Handy aus.
 
 ![Taschenfunk](docs/screens/hero.png)
 
-*Alle Bilder sind echte Bildschirmfotos vom Gerät (`tools/remote.py`).*
+*Alle Bilder sind echte Bildschirmfotos – von der Uhr (`tools/remote.py`) und von der Weboberfläche im Handy-Browser.*
 
 ```
 firmware/   PlatformIO-Projekt (Arduino-Core 3.3 / ESP-IDF 5.5, LVGL 9.2)
@@ -154,9 +154,16 @@ Die Weboberfläche zeigt, wie oft heute die Wut rausgeschüttelt wurde.
 ![Weboberfläche](docs/screens/weboberflaeche.png)
 
 `https://<IP der Uhr>` (QR-Code unter Einstellungen → Weboberfläche; `http://` leitet um). Fürs Handy gebaut,
-hell und dunkel. Reiter: Übersicht (mit Akku) · Kinder · Musik (Fernbedienung, Favoriten) · KI (Modelle, n8n) ·
-Gerät (WLAN, Schlüssel, Firmware, Sicherung); direkt verlinkbar (`#kinder`, `#ki` …).
-Schlüssel und Tokens werden nur gesetzt, nie ausgelesen.
+hell und dunkel (im Dunkeln echtes Schwarz wie auf der Uhr), mit Akku-Ring, schwebender Navigation und
+Zeitleiste für den Tagesablauf. Reiter:
+
+- **Übersicht:** Akku mit Restlaufzeit und Verlauf, Funk vom Handy, Uhr klingeln lassen, Sparmodus, Tiefschlaf, Nachtruhe
+- **Kinder:** Kindermodus, Wutmodus, Tagesablauf, Routinen und Sterne, Balance-Rekorde, Schlafenszeit, Lautstärke, Apps, Freigaben, PIN
+- **Musik:** Fernbedienung (abspielen, steuern, Lautstärke, Sleep-Timer), Suche mit 🧸 + zum Freigeben, Favoriten
+- **KI:** Name, Google-Suche, Modelle und Stimme, n8n mit Freigaben
+- **Gerät:** Name, Display (Helligkeit, Display-Zeit), WLAN, Gemini-Schlüssel, Firmware, Sicherung
+
+Direkt verlinkbar (`#kinder`, `#musik`, `#ki`, `#geraet`). Schlüssel und Tokens werden nur gesetzt, nie ausgelesen.
 
 **Nur HTTPS:** Die Uhr stellt sich beim ersten Start ein eigenes Zertifikat aus, deshalb warnt der Browser
 einmal („trotzdem öffnen“) – danach ist die Verbindung verschlüsselt, auch PIN und Schlüssel. HTTPS ist
@@ -214,9 +221,13 @@ gerade wach hält; `/api/pm` zeigt Schlafanteile und Sperren.
 Gebaut wird dafür das Arduino-Framework mit eigener ESP-IDF-Konfiguration (`custom_sdkconfig` in
 `platformio.ini`); der erste Build dauert einige Minuten länger.
 
+**Display:** Helligkeit und Display-Zeit stellt man auch in der Weboberfläche ein (Gerät → Display). Wird die
+Uhr nur durch eingehenden Funk geweckt, leuchtet sie gedimmt (30 %) und geht 8 s nach dem Funk wieder aus –
+bis jemand sie anfasst.
+
 **Sparmodus** (automatisch ab 20 %, oder immer): Display höchstens 40 % hell und nach 10 s aus, Zifferblätter
-nur noch einmal pro Sekunde, kein Funk im Hintergrund, ohne laufende Musik WLAN im Stromsparbetrieb und
-Prozessor auf 80 MHz, Tiefschlaf schon nach 3 statt 10 Minuten.
+nur noch einmal pro Sekunde, kein Funk im Hintergrund; ist ein Tiefschlaf eingestellt, kommt er schon nach
+3 Minuten.
 
 ## Updates per WLAN
 

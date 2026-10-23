@@ -53,15 +53,19 @@ o = Image.new("RGB", (4 * (size + 16) + 5 * pad, size + 16 + 2 * pad), BG)
 for i, (n, _) in enumerate(items): o.paste(watch(n, size), (pad + i * (size + 16 + pad), pad))
 o.save(f"{OUT}/hero.png", optimize=True)
 
-# Weboberfläche: drei Reiter nebeneinander, Spotify-Kennung unkenntlich
-ws = []
-for n in ("start", "kinder", "ki"):
-    i = Image.open(f"{SH}/web_{n}.png").convert("RGB").crop((0, 0, 1000, 1900)).resize((500, 950), Image.LANCZOS)
-    ws.append(i)
-o = Image.new("RGB", (3 * 500 + 4 * 30, 950 + 60), BG)
-for k, i in enumerate(ws):
-    m = Image.new("L", i.size, 0)
-    ImageDraw.Draw(m).rounded_rectangle((0, 0, i.width - 1, i.height - 1), 28, fill=255)
-    o.paste(i, (30 + k * 530, 30), m)
+# Weboberfläche: vier Reiter nebeneinander (Bildschirmfotos 390 × 844 im Dunkelmodus, z. B. aus der Handy-Ansicht)
+ws = [("web_start", "Übersicht"), ("web_kinder", "Kinder · Tagesablauf"), ("web_musik", "Musik · Fernbedienung"), ("web_geraet", "Gerät")]
+w, h, pad, ch = 390, 844, 30, 44
+o = Image.new("RGB", (4 * w + 5 * pad, h + 2 * pad + ch), BG)
+d = ImageDraw.Draw(o)
+for k, (n, c) in enumerate(ws):
+    i = Image.open(f"{SH}/{n}.png").convert("RGB").resize((w, h), Image.LANCZOS)
+    m = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(m).rounded_rectangle((0, 0, w - 1, h - 1), 36, fill=255)
+    x = pad + k * (w + pad)
+    o.paste(i, (x, pad), m)
+    d.rounded_rectangle((x, pad, x + w - 1, pad + h - 1), 36, outline=(48, 48, 54), width=2)
+    tw = d.textlength(c, font=cap)
+    d.text((x + (w - tw) / 2, pad + h + 12), c, fill=(200, 196, 188), font=cap)
 o.save(f"{OUT}/weboberflaeche.png", optimize=True)
 print("ok")

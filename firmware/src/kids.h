@@ -3,6 +3,7 @@
 // die erlaubten Apps, eine Lautstärke-Obergrenze und das Pixel-Zifferblatt mit dem Tagesablauf.
 #pragma once
 #include <Arduino.h>
+#include "kidacts.h"
 #include "music.h"
 
 namespace kids {
@@ -21,6 +22,10 @@ struct Cfg {
   bool angry;            // Wutmodus: auf der Uhr gibt es nur noch das Wut-Glas
   bool nightLock;        // Schlafenszeit: ab der Bettzeit bis zum Aufstehen gesperrt
   uint8_t storyMin;      // so lange darf nach der Bettzeit noch Musik/Hörspiel laufen
+  uint8_t world;         // Welt des Zifferblatts (kidart::World), 5 = jede Woche eine andere
+  uint8_t pet;           // Tier-Begleiter (kidart::Pet), 0 = keins
+  char petName[13];      // Name des Tiers
+  bool adventure;        // Wochen-Abenteuer in der Spielzeit
 };
 
 void begin();
@@ -49,7 +54,6 @@ void release(const char* path, const char* title, const char* sub, bool on);
 int list(music::Item* out, int max);
 
 // Tagesablauf für das Zifferblatt
-enum Act : uint8_t { SLEEP, WAKE, BREAKFAST, DAYCARE, LUNCH, NAP, PLAY, DINNER, BATH, STORY, ACTS };
 struct Slot { Act act; uint16_t start; const char* name; };  // Minuten nach Mitternacht; name: eigener Text oder nullptr
 static const int SLOTS_MAX = 16;
 int schedule(Slot* out, bool weekend);     // Abschnitte des Tages in zeitlicher Reihenfolge (höchstens SLOTS_MAX)

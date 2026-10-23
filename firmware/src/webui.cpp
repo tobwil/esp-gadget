@@ -223,6 +223,11 @@ nav button.sel{background:rgba(201,138,43,.15);color:var(--acc)}nav button.sel.k
  <section class="kidc"><div class="row"><div class="t"><b>Kindermodus</b><small>Auf der Uhr keine freie Auswahl mehr</small></div><label class="sw"><input type="checkbox" id="kon"><span></span></label></div>
   <div class="row angry"><div class="t"><b>Wutmodus</b><small id="angst"></small></div><label class="sw"><input type="checkbox" id="kangry"><span></span></label></div>
   <p class="note">Wutmodus: Auf der Uhr gibt es nur noch das Wut-Glas – kräftig schütteln, bis alle roten Funken draußen sind, dann wird es ruhig und ein Kreis atmet vor.</p></section>
+ <section class="kidc"><h2>Zifferblatt</h2><p class="note">Eine Welt für die Pixel-Geschichte, ein Tier, das überall mitkommt, und in der Spielzeit ein Abenteuer mit jeden Tag einem neuen Kapitel.</p>
+  <label class="f" for="kworld">Welt</label><select id="kworld"><option value="5">✨ Jede Woche eine andere</option><option value="0">🏠 Zuhause</option><option value="1">🚀 Weltraum</option><option value="2">🚜 Bauernhof</option><option value="3">🐠 Unterwasser</option><option value="4">🦄 Märchenland</option></select>
+  <div class="two"><div><label class="f" for="kpet">Tier</label><select id="kpet"><option value="0">keins</option><option value="1">🐱 Katze</option><option value="2">🐰 Hase</option><option value="3">🐶 Hund</option><option value="4">🐉 Drache</option></select></div><div><label class="f" for="kpetn">Name</label><input id="kpetn" maxlength="12" autocomplete="off"></div></div>
+  <p class="note" id="kpetst"></p>
+  <div class="row"><div class="t"><b>Wochen-Abenteuer</b><small>In der Spielzeit eine Karte, jeden Tag ein Kapitel</small></div><label class="sw"><input type="checkbox" id="kadv"><span></span></label></div></section>
  <section class="kidc"><h2>Tagesablauf</h2><p class="note">Das Zifferblatt zeigt den Tag als Pixel-Geschichte.</p>
   <div class="two"><div><label class="f" for="kw">Aufstehen</label><input type="time" id="kw"></div><div><label class="f" for="kb">Ins Bett</label><input type="time" id="kb"></div></div>
   <div class="seg" id="kplace"><button data-v="0">Kita</button><button data-v="1">Schule</button></div>
@@ -349,7 +354,10 @@ function render(){
  $('rnow').innerHTML=[['Morgens',r.morning],['Abends',r.evening]].map(([n,l])=>`<p class="note">${n}: `+l.map(i=>(i.done?'✅ ':'⬜ ')+esc(i.text)).join(' · ')+'</p>').join('');
  if(document.activeElement!==$('rmorn'))$('rmorn').value=r.morning.map(i=>i.text).join('\n');
  if(document.activeElement!==$('reve'))$('reve').value=r.evening.map(i=>i.text).join('\n');
- if(!dDirty&&k.day){dPlan=JSON.parse(JSON.stringify(k.day));dRender()}$('dst').textContent=k.day&&k.day.custom?'· eigener':'· Standard';$('knight').checked=k.nightLock;if(document.activeElement!==$('kstory'))$('kstory').value=k.storyMin;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
+ if(!dDirty&&k.day){dPlan=JSON.parse(JSON.stringify(k.day));dRender()}$('dst').textContent=k.day&&k.day.custom?'· eigener':'· Standard';$('knight').checked=k.nightLock;
+ if(document.activeElement!==$('kworld'))$('kworld').value=k.world;if(document.activeElement!==$('kpet'))$('kpet').value=k.pet;
+ if(document.activeElement!==$('kpetn'))$('kpetn').value=k.petName;$('kadv').checked=k.adventure;
+ {const st=s.routines?s.routines.total:0,nm=esc(k.petName||'Das Tier');$('kpetst').innerHTML=!k.pet?'':st>=60?`${nm} trägt Halstuch und Krone – ${st} Sterne insgesamt ⭐`:st>=20?`${nm} hat ein Halstuch. Noch <b>${60-st}</b> Sterne bis zur Krone.`:`Noch <b>${20-st}</b> Sterne, dann bekommt ${nm} ein Halstuch. Bei Sternen von heute freut sich ${nm} mit Herzchen.`;}if(document.activeElement!==$('kstory'))$('kstory').value=k.storyMin;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
  $('kapps').innerHTML=APPS.map(([b,n,d])=>row(n,d,`<label class="sw"><input type="checkbox" ${k.apps&b?'checked':''} onchange="kids({apps:this.checked?S.kids.apps|${b}:S.kids.apps&~${b}})"><span></span></label>`)).join('');
  $('krel').innerHTML=k.released.map(r=>row(r.title,r.sub,btn('Entfernen',`rel(${J(r)},false)`))).join('')||'<p class="note">Noch nichts – unten suchen oder einen Favoriten freigeben.</p>';
  $('pinst').innerHTML=k.pin?'<span class="ok">PIN ist gesetzt</span> – die Weboberfläche fragt danach.':'Keine PIN – jeder im WLAN kann die Uhr einstellen.';
@@ -392,6 +400,8 @@ $('kon').onchange=$('kon2').onchange=e=>{kids({on:e.target.checked});toast(e.tar
 $('kangry').onchange=$('kangry2').onchange=e=>{kids(e.target.checked?{angry:true,on:true}:{angry:false});toast(e.target.checked?'Wutmodus an – nur noch das Wut-Glas':'Wutmodus aus')};
 $('kw').onchange=()=>kids({wake:mins($('kw').value)});$('kb').onchange=()=>kids({bed:mins($('kb').value)});
 $('kplace').onclick=e=>{if(e.target.dataset.v)kids({school:e.target.dataset.v=='1'})};
+$('kworld').onchange=e=>kids({world:+e.target.value});$('kpet').onchange=e=>kids({pet:+e.target.value});
+$('kpetn').onchange=e=>kids({petName:e.target.value.trim()});$('kadv').onchange=e=>kids({adventure:e.target.checked});
 const lines=id=>$(id).value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,8);
 $('rgo').onclick=()=>post('routines',{morning:lines('rmorn'),evening:lines('reve')});
 $('greset').onclick=()=>confirm('Balance-Rekorde auf dieser Uhr löschen?')&&post('game/reset',{});
@@ -721,6 +731,10 @@ static void state() {
   ko["nap"] = kc.nap;
   ko["nightLock"] = kc.nightLock;
   ko["storyMin"] = kc.storyMin;
+  ko["world"] = kc.world;
+  ko["pet"] = kc.pet;
+  ko["petName"] = kc.petName;
+  ko["adventure"] = kc.adventure;
   JsonDocument dd;
   deserializeJson(dd, kids::dayJson());
   ko["day"] = dd;
@@ -749,6 +763,10 @@ static void setKids() {
   c.nightLock = d["nightLock"] | c.nightLock;
   c.storyMin = d["storyMin"] | c.storyMin;
   c.angry = d["angry"] | c.angry;
+  c.world = d["world"] | c.world;
+  c.pet = d["pet"] | c.pet;
+  if (d["petName"].is<const char*>()) snprintf(c.petName, sizeof(c.petName), "%s", (const char*)d["petName"]);
+  c.adventure = d["adventure"] | c.adventure;
   kids::set(c);
   if (kids::angry() && !wasAngry) music::stop();  // im Wutmodus läuft nichts anderes
   if (c.on) ui::volumeSet(cfg.volume);  // Obergrenze sofort anwenden

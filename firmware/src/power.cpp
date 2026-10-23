@@ -57,9 +57,8 @@ static void pmUpdate() {
   bool d = !hwScreenOn() && !streamingNow && (!hwUsb() || sleepOnUsb);
   if (d == doze || !lockAwake) return;
   doze = d;
-  // beim Dösen höchstens 80 MHz: die kurzen Wachphasen brauchen keine volle Geschwindigkeit
-  esp_pm_config_t c = {.max_freq_mhz = d ? 80 : 240, .min_freq_mhz = 80, .light_sleep_enable = true};
-  esp_pm_configure(&c);
+  // Keine 80-MHz-Grenze beim Dösen: gemessen kaum sparsamer (der Prozessor rechnet länger und schläft weniger),
+  // aber HTTPS-Anfragen dauerten 1,5–3 s statt 0,4 s.
   if (d) { esp_pm_lock_release(lockFast); esp_pm_lock_release(lockAwake); }
   else { esp_pm_lock_acquire(lockAwake); esp_pm_lock_acquire(lockFast); }
 }

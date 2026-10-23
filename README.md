@@ -118,6 +118,21 @@ Ein- und ausgeschaltet wird **nur über die Weboberfläche** (Reiter „Kinder�
 
 ![Kindermodus](docs/screens/kindermodus.png)
 
+### Welten, Tier-Begleiter und Wochen-Abenteuer
+
+![Kinder-Welten](docs/screens/kinderwelten.png)
+
+Unter Kinder → Zifferblatt: Die Pixel-Geschichte spielt **zuhause, im Weltraum, auf dem Bauernhof, unter Wasser
+oder im Märchenland** – oder jede Woche woanders. Jede Welt hat eigene Zimmer, Fenster, Spielplätze und ein
+eigenes Gebäude für Kita und Schule, und das Mädchen trägt Raumanzug, Latzhose mit Strohhut,
+Meerjungfrauen-Schwanz oder Krone. Ein **Tier** (Katze, Hase, Hund oder Drache, mit eigenem Namen) ist überall
+dabei und schläft nachts am Bettende; bei Sternen von heute freut es sich mit Herzchen, ab 20 Sternen trägt es
+ein Halstuch, ab 60 eine Krone. Mit dem **Wochen-Abenteuer** wird die Spielzeit zur Karte: sieben Stationen,
+jeden Tag ein Kapitel („Der rote Mars“, „Die Regenbogenbrücke“ …), die Figur wandert im Laufe der Zeit weiter.
+
+Die Szenen zeichnet `firmware/src/kidart.cpp` ohne LVGL – `sh tools/kidart_preview.sh` rendert sie am Rechner
+als Übersicht.
+
 ### Schlafenszeit
 
 Ab der Bettzeit bis zum Aufstehen ist die Uhr gesperrt: keine Apps, kein Funk, keine Kacheln, das Display

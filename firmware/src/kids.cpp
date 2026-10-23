@@ -33,6 +33,10 @@ void begin() {
   c.angry = p.getBool("angry", false);
   c.nightLock = p.getBool("night", true);
   c.storyMin = p.getUChar("story", 30);
+  c.world = p.getUChar("world", 5);
+  c.pet = p.getUChar("pet", 1);
+  if (!p.getString("petname", c.petName, sizeof(c.petName))) snprintf(c.petName, sizeof(c.petName), "Mimi");
+  c.adventure = p.getBool("adv", true);
   String day = p.getString("day", "");
   p.end();
   store.begin();
@@ -105,6 +109,10 @@ void set(const Cfg& n) {
   p.putBool("angry", c.angry);
   p.putBool("night", c.nightLock);
   p.putUChar("story", c.storyMin);
+  p.putUChar("world", c.world);
+  p.putUChar("pet", c.pet);
+  p.putString("petname", c.petName);
+  p.putBool("adv", c.adventure);
   p.end();
 }
 

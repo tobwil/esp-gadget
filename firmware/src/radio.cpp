@@ -286,7 +286,7 @@ static void task(void*) {
   bool micRunning = false;
   for (;;) {
     RxPkt p;
-    while (xQueueReceive(rxq, &p, txOn ? 0 : pdMS_TO_TICKS(10)) == pdTRUE) handle(p);
+    while (xQueueReceive(rxq, &p, txOn ? 0 : pdMS_TO_TICKS(pwr::dozing() ? 100 : 10)) == pdTRUE) handle(p);
 
     // UDP im WLAN
     bool online = netOnline();

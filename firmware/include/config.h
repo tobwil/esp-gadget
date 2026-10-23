@@ -13,9 +13,10 @@
 
 // Display aus nach so vielen Sekunden ohne Bedienung (am Gerät änderbar)
 #define SCREEN_TIMEOUT_S 30
-// Tiefschlaf nach so vielen Minuten mit dunklem Display (nur im Akkubetrieb, nicht bei Musik/Timer/Funk-Empfang).
-// 0 = nie
-#define DEEP_SLEEP_MIN 10
+// Tiefschlaf nach so vielen Minuten mit dunklem Display (Standard, in der Weboberfläche änderbar; nur im
+// Akkubetrieb, nicht bei Musik/Timer/Funk-Empfang). 0 = nie: die Uhr döst im Leichtschlaf und bleibt für Funk und
+// Weboberfläche erreichbar. Im Tiefschlaf ist das WLAN aus, dann weckt nur BOOT.
+#define DEEP_SLEEP_MIN 0
 
 #define VOLUME_DEFAULT 60      // %
 #define BRIGHTNESS_DEFAULT 80  // %

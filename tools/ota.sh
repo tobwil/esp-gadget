@@ -9,5 +9,10 @@ ENV=${2:-amoled-175c}
 PIN=${3:-}
 cd "$(dirname "$0")/../firmware"
 ~/.platformio/penv/bin/pio run -e "$ENV" | tail -1
-curl -sk --max-time 180 -H "X-Pin: $PIN" -F "file=@.pio/build/$ENV/firmware.bin" "https://$HOST/api/update"
-echo
+# eine dösende Uhr antwortet manchmal träge – bis zu dreimal versuchen
+for i in 1 2 3; do
+  curl -sSk --max-time 180 -H "X-Pin: $PIN" -F "file=@.pio/build/$ENV/firmware.bin" "https://$HOST/api/update" && echo && exit 0
+  echo "Versuch $i fehlgeschlagen" >&2
+  sleep 3
+done
+exit 1

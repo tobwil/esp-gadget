@@ -30,6 +30,11 @@ bool receiving();
 const char* talker();           // Name, wer gerade spricht
 int peers(Peer* out, int max);  // aktuelle Nachbarn, zuletzt gesehene zuerst
 bool takeEvent(Event* ev);
+
+// Zähneputzen im Team: jede Uhr meldet ihren Stand, die andere zeigt ihn an
+struct BrushMate { uint32_t id; char name[17]; uint8_t hero, mode, section, score; bool done; uint32_t seen; };
+void brushSend(uint8_t hero, uint8_t mode, uint8_t section, uint8_t score, bool done);
+bool brushMate(BrushMate* out);  // jemand in der Nähe putzt gerade (in den letzten 6 s gehört)
 uint32_t myId();
 
 extern volatile bool screenOpen;  // Funk-Bildschirm offen: auch ohne „Empfang im Hintergrund“ hören

@@ -195,7 +195,31 @@ static void fakePush(int x, int y, bool down) {
   if ((uint8_t)(fHead - fTail) < sizeof(fake) / sizeof(fake[0])) fake[fHead++ % 48] = {(int16_t)x, (int16_t)y, down};
 }
 
-static void touchRead(lv_indev_t*, lv_indev_data_t* data) {
+static volatile uint32_t strokeId = 0;
+static volatile int16_t strokeX0, strokeY0, strokeX1, strokeY1;
+static volatile bool strokeDown = false;
+
+static void trackStroke(const lv_indev_data_t* d) {  // für Wischgesten, die LVGL beim Blättern nicht meldet
+  bool down = d->state == LV_INDEV_STATE_PRESSED;
+  if (down && !strokeDown) { strokeId = strokeId + 1; strokeX0 = d->point.x; strokeY0 = d->point.y; }
+  if (down) { strokeX1 = d->point.x; strokeY1 = d->point.y; }
+  strokeDown = down;
+}
+
+void hwStroke(uint32_t& id, int& dx, int& dy, bool& released) {
+  id = strokeId;
+  dx = strokeX1 - strokeX0;
+  dy = strokeY1 - strokeY0;
+  released = !strokeDown;
+}
+
+static void touchReadRaw(lv_indev_t*, lv_indev_data_t* data);
+static void touchRead(lv_indev_t* in, lv_indev_data_t* data) {
+  touchReadRaw(in, data);
+  trackStroke(data);
+}
+
+static void touchReadRaw(lv_indev_t*, lv_indev_data_t* data) {
   static int16_t lx = 0, ly = 0;
   static bool swallow = false;
   if (fTail != fHead) {
@@ -317,6 +341,7 @@ static void handleLine(char* line) {
       for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) walk(lv_obj_get_child(o, i), d + 1);
     };
     walk(lv_screen_active(), 0);
+    walk(lv_layer_top(), 0);  // Klingeln, Hinweise
   }
   else if (!strcmp(line, "mem")) Serial.printf("Heap intern %u (min %u), PSRAM %u\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                                                 heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL), ESP.getFreePsram());

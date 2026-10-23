@@ -144,18 +144,41 @@ Seepferdchen.
 ![Zähneputzen](docs/screens/zahnputzen.png)
 
 Eine App (für Kinder und Erwachsene, in der Weboberfläche abschaltbar): erst **Pferd Luna oder Reh Fips** wählen,
-dann die Aufgabe. Zwei Minuten in vier Vierteln à 30 s – oben links, oben rechts, unten links, unten rechts; ein
-Gebiss im Bild leuchtet dort, wo gerade geputzt wird, und eine Zahnbürste zeigt darauf, beim Wechsel klingt ein Ton.
+dann das Spiel. Geputzt wird nach der **KAI-Methode**, zwei Minuten: erst die **K**auflächen (vier Ecken, hin und
+her), dann **A**ußen (Zähne aufeinander, kleine Kreise – rechts, vorne, links), dann **I**nnen (Mund weit auf, von
+Rot nach Weiß). Der Mund im Bild zeigt wie im Spiegel, wo gerade dran ist, Zahnmonster verschwinden nach und nach,
+und **Luna bzw. Fips sagen, wo es weitergeht** – mit echten Stimmen, die Uhr steht ja gegenüber auf dem Tisch. Dabei
+**hört sie zu** (Mikrofon), und jeden Tag ist ein anderes Spiel das „Spiel des Tages“:
 
-- **Geschichte:** Mit jedem Putzen geht es ein Kapitel weiter. Luna folgt einer Schatzkarte (Bach, Eule, Pilzpfad,
-  Gewitter, die Kiste mit goldenen Hufeisen), Fips hilft dem Glühwürmchen Lumi, seine Freunde zu finden (Igel,
-  Frösche, die Maus im alten Baum, Hängebrücke, Biber, Höhle). Jedes Mal gibt es ein Teil für die Sammlung.
-- **Rätsel:** In jedem Viertel tauchen Äpfel, Blumen, Schmetterlinge, Vögel, Pilze oder Sterne auf; danach kommen
-  Fragen zum Antippen. *Leicht* (ab 4): zählen bis 5 und Farben. *Knifflig* (ab 7): bis 12, zusammenrechnen,
-  „Was kam zuerst?“ – und kein Hinweis, worauf man achten soll. Jede richtige Antwort gibt einen Stern.
+- **Monsterjagd:** Die Zahnmonster verschwinden nur, solange die Uhr Putzen hört; wird es still, kommen sie zurück
+  und grinsen.
+- **Hoch oder tief:** Kommt der Schmetterling, hoch summen – kommt der Fisch, tief summen; dann springt der Frosch
+  hinterher. Die erste Runde („Summ erst einmal ganz normal“) merkt sich die eigene Stimmlage, deshalb klappt es
+  für Kinder und Erwachsene gleich.
+- **Summ-Ballon:** Summen lässt den Ballon steigen, Stille lässt ihn sinken; unterwegs Sterne einsammeln,
+  Regenbogensterne zählen dreifach.
 
-Zum Schluss wird „Zähne putzen“ in der laufenden Routine abgehakt. Die Weboberfläche zeigt Kapitel und Sammlung.
+Dazu drei **Kipp-Spiele** für die freie Hand – die andere hält ja die Zahnbürste:
 
+- **Zahnpasta-Kugel:** Die Kugel durch Kippen zum leuchtenden Stern rollen – der liegt immer in dem Bereich, der
+  gerade geputzt wird.
+- **Sterne fangen:** Luna bzw. Fips schaut aus dem Korb; nach links und rechts kippen und Sterne und Äpfel fangen.
+- **Wiesenlauf:** Nach vorn und hinten kippen: Steinen ausweichen, Hufeisen (Luna) bzw. Kleeblätter (Fips) sammeln.
+
+Erkennung: Summen ist ein Ton, das Bürstengeräusch Rauschen – nach einem Tiefpass entscheidet die Autokorrelation
+(70–530 Hz); Summen zählt auch unter dreifach lauter Bürste. Während eigener Ansagen hört die Uhr weg.
+
+- **Album:** Nach jedem Putzen ein neuer Sticker (24 Motive). Sieben Tage am Stück: ein Pokal, und Luna und Fips
+  tragen eine Krone.
+- **Zu zweit:** Putzen zwei Uhren gleichzeitig, melden sie sich über Funk („‹Name› putzt mit: Außen vorne“) – und beide
+  bekommen Team-Herzen fürs Album.
+
+Zum Schluss: „Ausspucken, nicht ausspülen“, auf Wunsch „Jetzt putzt Mama oder Papa nach“ (Weboberfläche), und
+„Zähne putzen“ in der laufenden Routine wird abgehakt. Die Weboberfläche zeigt Serie, Rekorde und Album.
+
+Die Ansagen erzeugt `tools/brush_voice.py` einmalig mit Gemini-TTS (MP3, 16 kHz) als `firmware/brushvoice.bin`
+(≈ 240 KB), die in die Firmware eingebettet wird. Dort liegen auch sieben Hörgeschichten je Figur, in denen die
+Putz-Hinweise in der Erzählung stecken – für später, nicht auf der Uhr (`--story`).
 Die Szenen zeichnet `firmware/src/kidart.cpp` ohne LVGL – `sh tools/kidart_preview.sh` rendert sie am Rechner
 als Übersicht.
 
@@ -304,10 +327,38 @@ Geräte im selben WLAN sind das ohnehin, Geräte ohne WLAN bleiben auf Kanal 1 (
 Befehle im seriellen Monitor:
 
 - **Eingaben:** `tap X Y`, `hold X Y`, `swipe l|r|u|d`, `boot`, `pwr`, `shot`
-- **Seiten:** `page apps|music|timer|stopwatch|alarm|radio|settings|game|web`, `home`, `browse search:Coldplay`
+- **Seiten:** `page apps|music|timer|stopwatch|alarm|radio|settings|game|brush|web`, `home`, `browse search:Coldplay`
 - **Musik:** `toggle`, `next`, `vol 60`, `browse rl:tag:kids`, `browse ard:soccer`, `voice start` / `voice stop`, `page assist`, `talk on` / `talk off` (Assistentin), `sleep 1` (Sleep-Timer), `alarm 7:30`, `alarmsrc ard:set:10815223 Name` (`-` = Ton)
-- **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung), `angry on|off`, `shake 10` (10 s Schütteln vortäuschen)
-- **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status`, `poweroff`
+- **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung), `tilt 0.3 -0.2` / `tilt off` (Neigung vortäuschen), `angry on|off`, `shake 10` (10 s Schütteln vortäuschen)
+- **Zähneputzen:** `page brush`, `brush save` / `brush load` (Album, Serie und Rekorde sichern und zurückholen; dazwischen wird die Routine nicht abgehakt), `ear on|off` (was das Mikrofon in den Summ-Spielen hört, je Prüfung eine Zeile)
+- **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status` (mit Laufzeit und freiem Speicher), `dump` (alle Texte auf dem Bildschirm und der obersten Ebene mit Lage), `poweroff`
+
+### Testsammlung
+
+```bash
+sh tests/run_host.sh                                              # am Rechner: Hören, Zeichnen, Sprachdatei, Weboberfläche, beide Builds
+~/.platformio/penv/bin/python tests/device/test_device.py          # auf der Uhr (USB + WLAN), lautlos
+~/.platformio/penv/bin/python tests/device/test_device.py --sound  # dazu die Summ-Spiele mit Tönen aus dem Rechner (hörbar!)
+```
+
+- **Am Rechner** (`tests/host`, ≈ 5 600 Prüfungen): Die Summ-Erkennung (`hearing.cpp`, derselbe Code wie auf der Uhr)
+  bekommt künstliches Summen von 80 bis 520 Hz, Bürstenrauschen, beides gemischt und zwei Minuten Dauerputzen. Alle
+  Zeichnungen laufen mit vielen Werten (auch außerhalb des Bildes) gegen Schutzbereiche; Sticker müssen sich
+  unterscheiden, Ziele der Zahnpasta-Kugel erreichbar sein. Die Sprachdatei muss jede Ansage für beide Figuren
+  enthalten, jedes Stück muss sich dekodieren lassen und in seinen Abschnitt passen; das Skript der Weboberfläche muss
+  gültig sein und jede angesprochene ID im HTML finden. Dazu: keine großen Felder auf dem Stapel (8 KB) und ein
+  Budget für den statischen internen RAM – beides hat schon Abstürze gefunden.
+- **Auf der Uhr** (`tests/device`, Regression der ganzen Uhr): Status und Weboberfläche (Felder, Umleitung auf https,
+  404, keine Geheimnisse in Antworten und Sicherung, Einstellungen hin und zurück, Update-Schutz gegen Datenmüll und
+  die Firmware der anderen Uhr), alle Seiten, Kinder-Zifferblatt zu zehn Tageszeiten, im Erwachsenen-Modus alle
+  Zifferblätter, Wischen hin und zurück (Kacheln, Apps, Kontrollzentrum), Timer mit Klingeln und Stopp, Balance mit
+  vorgetäuschter Neigung (Rekorde bleiben), ein Radiosender mit gleichzeitigen Web-Anfragen, Funk-Seite; dazu das
+  ganze Zahnputz-Menü, die drei Kipp-Spiele (der Test steuert Korb, Kugel und Figur anhand der Bildschirmfotos), mit
+  `--sound` die drei Summ-Spiele, ein voller Zwei-Minuten-Durchlauf (KAI-Reihenfolge, Dauer, Sticker, Serie) und zum
+  Schluss: kein Neustart, genug interner Speicher, keine Musik.
+- **Leise und ohne Spuren:** Die Uhr steht während der Tests auf Lautstärke 0. Album, Serie und Rekorde werden vorher
+  gesichert und danach zurückgeholt, Kindermodus, Zifferblatt und Lautstärke wieder eingestellt, die Routine wird
+  nicht abgehakt.
 
 ## Technik
 

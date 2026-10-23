@@ -10,6 +10,7 @@
 #include "hw.h"
 #include "keys.h"
 #include "assist.h"
+#include "kidart.h"
 #include "kids.h"
 #include "n8n.h"
 #include "power.h"
@@ -246,8 +247,8 @@ nav button.sel{background:rgba(201,138,43,.15);color:var(--acc)}nav button.sel.k
   <button class="wide kid" id="rgo">Routinen speichern</button><button class="wide ghost" id="rreset">Sterne zurücksetzen</button></section>
  <section class="kidc"><h2>Zähneputzen</h2>
   <div class="row"><div class="t"><b>Zahnputz-App</b><small>Zwei Minuten mit Pferd Luna oder Reh Fips</small></div><label class="sw"><input type="checkbox" id="kbrushon"><span></span></label></div>
-  <p class="note">Als Fortsetzungsgeschichte oder als Rätsel mit Fragen danach. Das Gebiss im Bild zeigt, wo gerade geputzt wird.</p>
-  <label class="f" for="kbrush">Rätsel</label><select id="kbrush"><option value="0">leicht – zählen bis 5, Farben (ab 4)</option><option value="1">knifflig – bis 12, zusammenrechnen, Reihenfolge (ab 7)</option></select>
+  <p class="note">Nach der KAI-Methode: Kauflächen, außen kleine Kreise, innen von Rot nach Weiß. Luna und Fips sagen an, wo es weitergeht. Die Uhr hört dabei zu: Bei der Monsterjagd verschwinden die Zahnmonster nur, solange sie Putzen hört; bei „Hoch oder tief“ wird hoch oder tief gesummt; beim Summ-Ballon lässt Summen den Ballon steigen. Dazu drei Kipp-Spiele für die freie Hand: Zahnpasta-Kugel, Sterne fangen und Wiesenlauf. Jeden Tag ist ein anderes Spiel dran. Danach gibt es einen Sticker fürs Album, sieben Tage am Stück einen Pokal. Putzen zwei Uhren gleichzeitig, sehen sie sich gegenseitig und bekommen Team-Herzen.</p>
+  <div class="row"><div class="t"><b>Nachputz-Hinweis</b><small>Am Ende: „Jetzt putzt Mama oder Papa nach“</small></div><label class="sw"><input type="checkbox" id="kbrushpar"><span></span></label></div>
   <p class="note" id="kbrushst"></p></section>
  <section class="kidc"><h2>Balance-Rekorde</h2><p class="note" id="grec"></p><button class="wide ghost" id="greset">Rekorde zurücksetzen</button></section>
  <section class="kidc"><h2>Schlafenszeit</h2>
@@ -368,8 +369,8 @@ function render(){
  if(document.activeElement!==$('kpetn'))$('kpetn').value=k.petName;$('kadv').checked=k.adventure;
  {const st=s.routines?s.routines.total:0,nm=esc(k.petName||'Das Tier');$('kpetst').innerHTML=!k.pet?'':st>=60?`${nm} trägt Halstuch und Krone – ${st} Sterne insgesamt ⭐`:st>=20?`${nm} hat ein Halstuch. Noch <b>${60-st}</b> Sterne bis zur Krone.`:`Noch <b>${20-st}</b> Sterne, dann bekommt ${nm} ein Halstuch. Bei Sternen von heute freut sich ${nm} mit Herzchen.`;}if(document.activeElement!==$('kstory'))$('kstory').value=k.storyMin;
  $('kstst').textContent=k.storyMin?`Tagsüber ohne Grenze. Ab ${hm(k.bed)} nur noch Musik, ab ${hm((k.bed+k.storyMin)%1440)} wird sie sanft ausgeblendet und ist bis ${hm(k.wake)} gesperrt.`:`Tagsüber ohne Grenze. Ab ${hm(k.bed)} wird Musik ausgeblendet und ist bis ${hm(k.wake)} gesperrt.`;
- $('kphases').checked=k.phases;if(document.activeElement!==$('kbrush'))$('kbrush').value=k.brushHard?1:0;$('kbrushon').checked=k.brushOn;
- if(k.brush)$('kbrushst').innerHTML=`🐴 Luna: Kapitel <b>${k.brush.lunaChapter}</b> von 7 · ${k.brush.lunaShoes} goldene Hufeisen<br>🦌 Fips: Kapitel <b>${k.brush.fipsChapter}</b> von 7 · ${k.brush.fipsFlies} Glühwürmchen`;if(s.routines)$('ron').checked=s.routines.on;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
+ $('kphases').checked=k.phases;$('kbrushpar').checked=k.brushParent;$('kbrushon').checked=k.brushOn;
+ if(k.brush){const b=k.brush,nm=b.names||[];$('kbrushst').innerHTML=`🔥 <b>${b.streak}</b> ${b.streak==1?'Tag':'Tage'} am Stück (beste Serie ${b.best})<br>Rekorde: 👾 Monsterjagd <b>${b.monster}</b> · 🐸 Hoch oder tief <b>${b.pitch}</b> · 🎈 Summ-Ballon <b>${b.balloon}</b><br>⚪ Zahnpasta-Kugel <b>${b.ball??0}</b> · 🧺 Sterne fangen <b>${b.catcher??0}</b> · 🐴 Wiesenlauf <b>${b.meadow??0}</b><br>⭐ Album: <b>${nm.length}</b> von ${b.total} Stickern${nm.length?' – '+nm.map(esc).join(', '):''}`}if(s.routines)$('ron').checked=s.routines.on;$('kv').value=k.maxVol;$('kvv').textContent=k.maxVol;
  $('kapps').innerHTML=APPS.map(([b,n,d])=>row(n,d,`<label class="sw"><input type="checkbox" ${k.apps&b?'checked':''} onchange="kids({apps:this.checked?S.kids.apps|${b}:S.kids.apps&~${b}})"><span></span></label>`)).join('');
  $('krel').innerHTML=k.released.map(r=>row(r.title,r.sub,btn('Entfernen',`rel(${J(r)},false)`))).join('')||'<p class="note">Noch nichts – unten suchen oder einen Favoriten freigeben.</p>';
  $('pinst').innerHTML=k.pin?'<span class="ok">PIN ist gesetzt</span> – die Weboberfläche fragt danach.':'Keine PIN – jeder im WLAN kann die Uhr einstellen.';
@@ -414,7 +415,7 @@ $('kw').onchange=()=>kids({wake:mins($('kw').value)});$('kb').onchange=()=>kids(
 $('kplace').onclick=e=>{if(e.target.dataset.v)kids({school:e.target.dataset.v=='1'})};
 $('kworld').onchange=e=>kids({world:+e.target.value});$('kpet').onchange=e=>kids({pet:+e.target.value});
 $('kpetn').onchange=e=>kids({petName:e.target.value.trim()});$('kadv').onchange=e=>kids({adventure:e.target.checked});
-$('kbrush').onchange=e=>kids({brushHard:e.target.value=='1'});$('kbrushon').onchange=e=>kids({brushOn:e.target.checked});
+$('kbrushpar').onchange=e=>kids({brushParent:e.target.checked});$('kbrushon').onchange=e=>kids({brushOn:e.target.checked});
 $('kphases').onchange=e=>kids({phases:e.target.checked});$('ron').onchange=e=>post('routines/on',{on:e.target.checked});
 const lines=id=>$(id).value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,8);
 $('rgo').onclick=()=>post('routines',{morning:lines('rmorn'),evening:lines('reve')});
@@ -760,16 +761,23 @@ static void state() {
   ko["petName"] = kc.petName;
   ko["adventure"] = kc.adventure;
   ko["phases"] = kc.phases;
-  ko["brushHard"] = kc.brushHard;
+  ko["brushParent"] = kc.brushParent;
   ko["brushOn"] = kc.brushOn;
   {
-    int lc, ls, fc, ff;
-    brushStats(lc, ls, fc, ff);
+    BrushStats bs = brushStats();
     JsonObject br = ko["brush"].to<JsonObject>();
-    br["lunaChapter"] = lc;
-    br["lunaShoes"] = ls;
-    br["fipsChapter"] = fc;
-    br["fipsFlies"] = ff;
+    br["streak"] = bs.streak;
+    br["best"] = bs.best;
+    br["monster"] = bs.monster;
+    br["pitch"] = bs.pitch;
+    br["balloon"] = bs.balloon;
+    br["ball"] = bs.ball;
+    br["catcher"] = bs.catcher;
+    br["meadow"] = bs.meadow;
+    br["total"] = kidart::STICKERS;
+    JsonArray names = br["names"].to<JsonArray>();
+    for (int i = 0; i < kidart::STICKERS; i++)
+      if (bs.have >> i & 1) names.add(kidart::stickerName(i));
   }
   JsonDocument dd;
   deserializeJson(dd, kids::dayJson());
@@ -804,7 +812,7 @@ static void setKids() {
   if (d["petName"].is<const char*>()) snprintf(c.petName, sizeof(c.petName), "%s", (const char*)d["petName"]);
   c.adventure = d["adventure"] | c.adventure;
   c.phases = d["phases"] | c.phases;
-  c.brushHard = d["brushHard"] | c.brushHard;
+  c.brushParent = d["brushParent"] | c.brushParent;
   c.brushOn = d["brushOn"] | c.brushOn;
   kids::set(c);
   if (kids::angry() && !wasAngry) music::stop();  // im Wutmodus läuft nichts anderes

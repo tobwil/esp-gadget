@@ -39,7 +39,17 @@ static void toScreen(float x, float y, float& sx, float& sy) {
 #endif
 }
 
+static bool fakeOn = false;
+static float fakeX = 0, fakeY = 0;
+
+void fake(bool on, float gx, float gy) {
+  fakeOn = on;
+  fakeX = gx;
+  fakeY = gy;
+}
+
 bool gravity(float& gx, float& gy) {
+  if (fakeOn) { gx = fakeX; gy = fakeY; return true; }
   float x, y, z;
   if (!ok || !qmi.getAccelerometer(x, y, z)) return false;
   toScreen(x, y, gx, gy);

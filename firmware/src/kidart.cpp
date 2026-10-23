@@ -1,5 +1,6 @@
 #include "kidart.h"
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <algorithm>
 
@@ -1073,42 +1074,8 @@ const char* const CHAPTER_T[2][7] = {
     {"Die Schatzkarte", "Am Bach", "Die Eule", "Die roten Pilze", "Das Gewitter", "Das große X", "Das Fest"},
     {"Das Glühwürmchen", "Der Igel und die Frösche", "Der alte Baum", "Die Hängebrücke", "Der Biber", "Die dunkle Höhle", "Der leuchtende Wald"},
 };
-const char* const STORY_T[2][7][4] = {
-    {{"Luna findet im Stall eine alte Karte.", "Darauf ist ein großes X hinter dem Hügel!", "Sie trabt los – doch der Weg ist zugewachsen.", "Morgen sucht Luna einen anderen Weg."},
-     {"Luna kommt an einen breiten Bach.", "Die Steine darin sind nass und glitschig.", "Vorsichtig, Huf für Huf, geht sie hinüber.", "Geschafft! Dahinter beginnt der Wald."},
-     {"Im Wald ist es dunkel und still.", "Eine Eule ruft: „Wohin so spät, Luna?“", "Luna zeigt ihr die Schatzkarte.", "„Folge den roten Pilzen!“, sagt die Eule."},
-     {"Pilz für Pilz geht es tiefer in den Wald.", "Plötzlich gibt es drei Wege!", "Nur der mittlere hat rote Pilze.", "Er führt zu einer hellen Lichtung."},
-     {"Dunkle Wolken ziehen auf.", "Blitz und Donner! Luna stellt sich unter.", "Der Regen trommelt. Luna wartet geduldig.", "Die Sonne kommt – das X ist ganz nah!"},
-     {"Hinter dem Hügel liegt ein großer Stein.", "Luna schiebt mit aller Kraft …", "… und darunter glitzert etwas!", "Eine Kiste voller goldener Hufeisen!"},
-     {"Luna bringt den Schatz zurück zum Hof.", "Alle Tiere kommen und staunen.", "Jedes Tier bekommt ein goldenes Hufeisen.", "Und Luna bekommt den größten Apfel!"}},
-    {{"Zwischen den Bäumen blinkt ein Licht.", "Es ist Lumi, ein kleines Glühwürmchen.", "Lumi weint: „Ich finde meine Freunde nicht.“", "Fips verspricht: „Wir suchen sie zusammen!“"},
-     {"Am Bach sitzt ein Igel.", "„Ich sah Lichter zum Moor fliegen“, sagt er.", "Im Moor quaken die Frösche laut.", "Ein Frosch zeigt auf einen alten Baum."},
-     {"Der alte Baum hat eine kleine Tür!", "Fips klopft dreimal. Knarr …", "Drinnen wohnt eine Maus mit Brille.", "Sie hat eine Karte vom ganzen Wald."},
-     {"Auf der Karte: der Silbersee.", "Der Weg führt über eine Hängebrücke.", "Sie wackelt – aber Fips ist mutig!", "Am anderen Ufer glitzert der See."},
-     {"Am See sitzt ein trauriger Biber.", "Sein Damm ist kaputt gegangen.", "Fips und Lumi helfen beim Bauen.", "Zum Dank zeigt er ihnen eine Höhle."},
-     {"In der Höhle ist es stockdunkel.", "Lumi leuchtet, so hell sie kann.", "Da – ganz viele kleine Lichter!", "Lumis Freunde! Sie hatten sich versteckt."},
-     {"Alle Glühwürmchen fliegen nach Hause.", "Sie tanzen über der Wiese.", "Der ganze Wald leuchtet.", "Fips hat jetzt viele leuchtende Freunde!"}},
-};
 
 void apple(float x, float y) { disc(x, y, 1.2f, rgb(0xe74c3c)); cell((int)x, (int)y - 2, rgb(0x3fa34d)); }
-
-// Gebiss unten in der Mitte (wie im Spiegel): das Viertel, das dran ist, leuchtet, und die Zahnbürste zeigt darauf
-void teeth(int q, int f) {
-  const int X = 18, Y = 39;
-  box(X, Y, 22, 9, rgb(0x14141a));
-  box(X + 1, Y + 1, 20, 7, rgb(0xc94a5e));
-  box(X + 2, Y + 2, 18, 5, rgb(0x5a1a2a));
-  for (int k = 0; k < 4; k++) {
-    bool on = k == q, right = k % 2, up = k < 2;
-    int x = X + 2 + (right ? 10 : 0), y = up ? Y + 2 : Y + 5;
-    uint16_t c = on ? ((f % 2) ? rgb(0x6ff2ff) : rgb(0xb8faff)) : rgb(0xf4f1ea);
-    for (int i = 0; i < 4; i++) box(x + i * 2, y, 1, 2, c);
-  }
-  bool right = q % 2, up = q < 2;
-  int by = up ? Y + 2 : Y + 6, bx = right ? X + 22 : X - 6, wob = f % 2;
-  box(bx + wob, by, 6, 1, rgb(0x3d7be0));
-  box(right ? bx + wob : bx + 4 + wob, by - 1, 2, 1, WHITE);
-}
 
 // --- Kulissen
 void bgMeadow(int f) { W = HOME; outdoor(f); }
@@ -1350,38 +1317,397 @@ void storyScene(Hero h, int day, int beat, float prog, int f) {
     deer(hx, hy, false, f);
     if (lx >= 0) firefly(lx + (f % 4 < 2 ? 0 : 1), ly - (f % 3 == 0), f, 10);
   }
-  if (beat < 4) teeth(beat, f);
 }
 
-// --- Rätsel: Dinge zum Zählen und Merken
-const uint32_t QCOL[Q_COLORS] = {0xe74c3c, 0x3d7be0, 0xffd23f, 0xa06cd5};
+// --- Zahnputz-Spiel: der Mund in drei Ansichten, Zahnmonster und die Zahnbürste
+// Gezeichnet wie im Spiegel: „rechts“ ist rechts im Bild.
 
-void qObject(int obj, int x, int y, uint16_t c, int f) {
-  switch (obj) {
-    case Q_APPLE: apple(x + 0.5f, y + 0.5f); break;
-    case Q_FLOWER: box(x, y + 1, 1, 2, rgb(0x3fa34d)); cell(x - 1, y, c); cell(x + 1, y, c); cell(x, y - 1, c); cell(x, y, rgb(0xfff1a8)); break;
-    case Q_BUTTERFLY: { int wf = (f + x) % 2; box(x, y - 1, 1, 2, rgb(0x4a3a6a)); box(x - 2, y - 1 - wf, 2, 2, c); box(x + 1, y - 1 - wf, 2, 2, c); break; }
-    case Q_BIRD: { int wf = (f + x) % 2; box(x, y, 3, 2, c); cell(x + 3, y, rgb(0xff8a2a)); cell(x + 1, y - 1 + wf, c); break; }
-    case Q_MUSHROOM: box(x, y, 1, 2, rgb(0xf4f1ea)); box(x - 1, y - 1, 3, 1, c); cell(x, y - 2, c); break;
-    default: cell(x, y, rgb(0xfff6a0)); cell(x - 1, y, rgb(0xfff6a0)); cell(x + 1, y, rgb(0xfff6a0)); cell(x, y - 1, rgb(0xfff6a0)); cell(x, y + 1, rgb(0xfff6a0)); break;  // Stern
+const uint16_t LIP = rgb(0xe25b6e), LIP_D = rgb(0xb83a50), MOUTH = rgb(0x4a0f1e), GUM = rgb(0xf08c9c),
+               TOOTH = rgb(0xf8f5ec), TOOTH_D = rgb(0xd9d2c2), TONGUE = rgb(0xe8788a), HL = rgb(0x6ff2ff);
+
+void ellipseFill(float cx, float cy, float rx, float ry, uint16_t c) {
+  for (int y = (int)floorf(cy - ry); y <= (int)ceilf(cy + ry); y++)
+    for (int x = (int)floorf(cx - rx); x <= (int)ceilf(cx + rx); x++) {
+      float dx = (x + 0.5f - cx) / rx, dy = (y + 0.5f - cy) / ry;
+      if (dx * dx + dy * dy <= 1) cell(x, y, c);
+    }
+}
+
+void bgTiles() {
+  for (int y = 0; y < 48; y++)
+    for (int x = 0; x < 58; x++) cell(x, y, ((x / 4) + (y / 4)) % 2 ? rgb(0xcdeefa) : rgb(0xb7e2f4));
+}
+
+// Zähne einer Reihe: Backenzahn, Vorbackenzahn, Eckzahn, zwei Schneidezähne – und gespiegelt
+const int8_t TW[10] = {3, 2, 2, 3, 3, 3, 3, 2, 2, 3};
+int toothX(int i) { int x = 12; for (int k = 0; k < i; k++) x += TW[k] + 1; return x; }
+
+// Mund offen (Kauflächen, Innenflächen): obere und untere Zahnreihe, Zunge
+void mouthOpen(const bool* hiUp, const bool* hiLow, int f) {
+  const float cx = 29, cy = 23, rx = 19, ry = 14;
+  ellipseFill(cx, cy, rx + 3.2f, ry + 3.2f, LIP_D);
+  ellipseFill(cx, cy, rx + 2.4f, ry + 2.4f, LIP);
+  ellipseFill(cx, cy, rx, ry, MOUTH);
+  ellipseFill(cx, cy + 9, 10, 4.5f, TONGUE);
+  box(28, (int)cy + 7, 2, 3, mix(TONGUE, BLACK, 40));
+  for (int row = 0; row < 2; row++) {
+    const bool* hi = row ? hiLow : hiUp;
+    for (int i = 0; i < 10; i++) {
+      int x0 = toothX(i), w = TW[i];
+      float mid = x0 + w / 2.0f, t = (mid - cx) / rx;
+      float edge = ry * sqrtf(std::max(0.0f, 1 - t * t));
+      int h = (i == 3 || i == 4 || i == 5 || i == 6) ? 5 : (i == 0 || i == 9) ? 3 : 4;
+      int gy = row ? (int)(cy + edge) - 2 : (int)(cy - edge) + 1;  // Zahnfleisch
+      box(x0, gy, w, 2, GUM);
+      int ty = row ? gy - h : gy + 2;
+      uint16_t c = hi && hi[i] ? mix(TOOTH, HL, (f % 2) ? 120 : 70) : TOOTH;
+      box(x0, ty, w, h, c);
+      box(x0, row ? ty : ty + h - 1, w, 1, mix(c, TOOTH_D, 160));  // Schneidekante
+      if (i == 0 || i == 9) cell(x0 + 1, row ? ty : ty + h - 1, mix(c, BLACK, 70));  // Kaufläche mit Furche
+      if (hi && hi[i]) { box(x0, row ? ty - 1 : ty + h, w, 1, HL); }
+    }
   }
 }
 
-void quizScene(Hero h, const QuizBeat& b, int beat, int f) {
-  bool night = b.obj == Q_STAR;
-  if (night) bgNight(f); else bgMeadow(f);
-  // Plätze je nach Art: Bäume für Äpfel, Wiese für Blumen und Pilze, Luft für Schmetterlinge und Vögel, Himmel für Sterne
-  static const int8_t GROUND[12][2] = {{22, 37}, {27, 36}, {32, 38}, {37, 36}, {42, 37}, {47, 36}, {52, 38}, {24, 33}, {30, 32}, {35, 33}, {44, 32}, {50, 33}};
-  static const int8_t AIR[12][2] = {{24, 14}, {31, 10}, {38, 16}, {45, 11}, {51, 17}, {27, 22}, {35, 24}, {42, 21}, {49, 25}, {21, 28}, {30, 29}, {46, 29}};
-  static const int8_t TREE[12][2] = {{34, 14}, {38, 12}, {42, 14}, {46, 15}, {36, 18}, {40, 17}, {44, 19}, {48, 19}, {38, 22}, {42, 23}, {46, 23}, {34, 21}};
-  if (b.obj == Q_APPLE) {
-    box(39, 24, 3, 15, rgb(0x8a5a33));
-    disc(40.5f, 18.0f, 9.5f, rgb(0x3fa34d));
+// Zähne aufeinander (Außenflächen), breites Lächeln
+void mouthClosed(const bool* hi, int f) {
+  const float cx = 29, cy = 24;
+  ellipseFill(cx, cy, 25, 12.5f, LIP_D);
+  ellipseFill(cx, cy, 24.2f, 11.7f, LIP);
+  ellipseFill(cx, cy, 21, 8.5f, MOUTH);
+  for (int i = 0; i < 10; i++) {
+    int x0 = toothX(i), w = TW[i];
+    float t = (x0 + w / 2.0f - cx) / 21;
+    float edge = 8.5f * sqrtf(std::max(0.0f, 1 - t * t));
+    int top = (int)(cy - edge) + 1, bot = (int)(cy + edge) - 1;
+    uint16_t c = hi[i] ? mix(TOOTH, HL, (f % 2) ? 120 : 70) : TOOTH;
+    box(x0, top, w, 1, GUM);
+    box(x0, top + 1, w, (int)cy - top - 1, c);  // oben bis zur Beißkante
+    box(x0, (int)cy, w, bot - (int)cy, c);
+    box(x0, (int)cy - 1, w, 1, mix(c, TOOTH_D, 150));
+    box(x0, bot, w, 1, GUM);
   }
-  const int8_t(*P)[2] = b.obj == Q_APPLE ? TREE : (b.obj == Q_FLOWER || b.obj == Q_MUSHROOM) ? GROUND : AIR;
-  for (int k = 0; k < b.count && k < 12; k++) qObject(b.obj, P[k][0], P[k][1], rgb(QCOL[b.color % Q_COLORS]), f);
-  if (h == LUNA) horse(2, 27, false, f); else deer(2, 30, false, f);
-  if (beat < 4) teeth(beat, f);
+}
+
+void brush(int x, int y, bool fromRight) {  // Bürstenkopf bei (x, y), Griff nach außen
+  uint16_t handle = rgb(0x3d7be0);
+  box(x, y, 3, 1, WHITE);       // Borsten
+  box(x, y + 1, 3, 1, handle);  // Kopf
+  if (fromRight) box(x + 3, y + 1, 12, 1, handle);
+  else box(x - 12, y + 1, 12, 1, handle);
+}
+
+void germ(int x, int y, bool angry, int f) {
+  static const char* const G[] = {".gg.", "gege", "gggg", "g..g"};
+  const Pal pal[] = {{'g', angry ? rgb(0x9b59d0) : rgb(0x7bd64a)}, {'e', WHITE}};
+  sprite(x, y - ((f + x) % 2) - (angry && f % 2 ? 1 : 0), G, 4, pal, 2);
+}
+
+void coach(Hero h, int f) {  // Luna bzw. Fips schaut unten links ins Bild
+  if (h == LUNA) horse(-6, 36, false, f);
+  else deer(-5, 38, false, f);
+}
+
+// Mund mit dem Bereich, der dran ist; gx/gy: drei Stellen darin (Monster, Ziele); bx/by: wo die Bürste ansetzt
+struct MouthSpots { int gx[3], gy[3], bx, by; bool fromRight; };
+MouthSpots mouthArea(MouthView v, int area, bool brushing, int f) {
+  bool up[10] = {}, low[10] = {}, out[10] = {};
+  MouthSpots m{};
+  int* gx = m.gx;
+  int* gy = m.gy;
+  int bx = 0, by = 0;
+  bool fromRight = true;
+  if (v == M_CHEW) {  // 0 oben rechts, 1 oben links, 2 unten links, 3 unten rechts
+    bool right = area == 0 || area == 3, upper = area < 2;
+    int a = right ? 8 : 0;
+    (upper ? up : low)[a] = (upper ? up : low)[a + 1] = true;
+    mouthOpen(up, low, f);
+    int x0 = toothX(a), yy = upper ? 13 : 31;
+    for (int k = 0; k < 3; k++) { gx[k] = x0 - 1 + k * 2; gy[k] = upper ? yy + 3 + (k % 2) : yy - 4 - (k % 2); }
+    fromRight = right;
+    bx = x0 + (brushing ? (f % 2 ? 1 : -1) : 0);  // hin und her schrubben
+    by = upper ? yy + 2 : yy - 2;
+  } else if (v == M_OUTER) {  // 0 rechts, 1 vorne, 2 links
+    int from = area == 0 ? 7 : area == 1 ? 3 : 0, to = area == 0 ? 10 : area == 1 ? 7 : 3;
+    for (int i = from; i < to; i++) out[i] = true;
+    mouthClosed(out, f);
+    int x0 = toothX(from), x1 = toothX(to - 1) + TW[to - 1];
+    for (int k = 0; k < 3; k++) { gx[k] = x0 + k * (x1 - x0 - 4) / 2; gy[k] = 19 + (k % 2) * 6; }
+    fromRight = area != 2;
+    static const int8_t CX[4] = {0, 1, 0, -1}, CY[4] = {-1, 0, 1, 0};  // kleine Kreise
+    bx = (x0 + x1) / 2 - 1 + (brushing ? CX[f % 4] : 0);
+    by = 23 + (brushing ? CY[f % 4] : 0);
+  } else {  // innen: 0 oben, 1 unten – von Rot nach Weiß
+    for (int i = 0; i < 10; i++) (area ? low : up)[i] = true;
+    mouthOpen(up, low, f);
+    for (int k = 0; k < 3; k++) { gx[k] = toothX(2 + k * 3); gy[k] = area ? 25 : 16; }
+    for (int i = 3; i <= 6; i++) {  // Pfeile vom Zahnfleisch zur Kante
+      int x = toothX(i) + 1, y = area ? 28 - (f % 3) : 14 + (f % 3);
+      cell(x, y, WHITE);
+      cell(x, y + (area ? 1 : -1), mix(WHITE, MOUTH, 120));
+    }
+    bx = 27;
+    by = area ? 27 - (brushing ? f % 3 : 0) : 15 + (brushing ? f % 3 : 0);
+  }
+  m.bx = bx;
+  m.by = by;
+  m.fromRight = fromRight;
+  return m;
+}
+
+void gameScene(Hero h, MouthView v, int area, int germs, bool brushing, int f) {
+  bgTiles();
+  MouthSpots m = mouthArea(v, area, brushing, f);
+  int bx = m.bx, by = m.by;
+  for (int k = 0; k < germs && k < 3; k++) germ(m.gx[k], m.gy[k], !brushing, f);
+  brush(bx, by, m.fromRight);
+  if (brushing && germs > 0)  // Schaum und Glitzer an der Bürste
+    for (int k = 0; k < 2; k++) cell(bx + ((f + k * 3) % 4) - 1, by - 1 - (k + f) % 2, k ? rgb(0xfff6c8) : WHITE);
+  coach(h, f);
+}
+
+// --- Summ-Ballon: der Ballon steigt beim Summen; Sterne einsammeln; unten ein kleiner Mund zeigt, wo geputzt wird
+
+void miniMouth(MouthView v, int area, int f) {  // 18 × 8 Blöcke unten in der Mitte
+  const int X = 20, Y = 39;
+  box(X - 1, Y - 1, 20, 10, rgb(0x14141a));
+  ellipseFill(X + 9, Y + 4, 9, 4, LIP);
+  ellipseFill(X + 9, Y + 4, 7.5f, 2.8f, MOUTH);
+  for (int row = 0; row < 2; row++)
+    for (int i = 0; i < 8; i++) {
+      int x = X + 2 + i * 2, y = row ? Y + 5 : Y + 2;
+      bool on = false;
+      if (v == M_CHEW) on = (row == (area >= 2)) && ((area == 0 || area == 3) ? i >= 6 : i <= 1);
+      else if (v == M_OUTER) on = area == 0 ? i >= 5 : area == 1 ? (i >= 3 && i <= 4) : i <= 2;
+      else on = row == area;
+      cell(x, y, on ? ((f % 2) ? HL : rgb(0xb8faff)) : TOOTH);
+    }
+}
+
+// Ballon (14 × 18 Blöcke): Hülle in vier Streifen, Seile, Korb; Luna bzw. Fips schaut heraus
+const char* const BALLOON_PX[] = {
+    "....xxxxxx....", "..xxxxxxxxxx..", ".xxxxxxxxxxxx.", "xxxxxxxxxxxxxx", "xxxxxxxxxxxxxx", "xxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxx", ".xxxxxxxxxxxx.", "..xxxxxxxxxx..", "...xxxxxxxx...", "....xxxxxx....", ".....xxxx.....",
+};
+const char* const BHEAD_HORSE[] = {"..a.a.", ".mhhh.", "mhhehhn"};
+const char* const BHEAD_DEER[] = {".a..a.", "..ddd.", "..dedn"};
+
+void balloonSprite(int x, int y, Hero h, int f) {
+  static const uint32_t ST[4] = {0xff6b6b, 0xffd23f, 0x5ec8ff, 0x7ed957};
+  for (int j = 0; j < 12; j++)
+    for (int i = 0; i < 14; i++)
+      if (BALLOON_PX[j][i] == 'x') {
+        uint16_t c = rgb(ST[(i * 4 / 14 + 4) % 4]);
+        if (i == 3 && j > 1 && j < 8) c = mix(c, WHITE, 120);  // Glanz
+        cell(x + i, y + j, c);
+      }
+  uint16_t rope = rgb(0x8a5a33);
+  for (int j = 12; j < 15; j++) { cell(x + 4, y + j, rope); cell(x + 9, y + j, rope); }
+  const Pal ph[] = {{'h', rgb(0xb5703a)}, {'m', rgb(0x5a3417)}, {'a', rgb(0x8a5226)}, {'e', BLACK}, {'n', rgb(0x6b3f1f)},
+                    {'d', rgb(0xc98a4b)}};
+  sprite(x + 4, y + 12 - (f % 6 == 0), h == LUNA ? BHEAD_HORSE : BHEAD_DEER, 3, ph, 6);
+  box(x + 4, y + 15, 6, 3, rgb(0xe8bf72));  // Korb (heller als die Figur)
+  box(x + 4, y + 15, 6, 1, rgb(0xb98a3e));
+  for (int i = 0; i < 6; i += 2) cell(x + 4 + i, y + 16, rgb(0xc99a4e));  // Flechtmuster
+}
+
+const char* const GAME_STAR[] = {"..y..", ".yyy.", "yyyyy", ".yyy.", ".y.y."};
+void star5(int x, int y, uint16_t c) {
+  const Pal p[] = {{'y', c}};
+  sprite(x - 2, y - 2, GAME_STAR, 5, p, 1);
+}
+
+void balloonScene(Hero h, int by, const BalloonObj* o, int n, MouthView v, int area, bool humming, int f) {
+  for (int j = 0; j < 40; j++) box(0, j, 58, 1, mix(rgb(0x6fc4ff), rgb(0xd8f1ff), j * 255 / 39));
+  disc(46.0f, 9.0f, 3.0f, rgb(0xffd23f));
+  int drift = f % 70;
+  cloud(60 - drift, 8);
+  cloud((90 - drift) % 70 - 6, 20);
+  for (int x = 0; x < 58; x++) {  // Hügel, die vorbeiziehen
+    int hgt = 4 + (int)(2.5f * sinf((x + f) * 0.18f)) + (int)(1.5f * sinf((x + f) * 0.07f));
+    box(x, 40 - hgt, 1, 8 + hgt, (x + f) % 9 < 5 ? rgb(0x6cc057) : rgb(0x5cb04a));
+  }
+  for (int k = 0; k < n; k++) {
+    if (o[k].kind == 1) {
+      static const uint32_t RB[3] = {0xff6b6b, 0xffd23f, 0x7ed957};
+      star5(o[k].x, o[k].y, rgb(RB[f % 3]));
+      if (f % 2) cell(o[k].x + 2, o[k].y - 2, WHITE);
+    } else star5(o[k].x, o[k].y, rgb(0xffd23f));
+  }
+  balloonSprite(BALLOON_X, by, h, f);
+  if (humming) for (int k = 0; k < 3; k++) cell(BALLOON_X + 15 + k * 2, by + 13 - ((f + k) % 3) * 2, (k % 2) ? rgb(0xff8fc8) : WHITE);  // Töne
+  miniMouth(v, area, f);
+}
+
+// --- Hoch oder tief: Teich mit Frosch auf dem Seerosenblatt; oben ein Schmetterling, unten ein Fisch
+
+const char* const PG_FROG[] = {"..w...w..", ".wkw.wkw.", "ggggggggg", "grrrrrrrg", "ggggggggg", ".gg...gg.", "gg.....gg"};
+const char* const PG_FLY_A[] = {"pp...pp", "pppkppp", "..pkp..", "oo.k.oo", "oo...oo"};
+const char* const PG_FLY_B[] = {".......", ".ppkpp.", "..pkp..", ".o.k.o.", "......."};
+const char* const PG_FISH[] = {"..ooo...", ".ooooo.o", "okoooooo", ".ooooo.o", "..ooo..."};
+
+void arrow(int x, int y, bool up, uint16_t c) {  // 7 breit, 9 hoch
+  for (int j = 0; j < 4; j++) box(x + 3 - j, up ? y + j : y + 8 - j, 1 + 2 * j, 1, c);
+  box(x + 2, up ? y + 4 : y, 3, 5, c);
+}
+
+void pitchScene(Hero h, PitchTarget t, int pos, int result, bool humming, MouthView v, int area, int f) {
+  for (int j = 0; j < 22; j++) box(0, j, 58, 1, mix(rgb(0x7fd0ff), rgb(0xdff4ff), j * 255 / 21));
+  cloud(8 + (f / 4) % 50, 4);
+  for (int j = 22; j < 48; j++) box(0, j, 58, 1, mix(rgb(0x3fa7d6), rgb(0x1b5f8f), (j - 22) * 255 / 25));
+  for (int x = 0; x < 58; x += 7) box(x + (f / 3 + x) % 3, 22 + (x % 2), 3, 1, rgb(0x8fd8ff));  // Wellen
+  for (int k = 0; k < 4; k++) {  // Schilf am Rand
+    int x = k < 2 ? 1 + k * 2 : 52 + (k - 2) * 2;
+    box(x, 12 + k % 2 * 2, 1, 11 - k % 2 * 2, rgb(0x3e8e41));
+    box(x, 11 + k % 2 * 2, 1, 2, rgb(0x8a5a33));
+  }
+  ellipseFill(29.5f, 23.0f, 6.5f, 1.6f, rgb(0x4caf50));  // Seerosenblatt
+  cell(29, 22, rgb(0x3fa7d6));
+  const Pal pf[] = {{'w', WHITE}, {'k', BLACK}, {'g', rgb(0x4cc46a)}, {'r', rgb(0x2e7d32)}};
+  int fy = pos == 1 ? 5 : pos == 2 ? 28 : 16;
+  sprite(25, fy, PG_FROG, 7, pf, 4);
+  if (pos == 2) for (int k = 0; k < 3; k++) cell(27 + k * 2, fy - 2 - (f + k) % 3, rgb(0xcff3ff));  // Blasen
+  int flee = result == 2 ? 9 : 0;  // daneben: Schmetterling bzw. Fisch macht sich davon
+  if (t == T_HIGH) {
+    const Pal pb[] = {{'p', rgb(0xff8fc8)}, {'k', rgb(0x3a2a4a)}, {'o', rgb(0xffb347)}};
+    sprite(43 + flee, 5 + (f % 4 == 0) - flee / 3, f % 2 ? PG_FLY_A : PG_FLY_B, 5, pb, 3);
+    arrow(5, 3, true, rgb(0xffd23f));
+  } else if (t == T_LOW) {
+    const Pal pi[] = {{'o', rgb(0xff9a3c)}, {'k', BLACK}};
+    sprite(43 - (f % 3) + flee, 31 + flee / 3, PG_FISH, 5, pi, 2);
+    arrow(5, 27, false, rgb(0xffd23f));
+  }
+  if (result == 1) for (int k = 0; k < 4; k++) star5(22 + k * 5, fy - 3 + (k % 2) * 9, rgb(0xffd23f));
+  if (humming) for (int k = 0; k < 3; k++) cell(36 + k * 2, fy + 1 - ((f + k) % 3) * 2, (k % 2) ? rgb(0xff8fc8) : WHITE);  // Töne
+  (void)h;
+  miniMouth(v, area, f);
+}
+
+// --- Kipp-Spiele (Uhr in der freien Hand)
+
+const char* const RUN_SHOE[] = {".yyy.", "yy.yy", "y...y", "yk.ky", "yy.yy"};
+const char* const RUN_CLOVER[] = {".g.g.", "ggggg", ".ggg.", "..s..", "..s.."};
+const char* const RUN_APPLE[] = {"..s..", ".rrr.", "rrwrr", "rrrrr", ".rrr."};
+
+void pasteBall(int x, int y, int f) {  // Zahnpasta-Klecks, 3 × 3
+  box(x - 1, y - 1, 3, 3, WHITE);
+  cell(x - 1, y, rgb(0x5ec8ff));
+  cell(x + 1, y - 1 + f % 2, rgb(0xff6b9a));
+  cell(x - 1, y - 1, mix(WHITE, rgb(0x5ec8ff), 60));
+}
+
+void tiltBallScene(Hero h, MouthView v, int area, float bx, float by, int target, bool pop, int f) {
+  bgTiles();
+  MouthSpots m = mouthArea(v, area, false, f);
+  int tx = m.gx[target % 3], ty = m.gy[target % 3];
+  uint16_t glow = f % 2 ? rgb(0xfff27a) : rgb(0xffd23f);
+  for (int k = 0; k < 4; k++) {  // Ziel: pulsierender Stern mit Strahlen
+    static const int8_t DX[4] = {0, 3, 0, -3}, DY[4] = {-3, 0, 3, 0};
+    if ((f + k) % 2) cell(tx + DX[k], ty + DY[k], rgb(0xfff6c8));
+  }
+  star5(tx, ty, glow);
+  if (pop) for (int k = 0; k < 6; k++) cell(tx - 4 + (k * 7 + f) % 9, ty - 4 + (k * 5 + f) % 9, k % 2 ? WHITE : rgb(0xff8fc8));
+  pasteBall((int)lroundf(bx), (int)lroundf(by), f);
+  coach(h, f);
+}
+
+void basketHero(int x, int y, Hero h, int f) {  // Korb (8 breit), die Figur schaut heraus
+  const Pal ph[] = {{'h', rgb(0xb5703a)}, {'m', rgb(0x5a3417)}, {'a', rgb(0x8a5226)}, {'e', BLACK}, {'n', rgb(0x6b3f1f)},
+                    {'d', rgb(0xc98a4b)}};
+  sprite(x + 1, y - 3 + (f % 4 == 0), h == LUNA ? BHEAD_HORSE : BHEAD_DEER, 3, ph, 6);
+  box(x, y, 8, 3, rgb(0xe8bf72));
+  box(x, y, 8, 1, rgb(0xb98a3e));
+  for (int i = 1; i < 8; i += 2) cell(x + i, y + 1, rgb(0xc99a4e));
+}
+
+void catchScene(Hero h, float basketX, const BalloonObj* o, int n, MouthView v, int area, int f) {
+  for (int j = 0; j < 30; j++) box(0, j, 58, 1, mix(rgb(0x2a3a7a), rgb(0x7fb0e8), j * 255 / 29));  // Abendhimmel
+  for (int k = 0; k < 8; k++) if ((k + f / 3) % 4) cell((k * 17 + 3) % 56, (k * 5 + 2) % 18, rgb(0xfff6c8));
+  for (int j = 30; j < 48; j++) box(0, j, 58, 1, mix(rgb(0x5cb04a), rgb(0x3e8e41), (j - 30) * 255 / 17));
+  for (int k = 0; k < n; k++) {
+    if (o[k].kind == 1) {
+      const Pal p[] = {{'r', rgb(0xe74c3c)}, {'w', rgb(0xff9a8a)}, {'s', rgb(0x3fa34d)}};
+      sprite(o[k].x - 2, o[k].y - 2, RUN_APPLE, 5, p, 3);
+    }
+    else star5(o[k].x, o[k].y, rgb(0xffd23f));
+  }
+  basketHero((int)lroundf(basketX) - 4, 31, h, f);
+  miniMouth(v, area, f);
+}
+
+
+void meadowRunScene(Hero h, float heroY, const BalloonObj* o, int n, bool stumble, MouthView v, int area, int f) {
+  for (int j = 0; j < 14; j++) box(0, j, 58, 1, mix(rgb(0x7fd0ff), rgb(0xdff4ff), j * 255 / 13));
+  cloud(60 - (f / 2) % 70, 3);
+  for (int x = 0; x < 58; x++) {  // ferne Hügel, ziehen langsam vorbei
+    int hgt = 3 + (int)(2.0f * sinf((x + f / 2) * 0.15f));
+    box(x, 14 - hgt, 1, hgt, rgb(0x8fcf7f));
+  }
+  for (int j = 14; j < 48; j++) box(0, j, 58, 1, mix(rgb(0x7ed957), rgb(0x4caf50), (j - 14) * 255 / 33));
+  for (int k = 0; k < 14; k++) cell(((k * 13 + 60) - (f * 2) % 60 + 60) % 58, 16 + (k * 7) % 22, rgb(0x3e8e41));  // Grashalme
+  for (int k = 0; k < n; k++) {
+    if (o[k].kind == 1) {
+      const Pal p[] = {{'y', rgb(0xffc21a)}, {'k', rgb(0x8a6a1a)}, {'g', rgb(0x3fbf4f)}, {'s', rgb(0x2e7d32)}};
+      sprite(o[k].x - 2, o[k].y - 2, h == LUNA ? RUN_SHOE : RUN_CLOVER, 5, p, 4);
+    } else stone(o[k].x, o[k].y, 3, rgb(0x9e9e9e));
+  }
+  int hy = (int)lroundf(heroY);
+  if (!stumble || f % 2) {
+    if (h == LUNA) horse(4, hy, false, f);
+    else deer(5, hy + 1, false, f);
+  }
+  miniMouth(v, area, f);
+}
+
+// --- Sticker
+
+const char* const ST_STAR[] = {"...y...", "..yyy..", "yyyyyyy", ".yyyyy.", "..yyy..", ".yy.yy.", ".y...y."};
+const char* const ST_FROG[] = {".ww.ww.", ".wk.kw.", "ggggggg", "grrrrrg", "ggggggg", ".g...g."};
+const char* const ST_UNICORN[] = {".....y..", "....yy..", "..pwww..", ".ppwkww.", ".pwwwwww", "..wwwwwn", "..ww....", "..ww...."};
+const char* const ST_MOON[] = {"..yyy..", ".yyy...", "yyy....", "yyy....", "yyy....", ".yyy...", "..yyy.."};
+const char* const ST_SHOE[] = {"..yyy..", ".yy.yy.", "yy...yy", "y.....y", "yk...ky", "yy...yy", "yy...yy"};
+const char* const ST_FLY[] = {".w..w.", "wwkkww", ".wkkw.", "..kk..", ".yyyy.", "..yy.."};
+const char* const ST_OWL[] = {".b...b.", ".bbbbb.", "bwwbwwb", "bwkbkwb", "bbbobbb", ".bcccb.", ".bcccb.", "..o.o.."};
+const char* const ST_TOOTH[] = {".bbbbb.", "bwwwwwb", "bwhwwwb", "bwwwwwb", "bwwbwwb", "bwb.bwb", ".b...b."};
+
+void stickerIcon(int id, int cx, int cy, int f) {
+  switch (id) {
+    case 0: disc(cx + 0.5f, cy + 0.5f, 3.0f, rgb(0xe74c3c)); box(cx, cy - 4, 1, 2, rgb(0x6b4226)); cell(cx + 1, cy - 4, rgb(0x3fa34d)); break;
+    case 1: for (int k = 0; k < 4; k++) disc(cx + (k % 2 ? 2.0f : -2.0f) + 0.5f, cy + (k / 2 ? 2.0f : -2.0f) + 0.5f, 1.6f, rgb(0xff8fc8)); disc(cx + 0.5f, cy + 0.5f, 1.3f, rgb(0xffd23f)); break;
+    case 2: box(cx, cy - 2, 1, 5, rgb(0x4a3a6a)); disc(cx - 1.5f, cy - 0.5f, 2.0f, rgb(0xffb347)); disc(cx + 2.5f, cy - 0.5f, 2.0f, rgb(0x5ec8ff)); break;
+    case 3: box(cx, cy, 1, 3, rgb(0xf4f1ea)); ellipseFill(cx + 0.5f, cy, 3.5f, 2.0f, rgb(0xe8453c)); cell(cx - 1, cy - 1, WHITE); cell(cx + 2, cy, WHITE); break;
+    case 4: { const Pal p[] = {{'y', rgb(0xffc21a)}}; sprite(cx - 3, cy - 3, ST_STAR, 7, p, 1); break; }
+    case 5: { const Pal p[] = {{'y', rgb(0xf0b429)}, {'k', rgb(0x8a6a1a)}}; sprite(cx - 3, cy - 3, ST_SHOE, 7, p, 2); break; }
+    case 6: {
+      const Pal p[] = {{'w', rgb(0xcfe8ff)}, {'k', rgb(0x3a3a4a)}, {'y', f % 2 ? rgb(0xfff27a) : rgb(0xd8ff5a)}};
+      sprite(cx - 3, cy - 3, ST_FLY, 6, p, 3);
+      break;
+    }
+    case 7: fish(cx - 2, cy, rgb(0xff9a3c), false); break;
+    case 8: box(cx - 1, cy - 1, 3, 3, rgb(0xffd23f)); cell(cx + 2, cy, rgb(0xff8a2a)); cell(cx, cy - 1, BLACK); break;
+    case 9: { const Pal p[] = {{'w', WHITE}, {'k', BLACK}, {'g', rgb(0x4cc46a)}, {'r', rgb(0x2e7d32)}}; sprite(cx - 3, cy - 3, ST_FROG, 6, p, 4); break; }
+    case 10: hedgehog(cx - 4, cy - 1); break;
+    case 11: { const Pal p[] = {{'b', rgb(0x8a5a33)}, {'w', WHITE}, {'k', BLACK}, {'o', rgb(0xff9a3c)}, {'c', rgb(0xe8c9a0)}}; sprite(cx - 3, cy - 4, ST_OWL, 8, p, 5); break; }
+    case 12: { const Pal p[] = {{'y', rgb(0xffc21a)}, {'p', rgb(0xff6fb5)}, {'w', rgb(0xd9cff7)}, {'k', BLACK}, {'n', rgb(0xff9cc8)}}; sprite(cx - 4, cy - 4, ST_UNICORN, 8, p, 5); break; }
+    case 13: { static const uint32_t RB[] = {0xff6b6b, 0xffe66d, 0x5ec8ff}; for (int k = 0; k < 3; k++) ringBlocks(cx + 0.5f, cy + 3.0f, 3.5f - k, 4.5f - k, rgb(RB[k]), true); break; }
+    case 14: heart(cx - 1, cy - 1, rgb(0xff5c8a)); box(cx - 2, cy - 1, 1, 2, rgb(0xff5c8a)); box(cx + 2, cy - 1, 1, 2, rgb(0xff5c8a)); break;
+    case 15: box(cx - 2, cy, 5, 2, rgb(0xffd23f)); cell(cx - 2, cy - 1, rgb(0xffd23f)); cell(cx, cy - 1, rgb(0xffd23f)); cell(cx + 2, cy - 1, rgb(0xffd23f)); cell(cx, cy, rgb(0xe8453c)); break;
+    case 16: { const Pal p[] = {{'y', rgb(0xf5c542)}}; sprite(cx - 3, cy - 3, ST_MOON, 7, p, 1); if (f % 2) cell(cx + 2, cy - 2, rgb(0xffd23f)); break; }
+    case 17: disc(cx + 0.5f, cy + 0.5f, 2.2f, rgb(0xffd23f)); for (int k = 0; k < 4; k++) cell(cx + (k % 2 ? 0 : (k ? 3 : -3)), cy + (k % 2 ? (k == 1 ? -3 : 3) : 0), rgb(0xffb347)); break;
+    case 18: box(cx, cy - 1, 1, 4, rgb(0xff8a2a)); box(cx - 1, cy - 1, 1, 2, rgb(0xff8a2a)); cell(cx, cy - 2, rgb(0x3fa34d)); cell(cx - 1, cy - 3, rgb(0x3fa34d)); break;
+    case 19: disc(cx + 0.5f, cy + 0.5f, 2.0f, rgb(0xe74c3c)); box(cx - 1, cy - 2, 3, 1, rgb(0x3fa34d)); cell(cx - 1, cy, rgb(0xfff1a8)); break;
+    case 20: ellipseFill(cx + 0.5f, cy - 0.5f, 2.5f, 3.0f, rgb(0xff6b6b)); box(cx, cy + 2, 1, 2, rgb(0x8a5a33)); break;
+    case 21: for (int k = -2; k <= 2; k++) box(cx + k, cy - 2 + abs(k) / 2, 1, 4 - abs(k) / 2, k % 2 ? rgb(0xffb3c6) : rgb(0xff9cb5)); break;
+    case 22: box(cx - 2, cy - 1, 5, 3, rgb(0x4cc46a)); cell(cx - 2, cy - 2, rgb(0xffd23f)); cell(cx + 2, cy - 2, rgb(0xffd23f)); cell(cx - 1, cy, BLACK); cell(cx + 1, cy, BLACK); break;
+    case 23: {
+      const Pal p[] = {{'b', rgb(0x5ec8ff)}, {'w', WHITE}, {'h', rgb(0xb8faff)}};
+      sprite(cx - 3, cy - 3, ST_TOOTH, 7, p, 3);
+      cell(f % 2 ? cx + 4 : cx - 4, f % 2 ? cy - 4 : cy - 2, rgb(0xffd23f));  // Glitzer
+      break;
+    }
+    case 24: box(cx - 2, cy - 2, 5, 3, rgb(0xffd23f)); box(cx, cy + 1, 1, 1, rgb(0xffd23f)); box(cx - 1, cy + 2, 3, 1, rgb(0xd9a017)); cell(cx - 3, cy - 1, rgb(0xffd23f)); cell(cx + 3, cy - 1, rgb(0xffd23f)); break;
+    default: heart(cx - 3, cy - 1, rgb(0xff5c8a)); heart(cx + 1, cy - 1, rgb(0x8fd0ff)); break;  // Team-Herzen
+  }
 }
 
 }  // namespace
@@ -1427,7 +1753,6 @@ const char* petName(Pet p) {
 
 const char* heroName(Hero h) { return h == FIPS ? "Fips" : "Luna"; }
 const char* brushChapter(Hero h, int day) { return CHAPTER_T[h == FIPS][((day % 7) + 7) % 7]; }
-const char* brushText(Hero h, int day, int beat) { return beat >= 0 && beat < 4 ? STORY_T[h == FIPS][((day % 7) + 7) % 7][beat] : ""; }
 
 void drawBrushStory(uint16_t* buf, Hero h, int day, int beat, float prog, int frame) {
   px = buf;
@@ -1436,26 +1761,114 @@ void drawBrushStory(uint16_t* buf, Hero h, int day, int beat, float prog, int fr
   storyScene(h, ((day % 7) + 7) % 7, std::min(4, std::max(0, beat)), std::min(1.0f, std::max(0.0f, prog)), frame);
 }
 
-void drawBrushPick(uint16_t* buf, int frame) {
+void drawBrushPick(uint16_t* buf, int frame, uint8_t crowns) {
   px = buf;
   cur = nullptr;
   fill(0, 0, S, S, BLACK);
   bgMeadow(frame);
   horse(3, 27, false, frame);
   deer(43, 30, true, frame);
+  if (crowns & 1) crown(9, 26 - (frame % 4 == 0));
+  if (crowns & 2) crown(40, 29);
 }
 
-static const char* const QNAME[Q_OBJS][2] = {{"Apfel", "Äpfel"}, {"Blume", "Blumen"}, {"Schmetterling", "Schmetterlinge"},
-                                              {"Vogel", "Vögel"}, {"Pilz", "Pilze"}, {"Stern", "Sterne"}};
-const char* quizName(QuizObj o, bool plural) { return o < Q_OBJS ? QNAME[o][plural] : ""; }
-const char* quizColor(int c) { static const char* const N[Q_COLORS] = {"rot", "blau", "gelb", "lila"}; return N[((c % Q_COLORS) + Q_COLORS) % Q_COLORS]; }
-uint32_t quizColorRgb(int c) { return QCOL[((c % Q_COLORS) + Q_COLORS) % Q_COLORS]; }
-
-void drawBrushQuiz(uint16_t* buf, Hero h, const QuizBeat& b, int beat, int frame) {
+void drawBrushGame(uint16_t* buf, Hero h, MouthView v, int area, int germs, bool brushing, int frame) {
   px = buf;
   cur = nullptr;
   fill(0, 0, S, S, BLACK);
-  quizScene(h, b, beat, frame);
+  gameScene(h, v, area, germs, brushing, frame);
+}
+
+void drawBalloon(uint16_t* buf, Hero h, int balloonY, const BalloonObj* objs, int n, MouthView v, int area, bool humming, int frame) {
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  balloonScene(h, balloonY, objs, n, v, area, humming, frame);
+}
+
+void drawPitchGame(uint16_t* buf, Hero h, PitchTarget t, int frogPos, int result, bool humming, MouthView v, int area, int frame) {
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  pitchScene(h, t, frogPos, result, humming, v, area, frame);
+}
+
+void drawTiltBall(uint16_t* buf, Hero h, MouthView v, int area, float bx, float by, int target, bool pop, int frame) {
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  tiltBallScene(h, v, area, bx, by, target, pop, frame);
+}
+
+void tiltTarget(MouthView v, int area, int target, int& x, int& y) {
+  uint16_t* save = px;
+  // nur die Stellen ausrechnen, ins Leere zeichnen; per malloc (auf der Uhr > 4 KB → PSRAM, nicht der knappe interne RAM)
+  static uint16_t* scratch = (uint16_t*)malloc(S * S * sizeof(uint16_t));
+  if (!scratch) { x = y = 0; return; }
+  px = scratch;
+  MouthSpots m = mouthArea(v, area, false, 0);
+  px = save;
+  x = m.gx[target % 3];
+  y = m.gy[target % 3];
+}
+
+void drawCatch(uint16_t* buf, Hero h, float basketX, const BalloonObj* items, int n, MouthView v, int area, int frame) {
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  catchScene(h, basketX, items, n, v, area, frame);
+}
+
+void drawMeadowRun(uint16_t* buf, Hero h, float heroY, const BalloonObj* objs, int n, bool stumble, MouthView v, int area, int frame) {
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  meadowRunScene(h, heroY, objs, n, stumble, v, area, frame);
+}
+
+static const char* const STICKER_N[STICKERS] = {
+    "Apfel", "Blume", "Schmetterling", "Pilz", "Stern", "Hufeisen", "Glühwürmchen", "Fisch", "Küken", "Frosch", "Igel", "Eule", "Einhorn",
+    "Regenbogen", "Herz", "Krone", "Mond", "Sonne", "Möhre", "Erdbeere", "Luftballon", "Muschel", "Drache", "Glitzerzahn", "Pokal", "Team-Herzen"};
+const char* stickerName(int id) { return id >= 0 && id < STICKERS ? STICKER_N[id] : ""; }
+
+void drawSticker(uint16_t* buf, int id, int frame) {  // groß in der Mitte, auf Glitzer
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  for (int j = 0; j < 48; j++) box(0, j, 58, 1, mix(rgb(0x3a2a6a), rgb(0x8a6bbf), j * 255 / 47));
+  for (int k = 0; k < 10; k++) if ((k + frame) % 3) cell((k * 13 + 5) % 56, (k * 7 + 3) % 40, rgb(0xfff6c8));
+  disc(29.0f, 22.0f, 12.0f, rgb(0xfff8ec));
+  // doppelt so groß: in ein Hilfsraster zeichnen wäre aufwendig – stattdessen die Blöcke um (29, 22) verdoppeln
+  // 2 × 5,5 KB: nicht auf den Stapel (Hauptschleife hat 8 KB) und nicht statisch in den knappen internen RAM –
+  // einmal per malloc (auf der Uhr > 4 KB → PSRAM)
+  static uint16_t* tmp = (uint16_t*)malloc(58 * 48 * sizeof(uint16_t));
+  static uint16_t* icon = (uint16_t*)malloc(58 * 48 * sizeof(uint16_t));
+  if (!tmp || !icon) return;
+  for (int y = 0; y < 48; y++) for (int x = 0; x < 58; x++) tmp[y * 58 + x] = at(x, y);
+  stickerIcon(id, 29, 22, frame);
+  for (int y = 0; y < 48; y++) for (int x = 0; x < 58; x++) icon[y * 58 + x] = at(x, y);
+  for (int y = 0; y < 48; y++) for (int x = 0; x < 58; x++) cell(x, y, tmp[y * 58 + x]);
+  for (int y = 14; y < 31; y++)
+    for (int x = 21; x < 38; x++) {
+      uint16_t c = icon[y * 58 + x];
+      if (c != tmp[y * 58 + x]) box(29 + (x - 29) * 2, 22 + (y - 22) * 2, 2, 2, c);
+    }
+}
+
+void drawAlbum(uint16_t* buf, uint32_t have, int page, int frame) {
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  for (int j = 0; j < 48; j++) box(0, j, 58, 1, mix(rgb(0x2a1f4a), rgb(0x4a3a7a), j * 255 / 47));
+  for (int k = 0; k < 12; k++) {
+    int id = page * 12 + k;
+    if (id >= STICKERS) break;
+    int cx = 13 + (k % 4) * 11, cy = 13 + (k / 4) * 11;
+    bool got = have >> id & 1;
+    box(cx - 5, cy - 5, 10, 10, got ? rgb(0xfff8ec) : rgb(0x3a3358));
+    if (got) stickerIcon(id, cx, cy, frame);
+    else { box(cx - 1, cy - 3, 3, 1, rgb(0x6b6390)); cell(cx + 1, cy - 2, rgb(0x6b6390)); cell(cx, cy - 1, rgb(0x6b6390)); cell(cx, cy + 1, rgb(0x6b6390)); }
+  }
 }
 
 const char* chapter(World w, int day) { return w < WORLDS && day >= 0 && day < 7 ? CHAPTERS[w][day] : ""; }

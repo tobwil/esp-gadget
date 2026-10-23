@@ -27,7 +27,7 @@ struct Cfg {
   char petName[13];      // Name des Tiers
   bool adventure;        // Wochen-Abenteuer in der Spielzeit
   bool phases;           // Tagesablauf auf dem Zifferblatt (sonst nur Tag und Nacht)
-  bool brushHard;        // Zähneputzen: Rätsel knifflig (ab 7) statt leicht (ab 4)
+  bool brushParent;      // Zähneputzen: am Ende „Mama oder Papa putzt nach“
   bool brushOn;          // Zähneputzen-App anbieten
 };
 

@@ -9,3 +9,6 @@ firmware/.dummy/
 firmware/managed_components/
 firmware/sdkconfig.*
 firmware/dependencies.lock
+tools/.tts-cache/
+tests/device/out/
+__pycache__/

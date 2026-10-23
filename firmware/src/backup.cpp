@@ -72,7 +72,7 @@ String make(bool secrets) {
   ko["pet"] = k.pet;
   ko["petName"] = k.petName;
   ko["adventure"] = k.adventure;
-  ko["brushHard"] = k.brushHard;
+  ko["brushParent"] = k.brushParent;
   ko["brushOn"] = k.brushOn;
   {
     JsonDocument dd;
@@ -157,7 +157,7 @@ bool restore(const String& json, String& err) {
     k.pet = ko["pet"] | k.pet;
     if (ko["petName"].is<const char*>()) snprintf(k.petName, sizeof(k.petName), "%s", (const char*)ko["petName"]);
     k.adventure = ko["adventure"] | k.adventure;
-    k.brushHard = ko["brushHard"] | k.brushHard;
+    k.brushParent = ko["brushParent"] | k.brushParent;
     k.brushOn = ko["brushOn"] | k.brushOn;
     if (ko["pin"].is<const char*>()) snprintf(k.pin, sizeof(k.pin), "%s", (const char*)ko["pin"]);
     kids::set(k);

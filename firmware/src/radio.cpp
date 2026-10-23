@@ -16,7 +16,7 @@ namespace radio {
 
 volatile bool screenOpen = false;
 
-enum PType : uint8_t { P_HELLO = 1, P_VOICE = 2, P_END = 3, P_KNOCK = 4 };
+enum PType : uint8_t { P_HELLO = 1, P_VOICE = 2, P_END = 3, P_KNOCK = 4, P_BRUSH = 5 };
 
 struct __attribute__((packed)) Hdr {
   uint8_t magic[2];  // 'T' 'F'
@@ -32,6 +32,11 @@ struct __attribute__((packed)) Hello {
   char name[17];
   int8_t battery;
   uint32_t epoch;    // 0 = Uhrzeit unbekannt
+};
+
+struct __attribute__((packed)) BrushPkt {  // Zähneputzen im Team: Stand alle 2 s
+  Hdr h;
+  uint8_t hero, mode, section, score, done;
 };
 
 static const int VOICE_SAMPLES = 448;
@@ -63,6 +68,8 @@ static const int PEER_MAX = 12;
 static Peer peerTab[PEER_MAX];
 static uint16_t peerSeq[PEER_MAX];
 static SemaphoreHandle_t lock;
+
+static BrushMate mate{};  // zuletzt gehörter Zahnputz-Stand (unter lock)
 
 static Event events[4];
 static uint8_t evHead = 0, evTail = 0;
@@ -172,6 +179,25 @@ void knock(uint32_t to) {
   send(&h, sizeof(h));
 }
 
+void brushSend(uint8_t hero, uint8_t mode, uint8_t section, uint8_t score, bool done) {
+  BrushPkt p{};
+  fill(p.h, P_BRUSH, 0);
+  p.hero = hero;
+  p.mode = mode;
+  p.section = section;
+  p.score = score;
+  p.done = done;
+  send(&p, sizeof(p));
+}
+
+bool brushMate(BrushMate* out) {
+  xSemaphoreTake(lock, portMAX_DELAY);
+  bool ok = mate.id && millis() - mate.seen < 6000;
+  if (ok) *out = mate;
+  xSemaphoreGive(lock);
+  return ok;
+}
+
 static volatile bool helloNow = false;
 void nameChanged() { helloNow = true; }
 
@@ -269,6 +295,21 @@ static void handle(const RxPkt& p) {
       if (rxFrom == h.from && listen && !txOn) audio::play(audio::FX_ROGER);
       if (rxFrom == h.from) rxLast = 0;
       break;
+    case P_BRUSH: {
+      if (p.len < sizeof(BrushPkt)) return;
+      const BrushPkt& b = *(const BrushPkt*)p.data;
+      xSemaphoreTake(lock, portMAX_DELAY);
+      mate.id = h.from;
+      snprintf(mate.name, sizeof(mate.name), "%s", peerName(h.from));
+      mate.hero = b.hero;
+      mate.mode = b.mode;
+      mate.section = b.section;
+      mate.score = b.score;
+      mate.done = b.done;
+      mate.seen = millis();
+      xSemaphoreGive(lock);
+      break;
+    }
     case P_KNOCK:
       audio::play(audio::FX_KNOCK);
       pushEvent(EV_KNOCK, peerName(h.from));

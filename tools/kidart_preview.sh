@@ -28,24 +28,27 @@ for w, wn in enumerate(worlds):
         o.paste(im, (lw + pad + i * (size + pad), y))
 o.save(OUT, optimize=True)
 print(OUT)
-# Zahnputz-Geschichten: Luna und Fips je sieben Kapitel à vier Bilder, dazu die Rätsel
+# Zähneputzen: Auswahl, die drei Spiele, Album und Sticker; darunter die neun Abschnitte nach KAI
 B = OUT.replace("kinderwelten", "zahnputzen") if "kinderwelten" in OUT else OUT.replace(".png", "_zahnputzen.png")
-days = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
-rows = [(f"{'Luna' if h == 0 else 'Fips'} · {days[d][:2]}", [f"s{h}_{d}_{b}" for b in range(4)]) for h in range(2) for d in range(7)]
-rows.append(("Rätsel", ["q0", "q1", "q2", "q3"]))
-rows.append(("", ["q4", "q5"]))
-sz = 180
-o = Image.new("RGB", (lw + 4 * (sz + pad) + pad, len(rows) * (int(sz * 96 / 116) + pad) + pad + 34), (13, 13, 15))
+secs = ["Kaufl. oben re.", "Kaufl. oben li.", "Kaufl. unten li.", "Kaufl. unten re.", "Außen rechts", "Außen vorne", "Außen links", "Innen oben", "Innen unten"]
+sz = 200
+hh = int(sz * 96 / 116)
+rows = [
+    [("pick", "Wer putzt mit?"), ("g0_0", "Monsterjagd"), ("g0_1", "Still: Monster da"), ("p1", "Hoch: Frosch springt"), ("p2", "Tief: Frosch taucht")],
+    [("p0", "Hoch oder tief?"), ("b0", "Summ-Ballon"), ("b2", "Stille: Ballon sinkt"), ("st11", "Neuer Sticker"), ("a3", "Album")],
+    [("t0", "Zahnpasta-Kugel"), ("t1", "Kugel am Stern"), ("t2", "Sterne fangen"), ("t3", "Wiesenlauf: Luna"), ("t4", "Wiesenlauf: Fips")],
+    [(f"g{i}_0", secs[i]) for i in range(5)],
+    [(f"g{i}_0", secs[i]) for i in range(5, 9)] + [("st24", "7 Tage: Pokal")],
+]
+o = Image.new("RGB", (5 * (sz + pad) + pad, len(rows) * (hh + pad + 30) + pad), (13, 13, 15))
 d = ImageDraw.Draw(o)
-for i, c in enumerate(["oben links", "oben rechts", "unten links", "unten rechts"]):
-    tw = d.textlength(c, font=F)
-    d.text((lw + pad + i * (sz + pad) + (sz - tw) / 2, 8), c, fill=(200, 196, 188), font=F)
-for r, (t, names) in enumerate(rows):
-    y = 34 + pad + r * (int(sz * 96 / 116) + pad)
-    d.text((14, y + 30), t, fill=(232, 182, 96), font=F)
-    for i, n in enumerate(names):
-        im = Image.open(f"{T}/{n}.ppm").convert("RGB").crop((0, 0, 116, 96)).resize((sz, int(sz * 96 / 116)), Image.NEAREST)
-        o.paste(im, (lw + pad + i * (sz + pad), y))
+for r, row in enumerate(rows):
+    for k, (n, t) in enumerate(row):
+        x, y = pad + k * (sz + pad), pad + r * (hh + pad + 30)
+        im = Image.open(f"{T}/{n}.ppm").convert("RGB").crop((0, 0, 116, 96)).resize((sz, hh), Image.NEAREST)
+        o.paste(im, (x, y))
+        tw = d.textlength(t, font=F)
+        d.text((x + (sz - tw) / 2, y + hh + 4), t, fill=(200, 196, 188), font=F)
 o.save(B, optimize=True)
 print(B)
 PY

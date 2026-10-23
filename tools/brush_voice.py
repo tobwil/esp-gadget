@@ -1,5 +1,6 @@
-# Stimmen für das Zähneputzen: Pferd Luna und Reh Fips sprechen Ansagen (KAI) und ihre Hörgeschichten.
-#   K=<Gemini-Schlüssel> python3 tools/brush_voice.py
+# Stimmen für das Zähneputzen: Pferd Luna und Reh Fips sprechen die Ansagen (KAI, Spiele, Schluss).
+#   K=<Gemini-Schlüssel> python3 tools/brush_voice.py           # nur Ansagen – das kommt auf die Uhr
+#   K=<Gemini-Schlüssel> python3 tools/brush_voice.py --story   # dazu die Hörgeschichten (≈ 1,2 MB, derzeit nicht auf der Uhr)
 # Erzeugt mit Gemini-TTS (zwischengespeichert in tools/.tts-cache), kodiert als MP3 (16 kHz, mono, 16 kbit/s) und packt
 # alles in firmware/brushvoice.bin, die in die Firmware eingebettet wird. Aufbau der Datei:
 #   "BV1" + uint8 Anzahl + je Eintrag (char id[20], uint32 Versatz, uint32 Länge) + MP3-Daten (Little Endian)
@@ -26,12 +27,14 @@ CUES = {
     "spit": "Fertig! Jetzt ausspucken, aber nicht ausspülen.",
     "parent": "Und jetzt darf Mama oder Papa noch einmal nachputzen.",
     "hum": "Summ mal! Dann fliegt der Ballon nach oben.",
+    "monster": "Monsterjagd! Putz schön kräftig, dann verschwinden die Zahnmonster. Wenn du aufhörst, kommen sie zurück!",
+    "pitch": "Hoch oder tief! Kommt der Schmetterling, summst du hoch. Kommt der Fisch, summst du tief. Summ erst einmal ganz normal.",
     "team": "Deine Schwester putzt auch gerade. Zusammen schafft ihr das!",
     "sticker": "Du hast einen neuen Sticker bekommen!",
     "streak": "Sieben Tage hintereinander geputzt! Du bist ein Zahnputz-Profi!",
 }
 
-# Hörgeschichten: je Kapitel ein Titel und neun Stücke, eines je KAI-Abschnitt. Der Putz-Hinweis steckt in der Geschichte
+# Hörgeschichten (nur mit --story): je Kapitel ein Titel und neun Stücke, eines je KAI-Abschnitt. Der Putz-Hinweis steckt in der Geschichte
 # (keine eigene Ansage), damit sie rund durchläuft: Kauflächen oben rechts, oben links, unten links, unten rechts –
 # außen rechts, vorne, links (Zähne zusammen, kleine Kreise) – innen oben, innen unten (von Rot nach Weiß).
 # Länge: Kauflächen ≈ 6 s (Abschnitt 10 s), außen ≈ 8 s (13 s), innen ≈ 13 s (20 s) – Zeit zum Putzen bleibt.
@@ -202,15 +205,15 @@ def tts(text, voice):
         for attempt in range(8):  # das Kontingent erlaubt nur wenige Anfragen je Minute: bei 429 warten
             try:
                 d = json.load(urllib.request.urlopen(req, timeout=120))
+                pcm = base64.b64decode(d["candidates"][0]["content"]["parts"][0]["inlineData"]["data"])  # fehlt manchmal
                 break
             except Exception as e:
                 if attempt == 7:
                     raise
                 info = e.read().decode(errors="replace")[:300] if hasattr(e, "read") else ""
-                wait = 65 if getattr(e, "code", 0) == 429 else 5
+                wait = 65 if getattr(e, "code", 0) == 429 else 5  # 429: Minutenkontingent; sonst kurz
                 print(f"  nochmal in {wait} s:", e, info.replace("\n", " ")[:200], file=sys.stderr, flush=True)
                 time.sleep(wait)
-        pcm = base64.b64decode(d["candidates"][0]["content"]["parts"][0]["inlineData"]["data"])
         open(path, "wb").write(pcm)
     return path
 
@@ -229,7 +232,7 @@ def main():
     for hero, voice in VOICE.items():
         for cid, text in CUES.items():
             items.append((f"{hero}/c/{cid}", text, voice))
-        for ch, (title, parts) in enumerate(STORY[hero]):
+        for ch, (title, parts) in enumerate(STORY[hero] if "--story" in sys.argv else []):
             items.append((f"{hero}/{ch}/in", INTRO[hero].format(n=NUM[ch], t=title), voice))
             for k, text in enumerate(parts):
                 items.append((f"{hero}/{ch}/{k}", text, voice))

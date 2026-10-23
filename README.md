@@ -147,27 +147,31 @@ Eine App (für Kinder und Erwachsene, in der Weboberfläche abschaltbar): erst *
 dann das Spiel. Geputzt wird nach der **KAI-Methode**, zwei Minuten: erst die **K**auflächen (vier Ecken, hin und
 her), dann **A**ußen (Zähne aufeinander, kleine Kreise – rechts, vorne, links), dann **I**nnen (Mund weit auf, von
 Rot nach Weiß). Der Mund im Bild zeigt wie im Spiegel, wo gerade dran ist, Zahnmonster verschwinden nach und nach,
-und **Luna bzw. Fips sagen, wo es weitergeht** – mit echten Stimmen, die Uhr kann ja gegenüber auf dem Tisch stehen.
+und **Luna bzw. Fips sagen, wo es weitergeht** – mit echten Stimmen, die Uhr steht ja gegenüber auf dem Tisch. Dabei
+**hört sie zu** (Mikrofon), und jeden Tag ist ein anderes Spiel das „Spiel des Tages“:
 
-- **Hörgeschichte:** Die Figur erzählt durchgehend, mit jedem Putzen ein Kapitel – der Putz-Hinweis steckt in der
-  Geschichte („Ich scharre im Stroh, hin und her – scharr mit: Backenzähne oben rechts!“). Luna folgt einer
-  Schatzkarte (Bach, Eule, rote Pilze, Gewitter, das große X), Fips hilft dem Glühwürmchen Lumi (Igel und Frösche,
-  alter Baum, Hängebrücke, Biber, dunkle Höhle). Ein Satz darf noch ausklingen, bevor es weitergeht.
+- **Monsterjagd:** Die Zahnmonster verschwinden nur, solange die Uhr Putzen hört; wird es still, kommen sie zurück
+  und grinsen.
+- **Hoch oder tief:** Kommt der Schmetterling, hoch summen – kommt der Fisch, tief summen; dann springt der Frosch
+  hinterher. Die erste Runde („Summ erst einmal ganz normal“) merkt sich die eigene Stimmlage, deshalb klappt es
+  für Kinder und Erwachsene gleich.
 - **Summ-Ballon:** Summen lässt den Ballon steigen, Stille lässt ihn sinken; unterwegs Sterne einsammeln,
-  Regenbogensterne zählen dreifach. Kurze Ansagen sagen, wo geputzt wird. Das Mikrofon prüft, ob es wirklich ein Ton ist
-  (Autokorrelation nach einem Tiefpass), das Rauschen der Zahnbürste zählt nicht. Ein kleiner Mund unten zeigt,
-  wo geputzt wird. Rekord in der Weboberfläche.
+  Regenbogensterne zählen dreifach.
+
+Erkennung: Summen ist ein Ton, das Bürstengeräusch Rauschen – nach einem Tiefpass entscheidet die Autokorrelation
+(70–530 Hz); Summen zählt auch unter dreifach lauter Bürste. Während eigener Ansagen hört die Uhr weg.
+
 - **Album:** Nach jedem Putzen ein neuer Sticker (24 Motive). Sieben Tage am Stück: ein Pokal, und Luna und Fips
   tragen eine Krone.
 - **Zu zweit:** Putzen zwei Uhren gleichzeitig, melden sie sich über Funk („‹Name› putzt mit: Außen vorne“) – und beide
   bekommen Team-Herzen fürs Album.
 
 Zum Schluss: „Ausspucken, nicht ausspülen“, auf Wunsch „Jetzt putzt Mama oder Papa nach“ (Weboberfläche), und
-„Zähne putzen“ in der laufenden Routine wird abgehakt. Die Weboberfläche zeigt Kapitel, Serie, Ballon-Rekord und
-Album.
+„Zähne putzen“ in der laufenden Routine wird abgehakt. Die Weboberfläche zeigt Serie, Rekorde und Album.
 
-Die Stimmen erzeugt `tools/brush_voice.py` einmalig mit Gemini-TTS (MP3, 16 kHz) als `firmware/brushvoice.bin`,
-die in die Firmware eingebettet wird.
+Die Ansagen erzeugt `tools/brush_voice.py` einmalig mit Gemini-TTS (MP3, 16 kHz) als `firmware/brushvoice.bin`
+(≈ 240 KB), die in die Firmware eingebettet wird. Dort liegen auch sieben Hörgeschichten je Figur, in denen die
+Putz-Hinweise in der Erzählung stecken – für später, nicht auf der Uhr (`--story`).
 Die Szenen zeichnet `firmware/src/kidart.cpp` ohne LVGL – `sh tools/kidart_preview.sh` rendert sie am Rechner
 als Übersicht.
 

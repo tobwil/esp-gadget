@@ -105,6 +105,14 @@ void play(Fx fx) {
       tone(V_SINE, 1319, 1319, 220, 0.22f, 120, 5);
       tone(V_SINE, 1568, 1568, 400, 0.20f, 240, 5);
       break;
+    case FX_HIGH:  // aufwärts, hell (Dreieck: auf dem kleinen Lautsprecher gut hörbar)
+      tone(V_TRI, 523, 523, 160, 0.30f, 0, 8);
+      tone(V_TRI, 784, 784, 320, 0.30f, 150, 8);
+      break;
+    case FX_LOW:  // abwärts, dunkel
+      tone(V_TRI, 330, 330, 160, 0.40f, 0, 8);
+      tone(V_TRI, 196, 196, 360, 0.45f, 150, 8);
+      break;
     case FX_KNOCK:
       for (int i = 0; i < 2; i++) tone(V_TRI, 180, 120, 60, 0.6f, i * 160, 1);
       break;

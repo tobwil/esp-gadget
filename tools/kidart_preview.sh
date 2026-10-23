@@ -28,16 +28,16 @@ for w, wn in enumerate(worlds):
         o.paste(im, (lw + pad + i * (size + pad), y))
 o.save(OUT, optimize=True)
 print(OUT)
-# Zähneputzen: Auswahl, Summ-Ballon, Album und Sticker; darunter die neun Abschnitte nach KAI
+# Zähneputzen: Auswahl, die drei Spiele, Album und Sticker; darunter die neun Abschnitte nach KAI
 B = OUT.replace("kinderwelten", "zahnputzen") if "kinderwelten" in OUT else OUT.replace(".png", "_zahnputzen.png")
 secs = ["Kaufl. oben re.", "Kaufl. oben li.", "Kaufl. unten li.", "Kaufl. unten re.", "Außen rechts", "Außen vorne", "Außen links", "Innen oben", "Innen unten"]
 sz = 200
 hh = int(sz * 96 / 116)
 rows = [
-    [("pick", "Wer putzt mit? (Kronen)"), ("b0", "Summ-Ballon: hoch summen"), ("b1", "Fips im Ballon"), ("b2", "Stille: sinkt"), ("st11", "Neuer Sticker")],
-    [("a3", "Album: 6 von 26"), ("a0", "Album Seite 1"), ("a1", "Album Seite 2"), ("st24", "Pokal: 7 Tage"), ("st25", "Team-Herzen")],
+    [("pick", "Wer putzt mit?"), ("g0_0", "Monsterjagd"), ("g0_1", "Still: Monster da"), ("p1", "Hoch: Frosch springt"), ("p2", "Tief: Frosch taucht")],
+    [("p0", "Hoch oder tief?"), ("b0", "Summ-Ballon"), ("b2", "Stille: Ballon sinkt"), ("st11", "Neuer Sticker"), ("a3", "Album")],
     [(f"g{i}_0", secs[i]) for i in range(5)],
-    [(f"g{i}_0", secs[i]) for i in range(5, 9)] + [("g0_1", "Monster grinsen")],
+    [(f"g{i}_0", secs[i]) for i in range(5, 9)] + [("st24", "7 Tage: Pokal")],
 ]
 o = Image.new("RGB", (5 * (sz + pad) + pad, len(rows) * (hh + pad + 30) + pad), (13, 13, 15))
 d = ImageDraw.Draw(o)

@@ -61,6 +61,11 @@ int main(int argc, char** argv) {
     drawBalloon(px, k == 1 ? FIPS : LUNA, bys[k], o, 4, k == 0 ? M_CHEW : k == 1 ? M_OUTER : M_INNER, k, k < 2, 5 + k * 9);
     save((std::string(out) + "/b" + std::to_string(k) + ".ppm").c_str(), px);
   }
+  struct { PitchTarget t; int pos, res; bool hum; } pg4[4] = {{T_HIGH, 0, 0, false}, {T_HIGH, 1, 1, true}, {T_LOW, 2, 1, true}, {T_LOW, 0, 2, false}};
+  for (int k = 0; k < 4; k++) {
+    drawPitchGame(px, LUNA, pg4[k].t, pg4[k].pos, pg4[k].res, pg4[k].hum, M_OUTER, 1, 3 + k);
+    save((std::string(out) + "/p" + std::to_string(k) + ".ppm").c_str(), px);
+  }
   for (int pg = 0; pg < 3; pg++) {
     drawAlbum(px, 0x3FFFFFF, pg, 2);
     save((std::string(out) + "/a" + std::to_string(pg) + ".ppm").c_str(), px);

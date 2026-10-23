@@ -54,6 +54,11 @@ struct BalloonObj { int8_t x, y; uint8_t kind; };  // kind 0 Stern, 1 Regenbogen
 constexpr int BALLOON_X = 4, BALLOON_W = 14, BALLOON_H = 18;  // Ballon links, in Blöcken
 void drawBalloon(uint16_t* px, Hero h, int balloonY, const BalloonObj* objs, int n, MouthView v, int area, bool humming, int frame);
 
+// Hoch oder tief: Frosch auf dem Seerosenblatt; oben kommt ein Schmetterling (hoch summen), unten ein Fisch (tief summen)
+//   frogPos 0 Blatt, 1 oben, 2 unten · result 0 offen, 1 geschafft (Sterne), 2 daneben (Wölkchen)
+enum PitchTarget : uint8_t { T_NONE, T_HIGH, T_LOW };
+void drawPitchGame(uint16_t* px, Hero h, PitchTarget t, int frogPos, int result, bool humming, MouthView v, int area, int frame);
+
 // Sammelalbum: 24 Sticker zum Sammeln, dazu Pokal (7 Tage am Stück) und Team-Herzen (zu zweit geputzt)
 constexpr int STICKERS = 26, STICKER_TROPHY = 24, STICKER_TEAM = 25;
 const char* stickerName(int id);

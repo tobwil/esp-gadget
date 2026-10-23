@@ -25,21 +25,31 @@ void sleep(bool on) {
   else qmi.enableAccelerometer();
 }
 
+// Sensorachsen → Bildschirm (x nach rechts, y nach unten). Liegt die Uhr schräg, misst die nach oben zeigende
+// Achse +g – die Kugel rollt in die Gegenrichtung.
+static void toScreen(float x, float y, float& sx, float& sy) {
+#if BOARD_SQUARE
+  // 2.16: Sensor gegenüber dem 1.75C um 90° gedreht eingebaut
+  sx = -IMU_SIGN_X * x;
+  sy = IMU_SIGN_Y * y;
+#else
+  // 1.75C (siehe Waveshare-Beispiel): +x zeigt zur 12, +y zur 9
+  sx = IMU_SIGN_X * y;
+  sy = IMU_SIGN_Y * x;
+#endif
+}
+
 bool gravity(float& gx, float& gy) {
   float x, y, z;
   if (!ok || !qmi.getAccelerometer(x, y, z)) return false;
-  // Achsen des Sensors auf dem 1.75C (siehe Waveshare-Beispiel): +x zeigt zur 12, +y zur 9.
-  // Liegt die Uhr schräg, misst die nach oben zeigende Achse +g – die Kugel rollt in die Gegenrichtung.
-  gx = IMU_SIGN_X * y;
-  gy = IMU_SIGN_Y * x;
+  toScreen(x, y, gx, gy);
   return true;
 }
 
 bool accel(float& ax, float& ay, float& az) {
   float x, y, z;
   if (!ok || !qmi.getAccelerometer(x, y, z)) return false;
-  ax = IMU_SIGN_X * y;
-  ay = IMU_SIGN_Y * x;
+  toScreen(x, y, ax, ay);
   az = z;
   return true;
 }

@@ -190,10 +190,18 @@ Kontrollzentrum („noch ca. 5 h 20 min“). Geschätzt wird aus mindestens 20 M
 geordnet aus.
 
 **Immer:** Wird nichts gestreamt, schläft das WLAN-Funkmodul zwischen den Beacons des Routers (Funk mit
-anderen Uhren läuft im WLAN per Multicast weiter). Bei dunklem Display läuft der Prozessor mit 80 MHz, die
-Oberfläche zeichnet nichts, und der Audio-Teil hält 3 s nach dem letzten Ton an. Nach 10 Minuten mit dunklem
-Display geht die Uhr in den Tiefschlaf (BOOT weckt), außer Musik spielt, ein Timer läuft oder gefunkt wird –
-eine pausierte Wiedergabe hält sie nicht mehr wach. Die Weboberfläche zeigt, was sie gerade wach hält.
+anderen Uhren läuft im WLAN per Multicast weiter). Bei dunklem Display **döst** die Uhr: Der Prozessor geht
+automatisch in den Leichtschlaf (ESP-IDF Power Management), die Oberfläche zeichnet nichts, der Audio-Teil
+hält 3 s nach dem letzten Ton an. Sie bleibt dabei im WLAN erreichbar – für Funk und die Weboberfläche – und
+wacht per Doppeltipp sofort auf. Ohne WLAN (nur ESP-NOW) bleibt das Funkmodul wach.
+
+**Tiefschlaf** (Weboberfläche → Akku): „nie“ (Standard, immer erreichbar) oder nach 10/30/60 Minuten mit
+dunklem Display. Im Tiefschlaf ist auch das WLAN aus: kein Funk, keine Weboberfläche, wecken nur mit BOOT.
+Musik, Timer und Funk halten die Uhr wach, eine pausierte Wiedergabe nicht. Die Weboberfläche zeigt, was sie
+gerade wach hält; `/api/pm` zeigt Schlafanteile und Sperren.
+
+Gebaut wird dafür das Arduino-Framework mit eigener ESP-IDF-Konfiguration (`custom_sdkconfig` in
+`platformio.ini`); der erste Build dauert einige Minuten länger.
 
 **Sparmodus** (automatisch ab 20 %, oder immer): Display höchstens 40 % hell und nach 10 s aus, Zifferblätter
 nur noch einmal pro Sekunde, kein Funk im Hintergrund, ohne laufende Musik WLAN im Stromsparbetrieb und

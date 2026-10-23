@@ -66,6 +66,21 @@ int main(int argc, char** argv) {
     drawPitchGame(px, LUNA, pg4[k].t, pg4[k].pos, pg4[k].res, pg4[k].hum, M_OUTER, 1, 3 + k);
     save((std::string(out) + "/p" + std::to_string(k) + ".ppm").c_str(), px);
   }
+  // Kipp-Spiele
+  drawTiltBall(px, LUNA, M_CHEW, 0, 20.0f, 24.0f, 1, false, 2);
+  save((std::string(out) + "/t0.ppm").c_str(), px);
+  int tx, ty;
+  tiltTarget(M_OUTER, 1, 2, tx, ty);
+  drawTiltBall(px, FIPS, M_OUTER, 1, tx - 1.0f, ty + 0.0f, 2, true, 3);
+  save((std::string(out) + "/t1.ppm").c_str(), px);
+  BalloonObj fall[4] = {{12, 8, 0}, {30, 18, 1}, {44, 4, 0}, {24, 27, 0}};
+  drawCatch(px, LUNA, 24.0f, fall, 4, M_INNER, 0, 4);
+  save((std::string(out) + "/t2.ppm").c_str(), px);
+  BalloonObj run[4] = {{30, 26, 0}, {44, 18, 1}, {52, 30, 1}, {20, 34, 0}};
+  drawMeadowRun(px, LUNA, 18.0f, run, 4, false, M_CHEW, 2, 5);
+  save((std::string(out) + "/t3.ppm").c_str(), px);
+  drawMeadowRun(px, FIPS, 24.0f, run, 4, false, M_OUTER, 0, 6);
+  save((std::string(out) + "/t4.ppm").c_str(), px);
   for (int pg = 0; pg < 3; pg++) {
     drawAlbum(px, 0x3FFFFFF, pg, 2);
     save((std::string(out) + "/a" + std::to_string(pg) + ".ppm").c_str(), px);

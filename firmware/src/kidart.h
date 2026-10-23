@@ -59,6 +59,15 @@ void drawBalloon(uint16_t* px, Hero h, int balloonY, const BalloonObj* objs, int
 enum PitchTarget : uint8_t { T_NONE, T_HIGH, T_LOW };
 void drawPitchGame(uint16_t* px, Hero h, PitchTarget t, int frogPos, int result, bool humming, MouthView v, int area, int frame);
 
+// Kipp-Spiele (Uhr in der freien Hand, Positionen in Blöcken)
+//   Zahnpasta-Kugel: Kugel zum leuchtenden Stern im Bereich, der gerade geputzt wird (target 0 … 2)
+void drawTiltBall(uint16_t* px, Hero h, MouthView v, int area, float bx, float by, int target, bool pop, int frame);
+void tiltTarget(MouthView v, int area, int target, int& x, int& y);  // wo der Stern liegt
+//   Sterne fangen: Korb mit Figur unten (basketX = Mitte), kind 0 Stern, 1 Apfel
+void drawCatch(uint16_t* px, Hero h, float basketX, const BalloonObj* items, int n, MouthView v, int area, int frame);
+//   Wiesenlauf: Luna bzw. Fips läuft links (heroY = obere Kante), kind 0 Stein, 1 Hufeisen bzw. Kleeblatt
+void drawMeadowRun(uint16_t* px, Hero h, float heroY, const BalloonObj* objs, int n, bool stumble, MouthView v, int area, int frame);
+
 // Sammelalbum: 24 Sticker zum Sammeln, dazu Pokal (7 Tage am Stück) und Team-Herzen (zu zweit geputzt)
 constexpr int STICKERS = 26, STICKER_TROPHY = 24, STICKER_TEAM = 25;
 const char* stickerName(int id);

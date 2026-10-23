@@ -56,7 +56,7 @@ bool appCommand(const char* line) {
   else if (sscanf(line, "page %99s", a) == 1) {
     const ui::Page* p = !strcmp(a, "apps") ? &PAGE_APPS : !strcmp(a, "music") ? &PAGE_MUSIC : !strcmp(a, "timer") ? &PAGE_TIMER
                       : !strcmp(a, "stopwatch") ? &PAGE_STOPWATCH : !strcmp(a, "alarm") ? &PAGE_ALARM
-                      : !strcmp(a, "radio") ? &PAGE_RADIO : !strcmp(a, "settings") ? &PAGE_SETTINGS : !strcmp(a, "game") ? &PAGE_GAME : !strcmp(a, "web") ? &PAGE_WEB_ : !strcmp(a, "assist") ? &PAGE_ASSIST : nullptr;
+                      : !strcmp(a, "radio") ? &PAGE_RADIO : !strcmp(a, "settings") ? &PAGE_SETTINGS : !strcmp(a, "game") ? &PAGE_GAME : !strcmp(a, "web") ? &PAGE_WEB_ : !strcmp(a, "assist") ? &PAGE_ASSIST : !strcmp(a, "brush") ? &PAGE_BRUSH : nullptr;
     if (p) ui::push(p);
   } else if (sscanf(line, "timer %99s", a) == 1) cw::timerStart(atoi(a));
   else if (sscanf(line, "face %99s", a) == 1) { cfg.face = atoi(a); settingsSave(); ui::home(); }
@@ -86,6 +86,11 @@ bool appCommand(const char* line) {
     else if (!strcmp(a, "off")) { cfg.alarmOn = false; settingsSave(); }
   }
   else if (sscanf(line, "kidtime %99s", a) == 1) { int h = 0, m = 0; kidFaceTestMin = sscanf(a, "%d:%d", &h, &m) == 2 ? h * 60 + m : -1; }
+  else if (!strcmp(line, "tilt off")) imu::fake(false);  // Test: Kipp-Spiele ohne Kippen
+  else if (sscanf(line, "tilt %99s %99s", a, b) == 2) imu::fake(true, atof(a), atof(b));
+  else if (!strcmp(line, "ear on") || !strcmp(line, "ear off")) brushEarLog(line[5] == 'n');
+  else if (!strcmp(line, "brush save")) { brushTestState(false); Serial.println("ok"); }  // Test: Album usw. sichern …
+  else if (!strcmp(line, "brush load")) { brushTestState(true); Serial.println("ok"); }   // … und zurückholen
   else if (!strcmp(line, "imu")) { imu::sleep(false); delay(50); float x, y; imu::gravity(x, y); Serial.printf("Neigung: x %.2f y %.2f\n", x, y); }
   else if (!strncmp(line, "lightsleep usb ", 15)) { pwr::lightSleepOnUsb(!strcmp(line + 15, "on")); Serial.println("ok"); }
   else if (!strcmp(line, "poweroff")) {  // ausschalten; hängt USB dran und startet die PMU neu: Tiefschlaf
@@ -97,9 +102,9 @@ bool appCommand(const char* line) {
   }
   else if (!strcmp(line, "status")) {
     music::State s = music::state();
-    Serial.printf("WLAN %s %s · Musik %s %s %.0f/%u s %s · Akku %d%% · Heap %u\n", netOnline() ? "an" : "aus",
+    Serial.printf("WLAN %s %s · Musik %s %s %.0f/%u s %s · Akku %d%% · Heap %u · Laufzeit %lu s\n", netOnline() ? "an" : "aus",
                   netOnline() ? netIp().c_str() : "", s.active ? (s.playing ? "spielt" : "Pause") : "aus", s.title, s.pos, s.dur, s.msg,
-                  hwBattery(), heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+                  hwBattery(), heap_caps_get_free_size(MALLOC_CAP_INTERNAL), (unsigned long)(millis() / 1000));
   } else return false;
   return true;
 }

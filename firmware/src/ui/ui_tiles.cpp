@@ -300,6 +300,9 @@ static void scrolled(lv_event_t*) {
   }
 }
 
+static uint32_t strokeSeen = 0, strokeDone = 0;
+static int32_t strokeScroll = 0;
+
 static void build(lv_obj_t* scr) {
   pager = lv_obj_create(scr);
   lv_obj_remove_style_all(pager);
@@ -334,6 +337,12 @@ static void build(lv_obj_t* scr) {
   int startPos = 0;
   for (int i = 0; i < tilesStart && i < NT; i++) startPos += shownTile(i);
   lv_obj_scroll_to_x(pager, (shownTile(tilesStart) ? startPos : 0) * W, LV_ANIM_OFF);
+  {  // der Wisch, der diese Seite geöffnet hat, zählt nicht
+    int dx, dy;
+    bool released;
+    hwStroke(strokeSeen, dx, dy, released);
+    strokeDone = strokeSeen;
+  }
   tilesStart = 0;
   scrolled(nullptr);
   updateMusic();
@@ -343,25 +352,21 @@ static void build(lv_obj_t* scr) {
 }
 
 // Zurück zum Zifferblatt: auf der ersten Kachel nach rechts wischen. LVGL meldet die Geste nicht zuverlässig,
-// wenn die Kachelleiste die Berührung zum Blättern übernimmt – deshalb hier selbst erkennen.
+// wenn die Kachelleiste die Berührung zum Blättern übernimmt – deshalb den ganzen Wisch vom Touch-Treiber nehmen
+// (früher alle 100 ms selbst abgefragt: schnelle Wische gingen verloren, tests/device prüft das).
+
 static void swipeBack() {
-  lv_indev_t* in = lv_indev_get_next(nullptr);
-  if (!in) return;
-  static bool down = false;
-  static lv_point_t p0;
-  static int32_t sx0 = 0;
-  lv_point_t p;
-  lv_indev_get_point(in, &p);
-  bool pressed = lv_indev_get_state(in) == LV_INDEV_STATE_PRESSED;
-  if (pressed && !down) {
-    down = true;
-    p0 = p;
-    sx0 = lv_obj_get_scroll_x(pager);
-  } else if (!pressed && down) {
-    down = false;
-    int dx = p.x - p0.x, dy = p.y - p0.y;
-    if (sx0 <= 4 && dx > 70 && abs(dy) < dx && !fPressing) back();
+  uint32_t id;
+  int dx, dy;
+  bool released;
+  hwStroke(id, dx, dy, released);
+  if (id != strokeSeen) {  // neue Berührung: wo stand die Kachelleiste da?
+    strokeSeen = id;
+    strokeScroll = lv_obj_get_scroll_x(pager);
   }
+  if (!released || id == strokeDone) return;
+  strokeDone = id;
+  if (strokeScroll <= 4 && dx > 60 && abs(dy) < dx && !fPressing) back();
 }
 
 static void update() {

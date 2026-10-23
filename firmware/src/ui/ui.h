@@ -97,8 +97,10 @@ extern int kidFaceTestMin;          // Testzeit für Bildschirmfotos (−1 = ech
 void gameTestLevel(int level);     // Balance: Stufe direkt zeigen (Bildschirmfotos)
 void gameRecords(int& lvl, uint32_t& ms);  // Balance-Rekorde: höchste Stufe, schnellste Zeit „Alle Kugeln“ (0 = keine)
 void gameResetRecords();
-struct BrushStats { int streak, best, monster, pitch, balloon; uint32_t have; };  // Zähneputzen (ui_brush.cpp)
+struct BrushStats { int streak, best, monster, pitch, balloon, ball, catcher, meadow; uint32_t have; };  // Zähneputzen (ui_brush.cpp)
 BrushStats brushStats();
+void brushTestState(bool restore);
+void brushEarLog(bool on);          // seriell „ear on/off“: Mikrofon-Werte der Summ-Spiele mitschreiben  // Test: Album, Serie und Rekorde sichern bzw. zurückholen (seriell „brush save/load“)
 void browseOpen(const char* path);  // Musik-Liste öffnen (Pfad der Brücke)
 void tilesOpen(int idx);            // Kacheln ab Kachel idx (0 Musik, 1 Wetter, 2 Timer, 3 Funk)
 uint32_t radioTarget();             // gewählter Empfänger auf der Funk-Seite (0 = alle)

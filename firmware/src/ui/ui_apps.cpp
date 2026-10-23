@@ -28,10 +28,12 @@ static const App APPS[] = {
     {I_SETTINGS, "Einstellungen", C_SET, &PAGE_SETTINGS, 0},
 };
 static const int N = sizeof(APPS) / sizeof(APPS[0]);
-static lv_obj_t* timeL;
+static lv_obj_t *timeL, *list;
+static uint32_t strokeSeen = 0, strokeDone = 0;
+static int32_t strokeScroll = 0;
 
 static void build(lv_obj_t* scr) {
-  lv_obj_t* l = roundList(scr, 56, 40);
+  lv_obj_t* l = list = roundList(scr, 56, 40);
   lv_obj_remove_flag(l, LV_OBJ_FLAG_SCROLL_ELASTIC);  // oben angekommen: runterwischen schließt
   timeL = label(l, &font_text_24, C_TEXT(), "");
   lv_obj_set_style_text_align(timeL, LV_TEXT_ALIGN_CENTER, 0);
@@ -70,9 +72,31 @@ static void build(lv_obj_t* scr) {
     lv_obj_set_style_text_align(g, LV_TEXT_ALIGN_CENTER, 0);
   }
   listFit(l);
+  int dx, dy;
+  bool released;
+  hwStroke(strokeSeen, dx, dy, released);  // der Wisch, der diese Seite geöffnet hat, zählt nicht
+  strokeDone = strokeSeen;
+}
+
+// Oben angekommen schließt Runterwischen. LVGL meldet die Geste nicht, solange die Liste die Berührung zum Rollen
+// übernimmt – deshalb den ganzen Wisch vom Touch-Treiber nehmen (wie bei den Kacheln; tests/device prüft das).
+static void swipeClose() {
+  uint32_t id;
+  int dx, dy;
+  bool released;
+  hwStroke(id, dx, dy, released);
+  if (id != strokeSeen) {
+    strokeSeen = id;
+    strokeScroll = lv_obj_get_scroll_y(list);
+  }
+  if (!released || id == strokeDone) return;
+  strokeDone = id;
+  if (strokeScroll <= 4 && dy > 60 && abs(dx) < dy) back();
 }
 
 static void update() {
+  swipeClose();
+  if (top() != &PAGE_APPS) return;
   char b[8] = "--:--";
   if (timeValid()) {
     time_t now = time(nullptr);

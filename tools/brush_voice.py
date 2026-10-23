@@ -29,6 +29,10 @@ CUES = {
     "hum": "Summ mal! Dann fliegt der Ballon nach oben.",
     "monster": "Monsterjagd! Putz schön kräftig, dann verschwinden die Zahnmonster. Wenn du aufhörst, kommen sie zurück!",
     "pitch": "Hoch oder tief! Kommt der Schmetterling, summst du hoch. Kommt der Fisch, summst du tief. Summ erst einmal ganz normal.",
+    "ball": "Zahnpasta-Kugel! Nimm die Uhr in die freie Hand und kipp sie. Roll die Kugel zum leuchtenden Stern!",
+    "catch": "Sterne fangen! Nimm die Uhr in die freie Hand und kipp sie nach links und rechts. Fang die Sterne mit dem Korb!",
+    "run": {"luna": "Wiesenlauf! Nimm die Uhr in die freie Hand und kipp sie nach vorn und hinten. Dann galoppiere ich um die Steine und sammle Hufeisen!",
+            "fips": "Wiesenlauf! Nimm die Uhr in die freie Hand und kipp sie nach vorn und hinten. Dann springe ich um die Steine und sammle Kleeblätter!"},
     "team": "Deine Schwester putzt auch gerade. Zusammen schafft ihr das!",
     "sticker": "Du hast einen neuen Sticker bekommen!",
     "streak": "Sieben Tage hintereinander geputzt! Du bist ein Zahnputz-Profi!",
@@ -222,6 +226,7 @@ def mp3(pcm_path):  # Gemini liefert 24 kHz, 16 Bit, mono
     with tempfile.NamedTemporaryFile(suffix=".mp3") as t:
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "s16le", "-ar", "24000", "-ac", "1", "-i", pcm_path,
                         "-af", "silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,"
+                        "silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-40dB:stop_silence=0.3:window=0.02,"  # Pausen ≤ 0,3 s
                         "afade=t=in:d=0.04,areverse,afade=t=in:d=0.03,apad=pad_dur=0.12",  # weiche Ränder, kurze Stille hinten: kein Knacken
                         "-ar", "16000", "-ac", "1", "-b:a", "16k", t.name], check=True)
         return open(t.name, "rb").read()
@@ -230,8 +235,8 @@ def mp3(pcm_path):  # Gemini liefert 24 kHz, 16 Bit, mono
 def main():
     items = []
     for hero, voice in VOICE.items():
-        for cid, text in CUES.items():
-            items.append((f"{hero}/c/{cid}", text, voice))
+        for cid, text in CUES.items():  # ein Text für beide oder je Figur ein eigener
+            items.append((f"{hero}/c/{cid}", text[hero] if isinstance(text, dict) else text, voice))
         for ch, (title, parts) in enumerate(STORY[hero] if "--story" in sys.argv else []):
             items.append((f"{hero}/{ch}/in", INTRO[hero].format(n=NUM[ch], t=title), voice))
             for k, text in enumerate(parts):

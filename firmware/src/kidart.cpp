@@ -1,5 +1,6 @@
 #include "kidart.h"
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <algorithm>
 
@@ -1407,10 +1408,14 @@ void coach(Hero h, int f) {  // Luna bzw. Fips schaut unten links ins Bild
   else deer(-5, 38, false, f);
 }
 
-void gameScene(Hero h, MouthView v, int area, int germs, bool brushing, int f) {
-  bgTiles();
+// Mund mit dem Bereich, der dran ist; gx/gy: drei Stellen darin (Monster, Ziele); bx/by: wo die Bürste ansetzt
+struct MouthSpots { int gx[3], gy[3], bx, by; bool fromRight; };
+MouthSpots mouthArea(MouthView v, int area, bool brushing, int f) {
   bool up[10] = {}, low[10] = {}, out[10] = {};
-  int gx[3], gy[3], bx = 0, by = 0;
+  MouthSpots m{};
+  int* gx = m.gx;
+  int* gy = m.gy;
+  int bx = 0, by = 0;
   bool fromRight = true;
   if (v == M_CHEW) {  // 0 oben rechts, 1 oben links, 2 unten links, 3 unten rechts
     bool right = area == 0 || area == 3, upper = area < 2;
@@ -1444,8 +1449,18 @@ void gameScene(Hero h, MouthView v, int area, int germs, bool brushing, int f) {
     bx = 27;
     by = area ? 27 - (brushing ? f % 3 : 0) : 15 + (brushing ? f % 3 : 0);
   }
-  for (int k = 0; k < germs && k < 3; k++) germ(gx[k], gy[k], !brushing, f);
-  brush(bx, by, fromRight);
+  m.bx = bx;
+  m.by = by;
+  m.fromRight = fromRight;
+  return m;
+}
+
+void gameScene(Hero h, MouthView v, int area, int germs, bool brushing, int f) {
+  bgTiles();
+  MouthSpots m = mouthArea(v, area, brushing, f);
+  int bx = m.bx, by = m.by;
+  for (int k = 0; k < germs && k < 3; k++) germ(m.gx[k], m.gy[k], !brushing, f);
+  brush(bx, by, m.fromRight);
   if (brushing && germs > 0)  // Schaum und Glitzer an der Bürste
     for (int k = 0; k < 2; k++) cell(bx + ((f + k * 3) % 4) - 1, by - 1 - (k + f) % 2, k ? rgb(0xfff6c8) : WHITE);
   coach(h, f);
@@ -1565,6 +1580,82 @@ void pitchScene(Hero h, PitchTarget t, int pos, int result, bool humming, MouthV
   if (result == 1) for (int k = 0; k < 4; k++) star5(22 + k * 5, fy - 3 + (k % 2) * 9, rgb(0xffd23f));
   if (humming) for (int k = 0; k < 3; k++) cell(36 + k * 2, fy + 1 - ((f + k) % 3) * 2, (k % 2) ? rgb(0xff8fc8) : WHITE);  // Töne
   (void)h;
+  miniMouth(v, area, f);
+}
+
+// --- Kipp-Spiele (Uhr in der freien Hand)
+
+const char* const RUN_SHOE[] = {".yyy.", "yy.yy", "y...y", "yk.ky", "yy.yy"};
+const char* const RUN_CLOVER[] = {".g.g.", "ggggg", ".ggg.", "..s..", "..s.."};
+const char* const RUN_APPLE[] = {"..s..", ".rrr.", "rrwrr", "rrrrr", ".rrr."};
+
+void pasteBall(int x, int y, int f) {  // Zahnpasta-Klecks, 3 × 3
+  box(x - 1, y - 1, 3, 3, WHITE);
+  cell(x - 1, y, rgb(0x5ec8ff));
+  cell(x + 1, y - 1 + f % 2, rgb(0xff6b9a));
+  cell(x - 1, y - 1, mix(WHITE, rgb(0x5ec8ff), 60));
+}
+
+void tiltBallScene(Hero h, MouthView v, int area, float bx, float by, int target, bool pop, int f) {
+  bgTiles();
+  MouthSpots m = mouthArea(v, area, false, f);
+  int tx = m.gx[target % 3], ty = m.gy[target % 3];
+  uint16_t glow = f % 2 ? rgb(0xfff27a) : rgb(0xffd23f);
+  for (int k = 0; k < 4; k++) {  // Ziel: pulsierender Stern mit Strahlen
+    static const int8_t DX[4] = {0, 3, 0, -3}, DY[4] = {-3, 0, 3, 0};
+    if ((f + k) % 2) cell(tx + DX[k], ty + DY[k], rgb(0xfff6c8));
+  }
+  star5(tx, ty, glow);
+  if (pop) for (int k = 0; k < 6; k++) cell(tx - 4 + (k * 7 + f) % 9, ty - 4 + (k * 5 + f) % 9, k % 2 ? WHITE : rgb(0xff8fc8));
+  pasteBall((int)lroundf(bx), (int)lroundf(by), f);
+  coach(h, f);
+}
+
+void basketHero(int x, int y, Hero h, int f) {  // Korb (8 breit), die Figur schaut heraus
+  const Pal ph[] = {{'h', rgb(0xb5703a)}, {'m', rgb(0x5a3417)}, {'a', rgb(0x8a5226)}, {'e', BLACK}, {'n', rgb(0x6b3f1f)},
+                    {'d', rgb(0xc98a4b)}};
+  sprite(x + 1, y - 3 + (f % 4 == 0), h == LUNA ? BHEAD_HORSE : BHEAD_DEER, 3, ph, 6);
+  box(x, y, 8, 3, rgb(0xe8bf72));
+  box(x, y, 8, 1, rgb(0xb98a3e));
+  for (int i = 1; i < 8; i += 2) cell(x + i, y + 1, rgb(0xc99a4e));
+}
+
+void catchScene(Hero h, float basketX, const BalloonObj* o, int n, MouthView v, int area, int f) {
+  for (int j = 0; j < 30; j++) box(0, j, 58, 1, mix(rgb(0x2a3a7a), rgb(0x7fb0e8), j * 255 / 29));  // Abendhimmel
+  for (int k = 0; k < 8; k++) if ((k + f / 3) % 4) cell((k * 17 + 3) % 56, (k * 5 + 2) % 18, rgb(0xfff6c8));
+  for (int j = 30; j < 48; j++) box(0, j, 58, 1, mix(rgb(0x5cb04a), rgb(0x3e8e41), (j - 30) * 255 / 17));
+  for (int k = 0; k < n; k++) {
+    if (o[k].kind == 1) {
+      const Pal p[] = {{'r', rgb(0xe74c3c)}, {'w', rgb(0xff9a8a)}, {'s', rgb(0x3fa34d)}};
+      sprite(o[k].x - 2, o[k].y - 2, RUN_APPLE, 5, p, 3);
+    }
+    else star5(o[k].x, o[k].y, rgb(0xffd23f));
+  }
+  basketHero((int)lroundf(basketX) - 4, 31, h, f);
+  miniMouth(v, area, f);
+}
+
+
+void meadowRunScene(Hero h, float heroY, const BalloonObj* o, int n, bool stumble, MouthView v, int area, int f) {
+  for (int j = 0; j < 14; j++) box(0, j, 58, 1, mix(rgb(0x7fd0ff), rgb(0xdff4ff), j * 255 / 13));
+  cloud(60 - (f / 2) % 70, 3);
+  for (int x = 0; x < 58; x++) {  // ferne Hügel, ziehen langsam vorbei
+    int hgt = 3 + (int)(2.0f * sinf((x + f / 2) * 0.15f));
+    box(x, 14 - hgt, 1, hgt, rgb(0x8fcf7f));
+  }
+  for (int j = 14; j < 48; j++) box(0, j, 58, 1, mix(rgb(0x7ed957), rgb(0x4caf50), (j - 14) * 255 / 33));
+  for (int k = 0; k < 14; k++) cell(((k * 13 + 60) - (f * 2) % 60 + 60) % 58, 16 + (k * 7) % 22, rgb(0x3e8e41));  // Grashalme
+  for (int k = 0; k < n; k++) {
+    if (o[k].kind == 1) {
+      const Pal p[] = {{'y', rgb(0xffc21a)}, {'k', rgb(0x8a6a1a)}, {'g', rgb(0x3fbf4f)}, {'s', rgb(0x2e7d32)}};
+      sprite(o[k].x - 2, o[k].y - 2, h == LUNA ? RUN_SHOE : RUN_CLOVER, 5, p, 4);
+    } else stone(o[k].x, o[k].y, 3, rgb(0x9e9e9e));
+  }
+  int hy = (int)lroundf(heroY);
+  if (!stumble || f % 2) {
+    if (h == LUNA) horse(4, hy, false, f);
+    else deer(5, hy + 1, false, f);
+  }
   miniMouth(v, area, f);
 }
 
@@ -1702,6 +1793,39 @@ void drawPitchGame(uint16_t* buf, Hero h, PitchTarget t, int frogPos, int result
   pitchScene(h, t, frogPos, result, humming, v, area, frame);
 }
 
+void drawTiltBall(uint16_t* buf, Hero h, MouthView v, int area, float bx, float by, int target, bool pop, int frame) {
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  tiltBallScene(h, v, area, bx, by, target, pop, frame);
+}
+
+void tiltTarget(MouthView v, int area, int target, int& x, int& y) {
+  uint16_t* save = px;
+  // nur die Stellen ausrechnen, ins Leere zeichnen; per malloc (auf der Uhr > 4 KB → PSRAM, nicht der knappe interne RAM)
+  static uint16_t* scratch = (uint16_t*)malloc(S * S * sizeof(uint16_t));
+  if (!scratch) { x = y = 0; return; }
+  px = scratch;
+  MouthSpots m = mouthArea(v, area, false, 0);
+  px = save;
+  x = m.gx[target % 3];
+  y = m.gy[target % 3];
+}
+
+void drawCatch(uint16_t* buf, Hero h, float basketX, const BalloonObj* items, int n, MouthView v, int area, int frame) {
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  catchScene(h, basketX, items, n, v, area, frame);
+}
+
+void drawMeadowRun(uint16_t* buf, Hero h, float heroY, const BalloonObj* objs, int n, bool stumble, MouthView v, int area, int frame) {
+  px = buf;
+  cur = nullptr;
+  fill(0, 0, S, S, BLACK);
+  meadowRunScene(h, heroY, objs, n, stumble, v, area, frame);
+}
+
 static const char* const STICKER_N[STICKERS] = {
     "Apfel", "Blume", "Schmetterling", "Pilz", "Stern", "Hufeisen", "Glühwürmchen", "Fisch", "Küken", "Frosch", "Igel", "Eule", "Einhorn",
     "Regenbogen", "Herz", "Krone", "Mond", "Sonne", "Möhre", "Erdbeere", "Luftballon", "Muschel", "Drache", "Glitzerzahn", "Pokal", "Team-Herzen"};
@@ -1715,10 +1839,13 @@ void drawSticker(uint16_t* buf, int id, int frame) {  // groß in der Mitte, auf
   for (int k = 0; k < 10; k++) if ((k + frame) % 3) cell((k * 13 + 5) % 56, (k * 7 + 3) % 40, rgb(0xfff6c8));
   disc(29.0f, 22.0f, 12.0f, rgb(0xfff8ec));
   // doppelt so groß: in ein Hilfsraster zeichnen wäre aufwendig – stattdessen die Blöcke um (29, 22) verdoppeln
-  uint16_t tmp[58 * 48];
+  // 2 × 5,5 KB: nicht auf den Stapel (Hauptschleife hat 8 KB) und nicht statisch in den knappen internen RAM –
+  // einmal per malloc (auf der Uhr > 4 KB → PSRAM)
+  static uint16_t* tmp = (uint16_t*)malloc(58 * 48 * sizeof(uint16_t));
+  static uint16_t* icon = (uint16_t*)malloc(58 * 48 * sizeof(uint16_t));
+  if (!tmp || !icon) return;
   for (int y = 0; y < 48; y++) for (int x = 0; x < 58; x++) tmp[y * 58 + x] = at(x, y);
   stickerIcon(id, 29, 22, frame);
-  uint16_t icon[58 * 48];
   for (int y = 0; y < 48; y++) for (int x = 0; x < 58; x++) icon[y * 58 + x] = at(x, y);
   for (int y = 0; y < 48; y++) for (int x = 0; x < 58; x++) cell(x, y, tmp[y * 58 + x]);
   for (int y = 14; y < 31; y++)

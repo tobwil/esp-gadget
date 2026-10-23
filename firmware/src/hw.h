@@ -26,6 +26,9 @@ uint32_t hwIdleMs();           // ms seit der letzten Bedienung
 void hwInput();                // echte Bedienung (Touch, Taste) – nicht Funk oder Musik
 uint32_t hwLastInput();        // millis() der letzten echten Bedienung
 bool hwWakeRequested();        // Touch bei dunklem Display
+// letzter Wisch/Tipp, wie ihn der Touch-Treiber gesehen hat (jeder Lesevorgang, nicht nur alle 100 ms):
+// id zählt je Berührung hoch, dx/dy vom Aufsetzen bis zum letzten Punkt, released = schon losgelassen
+void hwStroke(uint32_t& id, int& dx, int& dy, bool& released);
 
 int hwBattery();               // %, −1 = kein Akku
 int hwBatteryMv();             // Akkuspannung in mV, 0 = unbekannt

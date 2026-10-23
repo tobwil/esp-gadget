@@ -36,6 +36,7 @@ hh = int(sz * 96 / 116)
 rows = [
     [("pick", "Wer putzt mit?"), ("g0_0", "Monsterjagd"), ("g0_1", "Still: Monster da"), ("p1", "Hoch: Frosch springt"), ("p2", "Tief: Frosch taucht")],
     [("p0", "Hoch oder tief?"), ("b0", "Summ-Ballon"), ("b2", "Stille: Ballon sinkt"), ("st11", "Neuer Sticker"), ("a3", "Album")],
+    [("t0", "Zahnpasta-Kugel"), ("t1", "Kugel am Stern"), ("t2", "Sterne fangen"), ("t3", "Wiesenlauf: Luna"), ("t4", "Wiesenlauf: Fips")],
     [(f"g{i}_0", secs[i]) for i in range(5)],
     [(f"g{i}_0", secs[i]) for i in range(5, 9)] + [("st24", "7 Tage: Pokal")],
 ]

@@ -7,6 +7,10 @@
 //   Hoch-Tief    – kommt der Schmetterling, hoch summen, kommt der Fisch, tief summen: der Frosch springt hinterher
 //                  (die erste Runde merkt sich die eigene Stimmlage – Kinder und Erwachsene gleich)
 //   Summ-Ballon  – Summen lässt den Ballon steigen, Stille sinken; Sterne einsammeln
+//   Dazu drei Kipp-Spiele für die freie Hand (die andere hält die Zahnbürste):
+//   Zahnpasta-Kugel – die Kugel zum leuchtenden Stern rollen, immer im Bereich, der gerade geputzt wird
+//   Sterne fangen   – mit dem Korb (Luna bzw. Fips schaut heraus) Sterne und Äpfel auffangen
+//   Wiesenlauf      – nach vorn/hinten kippen: Steinen ausweichen, Hufeisen bzw. Kleeblätter sammeln
 //   Album        – Sticker, die es nach jedem Putzen gibt; 7 Tage am Stück: Pokal und Krone
 //   Putzen zwei Uhren gleichzeitig, zeigen sie sich gegenseitig an (Funk) und es gibt Team-Herzen.
 //   Am Ende: „Ausspucken, nicht ausspülen“, auf Wunsch „Mama oder Papa putzt nach“; „Zähne putzen“ in der Routine
@@ -16,6 +20,8 @@
 #include <math.h>
 #include "../audio.h"
 #include "../clips.h"
+#include "../hearing.h"
+#include "../imu.h"
 #include "../kidart.h"
 #include "../kids.h"
 #include "../net.h"
@@ -29,12 +35,14 @@ using kidart::Hero;
 namespace {
 
 constexpr int S = kidart::S, Z = 4, OUT = S * Z;
-enum Step { PICK, MODE, ALBUM, INTRO, RUN, DONE };
-enum Game : uint8_t { MONSTER, PITCH, BALLOON, GAMES };
-const char* const GAME_NAME[GAMES] = {"Monsterjagd", "Hoch oder tief", "Summ-Ballon"};
-const char* const GAME_CUE[GAMES] = {"c/monster", "c/pitch", "c/hum"};
-const char* const GAME_REC[GAMES] = {"hm", "hp", "hb"};  // Rekord je Spiel (NVS)
-const char* const GAME_UNIT[GAMES] = {"Monster", "Treffer", "Sterne"};
+enum Step { PICK, MODE, GROUP, ALBUM, INTRO, RUN, DONE };
+enum Game : uint8_t { MONSTER, PITCH, BALLOON, BALL, CATCH, MEADOW, GAMES };
+constexpr int SOUND_GAMES = 3;  // die ersten drei hören zu, die anderen drei werden gekippt
+const char* const GAME_NAME[GAMES] = {"Monsterjagd", "Hoch oder tief", "Summ-Ballon", "Zahnpasta-Kugel", "Sterne fangen", "Wiesenlauf"};
+const char* const GAME_CUE[GAMES] = {"c/monster", "c/pitch", "c/hum", "c/ball", "c/catch", "c/run"};
+const char* const GAME_REC[GAMES] = {"hm", "hp", "hb", "hk", "hc", "hw"};  // Rekord je Spiel (NVS)
+const char* const GAME_UNIT[GAMES] = {"Monster", "Treffer", "Sterne", "Sterne", "Sterne", "Schätze"};
+bool tilting(int g) { return g >= SOUND_GAMES; }
 
 // KAI: neun Abschnitte
 struct Section { kidart::MouthView view; uint8_t area; uint16_t sec; const char* cue; const char* where; const char* how; };
@@ -55,15 +63,17 @@ constexpr uint32_t OVERRUN_MS = 3000;  // eine Ansage darf einen Abschnitt so vi
 Step step = PICK;
 Hero hero = kidart::LUNA;
 Game game = MONSTER;
-int sec = 0, albumPage = 0, frame = 0, score = 0;
+int sec = 0, albumPage = 0, frame = 0, score = 0, group = 0;
 uint32_t secStart = 0, introStart = 0, lastFrameAt = 0, lastSend = 0, hintAt = 0;
 bool teamSeen = false, hintTeam = false;
+bool testRun = false;
+bool earLog = false;  // seriell „ear on“: was das Mikrofon hört, je Prüfung eine Zeile  // Test über USB: Routine nicht abhaken (Album usw. holt „brush load“ zurück)
 uint16_t *px = nullptr, *big = nullptr;
 lv_obj_t *scrRef, *canvas, *topL, *botL, *panel = nullptr;
 int awarded[3], nAwarded = 0, showAward = 0;
 
 // ------------------------------------------------------------------ Speicher (Namensraum „brush“)
-//   al Album (Bitmaske) · sd letzter Putztag · st Serie · sb beste Serie · hm/hp/hb Rekorde der Spiele
+//   al Album (Bitmaske) · sd letzter Putztag · st Serie · sb beste Serie · hm/hp/hb/hk/hc/hw Rekorde der Spiele
 
 uint32_t getU(const char* key) {
   Preferences p;
@@ -166,7 +176,7 @@ void show() {  // Szene fertig: Ring, unten schwarz, auf den Bildschirm
 // ------------------------------------------------------------------ Mikrofon: Summen, Tonhöhe, Putzgeräusch
 
 struct Ear {
-  int16_t win[640];
+  int16_t win[hearing::N];
   int have = 0;
   float floor = 0.004f;
   bool voiced = false;  // ein Ton (Summen)
@@ -175,55 +185,28 @@ struct Ear {
   uint32_t deafUntil = 0;
 } ear;
 
-// Neue Mikrofonwerte holen und die letzten 40 ms prüfen. Während eigener Ansagen und Töne hört die Uhr weg.
-//   sound:  lauter als das Grundrauschen (das steigt nur sehr langsam mit, damit Dauerputzen nicht „verschwindet“)
-//   voiced: nach einem Tiefpass (≈ 900 Hz) deutlich periodisch (Autokorrelation) – Summen ist ein Ton, das
-//           Bürstengeräusch ist Rauschen. Am Rechner geprüft: Summen zählt auch unter dreifach lauter Bürste.
-//   pitch:  70 … 530 Hz (Kinder summen um 250 Hz, Erwachsene um 110 Hz)
+// Neue Mikrofonwerte holen und die letzten 40 ms prüfen (hearing.cpp). Während eigener Ansagen und Töne hört die
+// Uhr weg.
 void listen() {
   int16_t tmp[512];
   size_t n;
   bool deaf = clips::busy() || millis() < ear.deafUntil;
   while ((n = audio::micRead(tmp, 512)) > 0) {
     if (deaf) { ear.have = 0; continue; }
-    int keep = std::max(0, std::min(ear.have, 640 - (int)n));
+    int keep = std::max(0, std::min(ear.have, hearing::N - (int)n));
     memmove(ear.win, ear.win + ear.have - keep, keep * 2);
     memcpy(ear.win + keep, tmp, n * 2);
     ear.have = keep + n;
   }
   ear.voiced = ear.sound = false;
-  constexpr int N = 640, LAG_MIN = 30, LAG_MAX = 229;
-  if (deaf || ear.have < N) return;
-  static float x[N];
-  const int16_t* w = ear.win + ear.have - N;
-  float e = 0, s1 = 0, s2 = 0;
-  for (int i = 0; i < N; i++) {
-    float v = w[i] / 32768.0f;
-    e += v * v;
-    s1 += 0.3f * (v - s1);
-    s2 += 0.3f * (s1 - s2);
-    x[i] = s2;
-  }
-  float rms = sqrtf(e / N);
-  ear.floor += (rms - ear.floor) * (rms < ear.floor ? 0.3f : 0.002f);  // fällt schnell, steigt sehr langsam
-  if (rms < std::max(0.0015f, ear.floor * 2.0f)) return;
-  ear.sound = true;
-  static float r[LAG_MAX + 2];
-  float best = 0;
-  for (int lag = LAG_MIN; lag <= LAG_MAX + 1; lag++) {
-    float s = 0, a = 0, b = 0;
-    for (int i = 0; i + lag < N; i++) { s += x[i] * x[i + lag]; a += x[i] * x[i]; b += x[i + lag] * x[i + lag]; }
-    r[lag] = s / (sqrtf(a * b) + 1e-9f);
-    if (lag <= LAG_MAX) best = std::max(best, r[lag]);
-  }
-  if (best < 0.45f) return;
-  // erster Gipfel nahe am besten (sonst eine Oktave zu tief), dann zwischen zwei Abständen verfeinern
-  int lag = LAG_MIN + 1;
-  while (lag < LAG_MAX && !(r[lag] >= best * 0.88f && r[lag] >= r[lag - 1] && r[lag] >= r[lag + 1])) lag++;
-  float d = r[lag - 1] - 2 * r[lag] + r[lag + 1];
-  float off = d < 0 ? 0.5f * (r[lag - 1] - r[lag + 1]) / d : 0;
-  ear.voiced = true;
-  ear.pitch = 16000.0f / (lag + off);
+  if (deaf || ear.have < hearing::N) return;
+  hearing::Result r = hearing::analyze(ear.win + ear.have - hearing::N, ear.floor);
+  if (earLog)
+    Serial.printf("ohr rms %.4f grund %.4f periodisch %.2f %s %.0f Hz\n", r.rms, ear.floor, r.periodic,
+                  r.voiced ? "TON" : r.sound ? "laut" : "-", r.pitch);
+  ear.sound = r.sound;
+  ear.voiced = r.voiced;
+  if (r.voiced) ear.pitch = r.pitch;
 }
 
 // ------------------------------------------------------------------ Spiel: Monsterjagd
@@ -349,6 +332,110 @@ void balloonTick() {
   }
 }
 
+// ------------------------------------------------------------------ Kipp-Spiele
+
+float tiltX = 0, tiltY = 0;  // geglättete Neigung in g (rechts bzw. zu einem hin = positiv)
+
+void readTilt() {
+  float gx = 0, gy = 0;
+  if (!imu::gravity(gx, gy)) return;
+  tiltX += (gx - tiltX) * 0.5f;
+  tiltY += (gy - tiltY) * 0.5f;
+}
+
+// Zahnpasta-Kugel: rollt wie eine Murmel (Beschleunigung aus der Neigung, Reibung) und bleibt im runden Bild.
+// Bei leichter Neigung (0,5 g) höchstens ≈ 20 Blöcke/s – langsam genug für Vierjährige.
+constexpr float BALL_CX = 29, BALL_CY = 29, BALL_R = 23, BALL_YMAX = 45;
+float ballX = 29, ballY = 24, ballVX = 0, ballVY = 0;
+int ballTarget = 0;
+uint32_t popUntil = 0;
+
+void ballTick(float dt) {
+  readTilt();
+  ballVX += (tiltX * 120 - 3 * ballVX) * dt;
+  ballVY += (tiltY * 120 - 3 * ballVY) * dt;
+  ballX += ballVX * dt;
+  ballY += ballVY * dt;
+  float dx = ballX - BALL_CX, dy = ballY - BALL_CY, d = sqrtf(dx * dx + dy * dy);
+  if (d > BALL_R) {  // am runden Rand abprallen (nicht unter den Ring rollen)
+    float nx = dx / d, ny = dy / d, vn = ballVX * nx + ballVY * ny;
+    ballX = BALL_CX + nx * BALL_R;
+    ballY = BALL_CY + ny * BALL_R;
+    if (vn > 0) { ballVX -= 1.4f * vn * nx; ballVY -= 1.4f * vn * ny; }
+  }
+  if (ballY > BALL_YMAX) { ballY = BALL_YMAX; ballVY = -fabsf(ballVY) * 0.4f; }  // unten beginnt die Schrift
+  int tx, ty;
+  kidart::tiltTarget(SEC[sec].view, SEC[sec].area, ballTarget, tx, ty);
+  if (fabsf(ballX - tx) < 2.6f && fabsf(ballY - ty) < 2.6f) {
+    score++;
+    audio::play(audio::FX_OK);
+    popUntil = millis() + 500;
+    ballTarget = (ballTarget + 1 + esp_random() % 2) % 3;  // der nächste Stern liegt woanders
+  }
+}
+
+// Sterne fangen: die Neigung bestimmt direkt, wo der Korb steht – leicht für Vierjährige
+float basketX = 29;
+kidart::BalloonObj drops[6];
+int nDrops = 0, dropTimer = 0;
+float dropY[6];
+
+void catchTick(float dt) {
+  readTilt();
+  basketX = std::min(52.0f, std::max(5.0f, 29 + tiltX * 55));
+  for (int k = 0; k < nDrops; k++) {
+    dropY[k] += (6 + std::min(score, 30) * 0.12f) * dt;  // wird langsam schneller
+    drops[k].y = (int8_t)dropY[k];
+    bool caught = dropY[k] >= 28 && dropY[k] <= 32 && fabsf(drops[k].x - basketX) <= 4.5f;
+    if (caught) {
+      score += drops[k].kind ? 2 : 1;
+      audio::play(drops[k].kind ? audio::FX_CHIME : audio::FX_TAP);
+    }
+    if (caught || dropY[k] > 40) { drops[k] = drops[--nDrops]; dropY[k] = dropY[nDrops]; k--; }
+  }
+  dropTimer -= (int)(dt * 1000);
+  if (dropTimer <= 0 && nDrops < 6) {
+    drops[nDrops] = {(int8_t)(5 + esp_random() % 48), 0, (uint8_t)(esp_random() % 4 == 0)};
+    dropY[nDrops++] = 0;
+    dropTimer = 900 + esp_random() % 700;
+  }
+}
+
+// Wiesenlauf: nach vorn/hinten kippen bewegt Luna bzw. Fips über die Wiese, Hindernisse kommen von rechts
+float runY = 20;
+kidart::BalloonObj things[6];
+float thingX[6];
+int nThings = 0, thingTimer = 0;
+uint32_t stumbleUntil = 0;
+
+void meadowTick(float dt) {
+  readTilt();
+  runY = std::min(27.0f, std::max(6.0f, 17 + tiltY * 40));
+  bool stumbling = millis() < stumbleUntil;
+  float speed = stumbling ? 5 : 11;
+  for (int k = 0; k < nThings; k++) {
+    thingX[k] -= speed * dt;
+    things[k].x = (int8_t)thingX[k];
+    // Figur: x 4 … 17, Höhe runY … runY + 10; getroffen wird mit den Beinen/dem Körper
+    bool near = thingX[k] >= 6 && thingX[k] <= 16 && things[k].y >= runY + 3 && things[k].y <= runY + 12;
+    if (near && things[k].kind == 1) {
+      score++;
+      audio::play(audio::FX_TAP);
+      thingX[k] = -10;
+    } else if (near && !stumbling) {
+      stumbleUntil = millis() + 900;  // gestolpert: kurz langsamer, keine Strafe
+      audio::play(audio::FX_KNOCK);
+    }
+    if (thingX[k] < -4) { things[k] = things[--nThings]; thingX[k] = thingX[nThings]; k--; }
+  }
+  thingTimer -= (int)(dt * 1000);
+  if (thingTimer <= 0 && nThings < 6) {
+    things[nThings] = {62, (int8_t)(12 + esp_random() % 24), (uint8_t)(esp_random() % 5 < 3)};  // mehr Schätze als Steine
+    thingX[nThings++] = 62;
+    thingTimer = 700 + esp_random() % 600;
+  }
+}
+
 // ------------------------------------------------------------------ Bedienelemente
 
 void clearPanel() {
@@ -416,24 +503,37 @@ void showPick() {
   choice("Reh Fips", lv_color_hex(0xc98a4b), C_TEXT(), 92, 300, cb, kidart::FIPS);
 }
 
-void showMode() {  // das Spiel des Tages oben und groß, darunter die anderen und das Album
+void showGroup(int g);
+
+void showMode() {  // das Spiel des Tages oben in Gold, darunter die beiden Gruppen und das Album
   step = MODE;
   kidart::drawBrushPick(px, 0, crowns());
   show();
   setTop(kidart::heroName(hero));
-  setBottom("Das goldene ist heute dran.");
+  setBottom("Gold: das Spiel des Tages");
   clearPanel();
-  auto cb = [](lv_event_t* e) { start((Game)(intptr_t)lv_event_get_user_data(e)); };
   Game g0 = gameOfDay();
-  choice(GAME_NAME[g0], C_BRASS(), C_BG(), 0, 132, cb, g0);
-  for (int k = 1; k < GAMES; k++) {
-    Game g = (Game)((g0 + k) % GAMES);
-    choice(GAME_NAME[g], C_SURF2(), C_TEXT(), 0, 132 + k * 62, cb, g);
-  }
-  choice("Album", lv_color_hex(0x8a6bbf), C_TEXT(), 0, 132 + GAMES * 62, [](lv_event_t*) {
+  choice(GAME_NAME[g0], C_BRASS(), C_BG(), 0, 132, [](lv_event_t* e) { start((Game)(intptr_t)lv_event_get_user_data(e)); }, g0);
+  choice("Summ-Spiele", C_SURF2(), C_TEXT(), 0, 194, [](lv_event_t*) { showGroup(0); });
+  choice("Kipp-Spiele", C_SURF2(), C_TEXT(), 0, 256, [](lv_event_t*) { showGroup(1); });
+  choice("Album", lv_color_hex(0x8a6bbf), C_TEXT(), 0, 318, [](lv_event_t*) {
     albumPage = 0;
     showAlbum();
   });
+}
+
+void showGroup(int g) {  // die drei Summ- bzw. Kipp-Spiele
+  step = GROUP;
+  group = g;
+  setTop(g ? "Kipp-Spiele" : "Summ-Spiele");
+  setBottom(g ? "Uhr in die freie Hand, Zahnbürste in die andere" : "Die Uhr steht vor dir und hört zu");
+  clearPanel();
+  for (int k = 0; k < SOUND_GAMES; k++) {
+    Game gm = (Game)(g * SOUND_GAMES + k);
+    choice(GAME_NAME[gm], gm == gameOfDay() ? C_BRASS() : C_SURF2(), gm == gameOfDay() ? C_BG() : C_TEXT(), 0, 132 + k * 62,
+           [](lv_event_t* e) { start((Game)(intptr_t)lv_event_get_user_data(e)); }, gm);
+  }
+  choice("Zurück", lv_color_hex(0x3a3a44), C_TEXT(), 0, 318, [](lv_event_t*) { showMode(); });
 }
 
 void showAlbum() {
@@ -482,7 +582,8 @@ void start(Game g) {
   dropPanel();
   play(1);
   audio::hold(true);  // Verstärker bleibt an: kein Plopp zwischen den Ansagen
-  audio::micStart();
+  if (tilting(g)) imu::sleep(false);
+  else audio::micStart();
   say(GAME_CUE[g]);
   setTop(GAME_NAME[g]);
   if (g == MONSTER) {
@@ -494,11 +595,17 @@ void start(Game g) {
     pCenter = pSum = 0;
     pVoiced = pRound = pFrog = pResult = 0;
     setBottom("Summ erst einmal ganz normal");
-  } else {
+  } else if (g == BALLOON) {
     nObj = 0;
     by = B_BOTTOM;
     nextSpawn = 4;
     setBottom("Summen = steigen, Stille = sinken");
+  } else {
+    tiltX = tiltY = 0;
+    ballX = 29; ballY = 24; ballVX = ballVY = 0; ballTarget = 0; popUntil = 0;
+    basketX = 29; nDrops = 0; dropTimer = 0;
+    runY = 20; nThings = 0; thingTimer = 0; stumbleUntil = 0;
+    setBottom(g == BALL ? "Kipp die Uhr: Kugel zum Stern" : g == CATCH ? "Kipp nach links und rechts" : "Kipp nach vorn und hinten");
   }
 }
 
@@ -511,6 +618,7 @@ int pickSticker(uint32_t have) {  // einer, der noch fehlt; sind alle da, irgend
 void finish() {
   step = DONE;
   audio::micStop();
+  imu::sleep(true);
   radio::brushSend(hero, game, SECTIONS, std::min(score, 255), true);
   clips::stop();
   // Belohnungen: ein Sticker, Team-Herzen, Pokal bei 7 Tagen am Stück
@@ -532,7 +640,7 @@ void finish() {
   putU("al", have);
   bool record = score > (int)getU(GAME_REC[game]);
   if (record) putU(GAME_REC[game], score);
-  int stars = routines::checkMatching("ähne") + routines::checkMatching("Zahn");  // „Zähne putzen“ in der Routine
+  int stars = testRun ? 0 : routines::checkMatching("ähne") + routines::checkMatching("Zahn");  // „Zähne putzen“ in der Routine
 
   say("c/spit");
   if (kids::cfg().brushParent) say("c/parent", false);
@@ -571,13 +679,19 @@ void drawGame(int s) {
   const Section& c = SEC[s];
   if (game == MONSTER) kidart::drawBrushGame(px, hero, c.view, c.area, germs, heardRecently(), frame);
   else if (game == PITCH) kidart::drawPitchGame(px, hero, pTarget, pFrog, pResult, ear.voiced, c.view, c.area, frame);
-  else kidart::drawBalloon(px, hero, by, objs, nObj, c.view, c.area, ear.voiced, frame);
+  else if (game == BALLOON) kidart::drawBalloon(px, hero, by, objs, nObj, c.view, c.area, ear.voiced, frame);
+  else if (game == BALL) kidart::drawTiltBall(px, hero, c.view, c.area, ballX, ballY, ballTarget, millis() < popUntil, frame);
+  else if (game == CATCH) kidart::drawCatch(px, hero, basketX, drops, nDrops, c.view, c.area, frame);
+  else kidart::drawMeadowRun(px, hero, runY, things, nThings, millis() < stumbleUntil, c.view, c.area, frame);
 }
 
 void tickGame(uint32_t dt) {
   if (game == MONSTER) monsterTick(dt);
   else if (game == PITCH) pitchTick();
-  else balloonTick();
+  else if (game == BALLOON) balloonTick();
+  else if (game == BALL) ballTick(dt / 1000.0f);
+  else if (game == CATCH) catchTick(dt / 1000.0f);
+  else meadowTick(dt / 1000.0f);
 }
 
 void build(lv_obj_t* scr) {
@@ -606,7 +720,7 @@ void build(lv_obj_t* scr) {
 void update() {
   hwActivity();  // Display bleibt an
   uint32_t now = millis();
-  uint32_t tick = step == RUN || step == INTRO ? 150 : 350;
+  uint32_t tick = step == RUN || step == INTRO ? (tilting(game) ? 80 : 150) : 350;  // Kippen braucht flüssigere Bilder
   if (now - lastFrameAt < tick) return;
   uint32_t dt = std::min<uint32_t>(now - lastFrameAt, 500);
   lastFrameAt = now;
@@ -614,6 +728,7 @@ void update() {
 
   switch (step) {
     case MODE:
+    case GROUP:
       return;
     case PICK:
       kidart::drawBrushPick(px, frame, crowns());
@@ -637,7 +752,7 @@ void update() {
     case INTRO: {
       // Erklärung ausreden lassen; bei Hoch-Tief danach eichen (höchstens 10 s), dann läuft die Zeit
       bool talking = clips::busy() && now - introStart < 15000;
-      if (!talking) tickGame(dt);
+      if (!talking || tilting(game)) tickGame(dt);  // Kipp-Spiele gehen schon während der Erklärung
       bool ready = !talking && now - introStart > 1200 && (game != PITCH || pPhase != P_CALIB || now - introStart > 25000);
       if (!ready) {
         drawGame(0);
@@ -646,8 +761,10 @@ void update() {
       }
       if (game == PITCH && pPhase == P_CALIB) pitchNext();  // keine Eichung gehört: der erste Ton wird die Mitte
       step = RUN;
-      enterSection(0);
-      break;
+      enterSection(0);  // setzt secStart nach „now“ – erst im nächsten Bild weiterrechnen (sonst läuft die Zeit über)
+      drawGame(0);
+      show();
+      return;
     }
     case RUN:
       break;
@@ -672,6 +789,7 @@ void update() {
 void leave() {
   audio::hold(false);
   audio::micStop();
+  imu::sleep(true);
   if (step != DONE) clips::stop();  // „Ausspucken …“ darf nach „Fertig“ noch ausreden
   panel = nullptr;
   step = PICK;
@@ -681,6 +799,19 @@ void leave() {
 
 }  // namespace
 
+void brushEarLog(bool on) { earLog = on; }
+
+void brushTestState(bool restore) {  // Kopie im Namensraum „brushbk“ – die Tests verändern sonst das echte Album
+  testRun = !restore;
+  static const char* const KEYS[] = {"al", "sd", "st", "sb", "hm", "hp", "hb", "hk", "hc", "hw"};
+  Preferences from, to;
+  from.begin(restore ? "brushbk" : "brush", true);
+  to.begin(restore ? "brush" : "brushbk", false);
+  for (const char* k : KEYS) to.putUInt(k, from.getUInt(k, 0));
+  from.end();
+  to.end();
+}
+
 BrushStats brushStats() {
   BrushStats s{};
   s.streak = currentStreak();
@@ -688,6 +819,9 @@ BrushStats brushStats() {
   s.monster = getU("hm");
   s.pitch = getU("hp");
   s.balloon = getU("hb");
+  s.ball = getU("hk");
+  s.catcher = getU("hc");
+  s.meadow = getU("hw");
   s.have = getU("al");
   return s;
 }

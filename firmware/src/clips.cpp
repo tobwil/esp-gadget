@@ -1,5 +1,6 @@
 #include "clips.h"
 #include <mp3dec.h>
+#include <freertos/idf_additions.h>
 #include "audio.h"
 
 // eingebettet über board_build.embed_files (platformio.ini)
@@ -28,8 +29,9 @@ static bool find(const char* id, uint32_t* off, uint32_t* len) {
 }
 
 static void task(void*) {
-  HMP3Decoder dec = MP3InitDecoder();
-  static int16_t pcm[1152 * 2];
+  HMP3Decoder dec = nullptr;
+  int16_t* pcm = (int16_t*)heap_caps_malloc(1152 * 2 * sizeof(int16_t), MALLOC_CAP_SPIRAM);  // nicht in den internen RAM
+  if (!pcm) { vTaskDelete(nullptr); return; }
   Item it;
   for (;;) {
     playing = uxQueueMessagesWaiting(queue) > 0;
@@ -37,8 +39,7 @@ static void task(void*) {
     playing = true;
     uint32_t off, len;
     if (it.gen != gen || !find(it.id, &off, &len)) continue;
-    if (dec) MP3FreeDecoder(dec);  // frisch für jedes Stück: kein Rest vom vorigen im Überlappungspuffer
-    dec = MP3InitDecoder();
+    dec = MP3InitDecoder();  // frisch für jedes Stück: kein Rest vom vorigen im Überlappungspuffer
     if (!dec) continue;
     auto stale = [&] { return it.gen != gen; };
     unsigned char* p = (unsigned char*)voiceStart + off;
@@ -58,7 +59,9 @@ static void task(void*) {
       if (!stale()) audio::voiceWrite(pcm, n);  // 16 kHz mono, wie der Sprachkanal
     }
     while (audio::voiceUsed() && !stale()) vTaskDelay(pdMS_TO_TICKS(20));  // ausklingen lassen
-    if (!stale()) vTaskDelay(pdMS_TO_TICKS(250));                          // kurze Pause zwischen zwei Stücken
+    MP3FreeDecoder(dec);  // den Speicher nicht dauerhaft belegen (interner RAM ist knapp)
+    dec = nullptr;
+    if (!stale()) vTaskDelay(pdMS_TO_TICKS(250));  // kurze Pause zwischen zwei Stücken
   }
 }
 
@@ -71,7 +74,8 @@ bool play(const char* id) {
   if (!has(id)) return false;
   if (!queue) {
     queue = xQueueCreate(12, sizeof(Item));
-    xTaskCreatePinnedToCore(task, "clips", 10240, nullptr, 4, nullptr, 1);
+    // Stapel im PSRAM: die Aufgabe bleibt bestehen, soll aber keinen internen RAM festhalten
+    xTaskCreatePinnedToCoreWithCaps(task, "clips", 10240, nullptr, 4, nullptr, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   }
   Item it{};
   strncpy(it.id, id, sizeof(it.id) - 1);

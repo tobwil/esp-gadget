@@ -155,6 +155,7 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
   <label class="f" for="rmorn">Morgens (ab dem Aufstehen, eine Aufgabe pro Zeile)</label><textarea id="rmorn" rows="4"></textarea>
   <label class="f" for="reve">Abends (2 Stunden vor der Bettzeit)</label><textarea id="reve" rows="4"></textarea>
   <button class="wide kid" id="rgo">Routinen speichern</button><button class="wide ghost" id="rreset">Sterne zurücksetzen</button></section>
+ <section class="kidc"><h2>Balance-Rekorde</h2><p class="note" id="grec"></p><button class="wide ghost" id="greset">Rekorde zurücksetzen</button></section>
  <section class="kidc"><h2>Schlafenszeit</h2>
   <div class="row"><div class="t"><b>Nachts sperren</b><small>Ab der Bettzeit bis zum Aufstehen: keine Apps, kein Funk, gedimmt</small></div><label class="sw"><input type="checkbox" id="knight"><span></span></label></div>
   <label class="f" for="kstory">Einschlafmusik nach der Bettzeit</label>
@@ -255,6 +256,7 @@ function render(){
  if(document.activeElement!==$('kw'))$('kw').value=hm(k.wake);if(document.activeElement!==$('kb'))$('kb').value=hm(k.bed);
  [...$('kplace').children].forEach(b=>b.classList.toggle('sel',+b.dataset.v==+k.school));
  const r=s.routines;
+ $('grec').innerHTML=s.game?`Ins Ziel: ${s.game.level?'<b>Stufe '+s.game.level+'</b>':'noch keiner'} · Alle Kugeln: ${s.game.ms?'<b>'+(s.game.ms/1000).toFixed(1).replace('.',',')+' s</b>':'noch keiner'}`:'';
  $('rst2').innerHTML=`⭐ heute <b>${r.today}</b> · Woche <b>${r.week}</b> · insgesamt <b>${r.total}</b>`;
  $('rnow').innerHTML=[['Morgens',r.morning],['Abends',r.evening]].map(([n,l])=>`<p class="note">${n}: `+l.map(i=>(i.done?'✅ ':'⬜ ')+esc(i.text)).join(' · ')+'</p>').join('');
  if(document.activeElement!==$('rmorn'))$('rmorn').value=r.morning.map(i=>i.text).join('\n');
@@ -300,6 +302,7 @@ $('kw').onchange=()=>kids({wake:mins($('kw').value)});$('kb').onchange=()=>kids(
 $('kplace').onclick=e=>{if(e.target.dataset.v)kids({school:e.target.dataset.v=='1'})};
 const lines=id=>$(id).value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,8);
 $('rgo').onclick=()=>post('routines',{morning:lines('rmorn'),evening:lines('reve')});
+$('greset').onclick=()=>confirm('Balance-Rekorde auf dieser Uhr löschen?')&&post('game/reset',{});
 $('rreset').onclick=()=>confirm('Alle Sterne auf 0 setzen?')&&post('routines/reset',{});
 $('bgo').onclick=async()=>{try{const r=await fetch('/api/backup'+($('bsec').checked?'?secrets=1':''),{headers:{'X-Pin':pin}});
  if(!r.ok)return toast('Fehler '+r.status);const b=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(b);
@@ -558,6 +561,12 @@ static void state() {
   JsonDocument rd;
   deserializeJson(rd, routines::stateJson());
   d["routines"] = rd;
+  int gl;
+  uint32_t gms;
+  gameRecords(gl, gms);
+  JsonObject gm = d["game"].to<JsonObject>();
+  gm["level"] = gl;
+  gm["ms"] = gms;
   JsonObject pw = d["power"].to<JsonObject>();
   pw["mode"] = (int)pwr::mode();
   pw["saving"] = pwr::saving();
@@ -829,6 +838,11 @@ void begin() {
     if (!authed()) return;
     routines::setConfig(srv->arg("plain"));
     msg("Routinen gespeichert");
+  });
+  on("/api/game/reset", HTTP_POST, []() {
+    if (!authed()) return;
+    gameResetRecords();
+    msg("Rekorde zurückgesetzt");
   });
   on("/api/routines/reset", HTTP_POST, []() {
     if (!authed()) return;

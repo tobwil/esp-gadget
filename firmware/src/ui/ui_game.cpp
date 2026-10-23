@@ -515,6 +515,19 @@ static void leave() {
   if (bg) { heap_caps_free(bg); bg = nullptr; drawnTheme = -1; }
 }
 
+// Rekorde für die Weboberfläche; Zurücksetzen nur dort (Eltern)
+void gameRecords(int& lvl, uint32_t& ms) {
+  loadBest();
+  lvl = bestLevel;
+  ms = bestMs;
+}
+
+void gameResetRecords() {
+  bestLevel = 0;
+  bestMs = 0;
+  saveBest();
+}
+
 // Für Bildschirmfotos: direkt eine Stufe zeigen
 void gameTestLevel(int l) {
   if (!timer) return;

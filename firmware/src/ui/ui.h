@@ -94,6 +94,8 @@ void angryBuild(lv_obj_t* scr);    // Wutmodus: das Wut-Glas (ui_angry.cpp)
 extern float angryTestShake;       // Test: so viele Sekunden Schütteln vortäuschen
 extern int kidFaceTestMin;          // Testzeit für Bildschirmfotos (−1 = echte Uhrzeit)
 void gameTestLevel(int level);     // Balance: Stufe direkt zeigen (Bildschirmfotos)
+void gameRecords(int& lvl, uint32_t& ms);  // Balance-Rekorde: höchste Stufe, schnellste Zeit „Alle Kugeln“ (0 = keine)
+void gameResetRecords();
 void browseOpen(const char* path);  // Musik-Liste öffnen (Pfad der Brücke)
 void tilesOpen(int idx);            // Kacheln ab Kachel idx (0 Musik, 1 Wetter, 2 Timer, 3 Funk)
 uint32_t radioTarget();             // gewählter Empfänger auf der Funk-Seite (0 = alle)

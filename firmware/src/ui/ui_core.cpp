@@ -519,9 +519,12 @@ void volumeShow(bool interactive) {
   volRefresh();
 }
 
-// Drehen am Rand: Winkeländerung → Lautstärke (eine volle Umdrehung = 0 … 100 %)
-static bool (*bzWhen)() = nullptr;
+// Drehen am Rand: Winkeländerung → Lautstärke (eine volle Umdrehung = 0 … 100 %).
+// Wischgesten beginnen oft am Rand – deshalb entscheidet erst die erste Bewegung: am Rand entlang = Drehen,
+// zur Mitte hin oder quer = Wischen. Bis dahin passiert nichts.
 static float bzLast = 0, bzAcc = 0;
+static bool bzMaybe = false;
+static lv_point_t bzStart;
 
 static void bezelCb(lv_event_t* e) {
   lv_event_code_t code = lv_event_get_code(e);
@@ -531,10 +534,22 @@ static void bezelCb(lv_event_t* e) {
   float ang = atan2f(dx, -dy) * 57.2958f;
   if (code == LV_EVENT_PRESSED) {
     bool (*when)() = (bool (*)())lv_event_get_user_data(e);
-    bezelActive = dx * dx + dy * dy > 165.0f * 165.0f && (!when || when());
+    float rIn = min(W, H) / 2 - 48;  // nur der äußere Streifen
+    bzMaybe = dx * dx + dy * dy > rIn * rIn && (!when || when());
+    bezelActive = false;
     bzMoved = false;
-    bzLast = ang;
+    bzStart = p;
     bzAcc = 0;
+  } else if (code == LV_EVENT_PRESSING && bzMaybe) {
+    float mx = p.x - bzStart.x, my = p.y - bzStart.y;
+    if (mx * mx + my * my < 18 * 18) return;
+    bzMaybe = false;
+    float ux = bzStart.x - CX, uy = bzStart.y - CY, ul = sqrtf(ux * ux + uy * uy);
+    ux /= ul;
+    uy /= ul;
+    float radial = fabsf(mx * ux + my * uy), tangential = fabsf(mx * uy - my * ux);
+    bezelActive = tangential > 2 * radial;
+    bzLast = ang;
   } else if (code == LV_EVENT_PRESSING && bezelActive) {
     float d = ang - bzLast;
     if (d > 180) d -= 360;
@@ -549,7 +564,7 @@ static void bezelCb(lv_event_t* e) {
       volumeShow(false);
     }
   } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
-    bezelActive = false;
+    bezelActive = bzMaybe = false;
   }
 }
 

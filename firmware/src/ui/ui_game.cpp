@@ -1,5 +1,6 @@
 // Balance: Kugeln durch Neigen der Uhr in Löcher rollen (Bewegungssensor QMI8658).
-//   „Ins Ziel“: eine Kugel ins goldene Loch, rote Löcher sind Fallen; mit jeder Stufe mehr Fallen
+//   „Ins Ziel“: eine Kugel ins goldene Loch. Die Stufen wechseln reihum: Mauern (Slalom), Labyrinth (Ringe mit
+//   Öffnungen, Ziel in der Mitte), Blockaden (verstreute Hindernisse) – rote Löcher als Fallen nur wenige
 //   „Alle Kugeln“: drei Kugeln in drei Löcher, so schnell wie möglich
 #include <Preferences.h>
 #include <math.h>
@@ -13,14 +14,18 @@ using namespace ui;
 static const float FIELD_R = gtheme::R;       // Spielfeld-Radius
 static const float BALL_R = 15;        // Kugel-Radius
 static const float GRAV = 1100;    // px/s² bei 1 g
-static const int MAXB = 3, MAXH = 12;
+static const float WALL_T = 6;     // halbe Wandstärke
+static const int MAXB = 3, MAXH = 12, MAXW = 128, MAXP = 420;
 
 struct Ball { float x, y, vx, vy; bool in; float sink; lv_obj_t* o; };
 struct Hole { float x, y, r; bool goal, filled; lv_obj_t* o; };
+struct Wall { float x1, y1, x2, y2; };  // Kapsel: Strecke mit Dicke 2·WALL_T
 
 static Ball balls[MAXB];
 static Hole holes[MAXH];
-static int nb = 0, nh = 0, level = 1, mode = 0;  // mode 0 = Menü, 1 = Ins Ziel, 2 = Alle Kugeln
+static Wall walls[MAXW];
+static lv_point_precise_t pts[MAXP];  // Punkte der gezeichneten Wände (müssen bestehen bleiben)
+static int nb = 0, nh = 0, nw = 0, np = 0, level = 1, mode = 0;  // mode 0 = Menü, 1 = Ins Ziel, 2 = Alle Kugeln
 static float startX, startY;
 static uint32_t t0 = 0, endAt = 0, resetAt = 0, lastStep = 0;
 static lv_obj_t *field, *hud, *menu, *result;
@@ -68,7 +73,7 @@ static void saveBest() {
 
 static void clearField(bool withTheme) {
   lv_obj_clean(field);
-  nb = nh = 0;
+  nb = nh = nw = np = 0;
   if (!withTheme) return;
   // Spielfeld: Schale mit dem Thema der Stufe
   if (!bg) bg = (uint16_t*)heap_caps_malloc(W * H * 2, MALLOC_CAP_SPIRAM);
@@ -79,12 +84,73 @@ static void clearField(bool withTheme) {
   lv_obj_set_pos(c, 0, 0);
 }
 
+// Abstand eines Punktes zu einer Wand (Mittellinie)
+static float wallDist(const Wall& w, float x, float y, float* px = nullptr, float* py = nullptr) {
+  float ex = w.x2 - w.x1, ey = w.y2 - w.y1, len2 = ex * ex + ey * ey;
+  float t = len2 > 0 ? fmaxf(0, fminf(1, ((x - w.x1) * ex + (y - w.y1) * ey) / len2)) : 0;
+  float qx = w.x1 + ex * t, qy = w.y1 + ey * t;
+  if (px) { *px = qx; *py = qy; }
+  return hypotf(x - qx, y - qy);
+}
+
 static bool freeSpot(float x, float y, float r, float gap) {
   if (sqrtf(x * x + y * y) > FIELD_R - r - 10) return false;
   if (y - r < -FIELD_R + 52 && fabsf(x) < 120) return false;  // frei unter der Anzeige oben
   for (int i = 0; i < nh; i++)
     if (hypotf(holes[i].x - x, holes[i].y - y) < holes[i].r + r + gap) return false;
+  for (int i = 0; i < nw; i++)
+    if (wallDist(walls[i], x, y) < WALL_T + r + gap) return false;
   return true;
+}
+
+// Wand als Linienzug: gezeichnet mit dunklem Rand, für die Physik in Strecken zerlegt
+static void addWalls(const float* xy, int n) {
+  if (n < 2 || np + n > MAXP) return;
+  lv_point_precise_t* p = &pts[np];
+  for (int i = 0; i < n; i++) p[i] = {(lv_value_precise_t)(CX + xy[2 * i]), (lv_value_precise_t)(CY + xy[2 * i + 1])};
+  np += n;
+  for (int k = 0; k < 2; k++) {  // erst der dunkle Rand, dann der helle Stein
+    lv_obj_t* l = lv_line_create(field);
+    lv_line_set_points(l, p, n);
+    lv_obj_set_style_line_width(l, (int)(2 * WALL_T) + (k ? 0 : 5), 0);
+    lv_obj_set_style_line_color(l, lv_color_hex(k ? 0xe2d8c6 : 0x2b241c), 0);
+    lv_obj_set_style_line_rounded(l, true, 0);
+    lv_obj_set_pos(l, 0, 0);
+  }
+  for (int i = 0; i + 1 < n && nw < MAXW; i++) walls[nw++] = {xy[2 * i], xy[2 * i + 1], xy[2 * i + 2], xy[2 * i + 3]};
+}
+
+static void addWall(float x1, float y1, float x2, float y2) {
+  float xy[4] = {x1, y1, x2, y2};
+  addWalls(xy, 2);
+}
+
+// Ring mit einer Öffnung (Winkel in Bogenmaß, Mitte und halbe Breite der Öffnung)
+static void addRing(float r, float gap, float half) {
+  float xy[2 * 40];
+  int n = 0;
+  float span = 6.2832f - 2 * half;
+  int seg = max(8, (int)(span / 0.17f));
+  for (int i = 0; i <= seg && n < 40; i++, n++) {
+    float a = gap + half + span * i / seg;
+    xy[2 * n] = cosf(a) * r;
+    xy[2 * n + 1] = sinf(a) * r;
+  }
+  addWalls(xy, n);
+}
+
+// Strecke quer zur Richtung (dx, dy) durch den Punkt (x, y), entlang der Strecke auf das Spielfeld gekürzt
+static void addCross(float x, float y, float dx, float dy, float from, float to) {
+  float nx = -dy, ny = dx, lim = FIELD_R - 4;
+  // |p + n·s| = lim  →  s² + 2·b·s + c = 0
+  float b = x * nx + y * ny, c = x * x + y * y - lim * lim, disc = b * b - c;
+  if (disc <= 0) return;
+  float s1 = -b - sqrtf(disc), s2 = -b + sqrtf(disc);
+  if (from > to) { float t = from; from = to; to = t; }
+  from = fmaxf(from, s1);
+  to = fminf(to, s2);
+  if (to - from < 10) return;
+  addWall(x + nx * from, y + ny * from, x + nx * to, y + ny * to);
 }
 
 static void addHole(float x, float y, float r, bool goal) {
@@ -120,23 +186,81 @@ static void newRound() {
   theme = mode == 1 ? (level - 1) % gtheme::COUNT : (int)(frand() * gtheme::COUNT) % gtheme::COUNT;
   clearField(true);
   if (mode == 1) {
-    // Start und Ziel auf gegenüberliegenden Seiten, dazwischen Fallen
-    float a = frand() * 6.2832f;
-    startX = cosf(a) * 150;
-    startY = sinf(a) * 150;
-    float gr = fmaxf(19, 30 - level * 1.2f);
-    addHole(-startX * 0.95f, -startY * 0.95f, gr, true);
-    int traps = min(MAXH - 1, 2 + level);
+    float gr = fmaxf(20, 30 - level * 1.0f);
+    int kind = (level - 1) % 3, traps = 0;
+    if (kind == 1) {
+      // Labyrinth: Ringe mit je einer Öffnung, die nächste liegt gegenüber; Ziel in der Mitte
+      int rings = level >= 8 ? 3 : 2;
+      static const float R3[] = {0.30f, 0.53f, 0.76f}, R2[] = {0.38f, 0.68f};
+      const float* rr = rings == 3 ? R3 : R2;
+      float gap = frand() * 6.2832f;
+      for (int i = rings - 1; i >= 0; i--) {
+        float r = rr[i] * FIELD_R;
+        addRing(r, gap, (BALL_R + WALL_T + 12) / r);
+        // Sperre neben der Öffnung: im Gang dahinter geht es nur in eine Richtung
+        if (level >= 5 && i > 0) {
+          float a = gap - (BALL_R + WALL_T + 26) / r, ri = rr[i - 1] * FIELD_R;
+          addWall(cosf(a) * (ri + 2), sinf(a) * (ri + 2), cosf(a) * (r - 2), sinf(a) * (r - 2));
+        }
+        gap += 3.1416f + (frand() - 0.5f) * 1.2f;
+      }
+      addHole(0, 0, gr, true);
+      // Start außen, unten (oben steht die Anzeige)
+      float a = 0.6f + frand() * 1.9f, r0 = (rr[rings - 1] * FIELD_R + FIELD_R) / 2;
+      startX = cosf(a) * r0;
+      startY = sinf(a) * r0;
+      traps = level >= 8 ? 1 : 0;
+    } else {
+      // Start und Ziel gegenüber
+      float a = frand() * 6.2832f;
+      startX = cosf(a) * 150;
+      startY = sinf(a) * 150;
+      float gx = -startX * 0.95f, gy = -startY * 0.95f, dx = -cosf(a), dy = -sinf(a);
+      if (kind == 0) {
+        // Mauern: Querwände, abwechselnd links und rechts offen – Slalom
+        int n = min(4, 2 + level / 4);
+        float side = frand() < 0.5f ? 1 : -1;
+        for (int i = 0; i < n; i++) {
+          float t = (i + 1.0f) / (n + 1), x = startX + (gx - startX) * t, y = startY + (gy - startY) * t;
+          addCross(x, y, dx, dy, side * -FIELD_R, side * (FIELD_R * 0.55f - BALL_R * 2.6f - level * 2));
+          side = -side;
+        }
+        traps = min(3, level / 3);
+      } else {
+        // Blockaden: kurze Hindernisse in zufälliger Lage, mit Platz dazwischen
+        int n = min(8, 4 + level / 3), placed = 0;
+        float cx[8], cy[8];
+        for (int tries = 0; placed < n && tries < 300; tries++) {
+          float x = (frand() * 2 - 1) * FIELD_R * 0.8f, y = (frand() * 2 - 1) * FIELD_R * 0.8f;
+          // Abstand zu Start und Ziel: halbe Länge + Kugel bzw. Loch + Luft
+          if (hypotf(x, y) > FIELD_R - 50 || hypotf(x - startX, y - startY) < 105 || hypotf(x - gx, y - gy) < 110) continue;
+          bool ok = true;
+          for (int k = 0; k < placed; k++) ok &= hypotf(x - cx[k], y - cy[k]) > 95;
+          if (!ok) continue;
+          float a2 = frand() * 3.1416f, len = 26 + frand() * 22;
+          addWall(x - cosf(a2) * len, y - sinf(a2) * len, x + cosf(a2) * len, y + sinf(a2) * len);
+          cx[placed] = x;
+          cy[placed++] = y;
+        }
+        traps = min(3, 1 + level / 4);
+      }
+      addHole(gx, gy, gr, true);
+    }
     for (int i = 0, tries = 0; i < traps && tries < 400; tries++) {
       float x = (frand() * 2 - 1) * FIELD_R, y = (frand() * 2 - 1) * FIELD_R;
-      if (!freeSpot(x, y, 24, 22) || hypotf(x - startX, y - startY) < 70) continue;
-      addHole(x, y, 24, false);
+      if (!freeSpot(x, y, 22, 20) || hypotf(x - startX, y - startY) < 70) continue;
+      addHole(x, y, 22, false);
       i++;
     }
     addBall(startX, startY);
   } else {
     float a0 = frand() * 6.2832f;
     for (int i = 0; i < 3; i++) addHole(cosf(a0 + i * 2.094f) * 140, sinf(a0 + i * 2.094f) * 140, 24, false);
+    // zwei kurze Mauern zwischen Mitte und Löchern
+    for (int i = 0; i < 2; i++) {
+      float a = a0 + 1.047f + i * 2.094f, x = cosf(a) * 95, y = sinf(a) * 95;
+      addWall(x - sinf(a) * 34, y + cosf(a) * 34, x + sinf(a) * 34, y - cosf(a) * 34);
+    }
     for (int i = 0; i < 3; i++) addBall(cosf(a0 + 1.047f + i * 2.094f) * 30, sinf(a0 + 1.047f + i * 2.094f) * 30);
   }
   t0 = millis();
@@ -214,36 +338,56 @@ static void step(lv_timer_t*) {
       }
       continue;
     }
-    b.vx += gx * GRAV * dt;
-    b.vy += gy * GRAV * dt;
-    // Sog am Lochrand
-    for (int k = 0; k < nh; k++) {
-      Hole& h = holes[k];
-      if (h.filled) continue;
-      float dx = h.x - b.x, dy = h.y - b.y, d = hypotf(dx, dy);
-      if (d < h.r && d > 0.1f) {
-        float pull = 1600 * (1 - d / h.r);
-        b.vx += dx / d * pull * dt;
-        b.vy += dy / d * pull * dt;
+    // in kleinen Schritten, damit die Kugel auch schnell nicht durch eine Wand rutscht
+    int sub = max(1, (int)ceilf(hypotf(b.vx, b.vy) * dt / 4) + 1);
+    float h = dt / sub;
+    bool knock = false;
+    for (int s = 0; s < sub; s++) {
+      b.vx += gx * GRAV * h;
+      b.vy += gy * GRAV * h;
+      // Sog am Lochrand
+      for (int k = 0; k < nh; k++) {
+        Hole& hl = holes[k];
+        if (hl.filled) continue;
+        float dx = hl.x - b.x, dy = hl.y - b.y, d = hypotf(dx, dy);
+        if (d < hl.r && d > 0.1f) {
+          float pull = 1600 * (1 - d / hl.r);
+          b.vx += dx / d * pull * h;
+          b.vy += dy / d * pull * h;
+        }
+      }
+      float damp = 1 - 1.1f * h;  // Rollreibung
+      b.vx *= damp;
+      b.vy *= damp;
+      b.x += b.vx * h;
+      b.y += b.vy * h;
+      // Rand: zurückprallen
+      float d = hypotf(b.x, b.y);
+      if (d > FIELD_R - BALL_R) {
+        float nx = b.x / d, ny = b.y / d, vn = b.vx * nx + b.vy * ny;
+        b.x = nx * (FIELD_R - BALL_R);
+        b.y = ny * (FIELD_R - BALL_R);
+        if (vn > 0) {
+          knock |= vn > 220;
+          b.vx -= 1.45f * vn * nx;
+          b.vy -= 1.45f * vn * ny;
+        }
+      }
+      // Wände: aus der Kapsel schieben und abprallen
+      for (int k = 0; k < nw; k++) {
+        float px, py, dw = wallDist(walls[k], b.x, b.y, &px, &py), mind = BALL_R + WALL_T;
+        if (dw >= mind || dw < 0.001f) continue;
+        float nx = (b.x - px) / dw, ny = (b.y - py) / dw, vn = b.vx * nx + b.vy * ny;
+        b.x = px + nx * mind;
+        b.y = py + ny * mind;
+        if (vn < 0) {
+          knock |= vn < -220;
+          b.vx -= 1.45f * vn * nx;
+          b.vy -= 1.45f * vn * ny;
+        }
       }
     }
-    float damp = 1 - 1.1f * dt;  // Rollreibung
-    b.vx *= damp;
-    b.vy *= damp;
-    b.x += b.vx * dt;
-    b.y += b.vy * dt;
-    // Rand: zurückprallen
-    float d = hypotf(b.x, b.y);
-    if (d > FIELD_R - BALL_R) {
-      float nx = b.x / d, ny = b.y / d, vn = b.vx * nx + b.vy * ny;
-      b.x = nx * (FIELD_R - BALL_R);
-      b.y = ny * (FIELD_R - BALL_R);
-      if (vn > 0) {
-        if (vn > 220) audio::play(audio::FX_TICK);
-        b.vx -= 1.45f * vn * nx;
-        b.vy -= 1.45f * vn * ny;
-      }
-    }
+    if (knock) audio::play(audio::FX_TICK);
   }
   // Kugeln stoßen sich
   for (int i = 0; i < nb; i++)
@@ -345,7 +489,7 @@ static void build(lv_obj_t* scr) {
   lv_obj_set_size(a, 240, 64);
   lv_obj_align(a, LV_ALIGN_CENTER, 0, -30);
   lv_obj_add_event_cb(a, [](lv_event_t*) { start(1); }, LV_EVENT_CLICKED, nullptr);
-  snprintf(b, sizeof(b), bestLevel ? "Rekord: Stufe %d" : "Fallen ausweichen", bestLevel);
+  snprintf(b, sizeof(b), bestLevel ? "Rekord: Stufe %d" : "Mauern, Labyrinthe, Fallen", bestLevel);
   lv_obj_t* ra = label(menu, &font_text_20, C_DIM(), b);
   lv_obj_align(ra, LV_ALIGN_CENTER, 0, 14);
   lv_obj_t* c = pill(menu, I_GROUP "  Alle Kugeln", C_SURF2(), C_TEXT());

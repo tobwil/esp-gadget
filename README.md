@@ -91,8 +91,10 @@ Anlegen, Ändern oder Löschen in n8n kann sie nicht.
 
 ![Balance](docs/screens/balance.png)
 
-Uhr neigen, Kugel rollen lassen. **Ins Ziel**: eine Kugel ins goldene Loch, rote Löcher sind Fallen, mit jeder
-Stufe mehr – und jede Stufe hat ein eigenes Thema. **Alle Kugeln**: drei Kugeln in drei Löcher, auf Zeit.
+Uhr neigen, Kugel rollen lassen. **Ins Ziel**: eine Kugel ins goldene Loch. Die Stufen wechseln reihum –
+**Mauern** (Slalom um Querwände), **Labyrinth** (Ringe mit je einer Öffnung, Ziel in der Mitte; später mit Sperren
+und drittem Ring) und **Blockaden** (verstreute Hindernisse). Rote Löcher sind Fallen, aber nur wenige; jede Stufe
+hat ein eigenes Thema. **Alle Kugeln**: drei Kugeln in drei Löcher, auf Zeit, mit zwei Mauern dazwischen.
 
 ## Kindermodus
 

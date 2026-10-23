@@ -113,7 +113,7 @@ String historyJson() {
   String s = "[";
   for (int i = hN - 1; i >= 0; i--) {
     const Sample& x = at(i);
-    s += "[" + String((now - x.t) / 60) + "," + x.pct + "," + x.mv + "," + x.chg + "]";
+    s += "[" + String(x.t < now ? (now - x.t) / 60 : 0) + "," + x.pct + "," + x.mv + "," + x.chg + "]";
     if (i) s += ",";
   }
   return s + "]";
@@ -129,7 +129,10 @@ void poll() {
 
   // Verlauf (erst, wenn die Uhrzeit stimmt)
   uint32_t t = time(nullptr);
-  if (hist && pct >= 0 && timeValid() && (!hN || t - at(0).t >= STEP_S || t < at(0).t)) {
+  if (hist && pct >= 0 && timeValid() && hN && t < at(0).t) {
+    // Uhr nach dem Tiefschlaf zurückgestellt (die interne Uhr läuft dort etwas vor): letzten Wert ersetzen
+    hist[(hHead - 1 + HIST) % HIST] = {t, (uint8_t)pct, (uint8_t)(hwCharging() || usb), (uint16_t)hwBatteryMv()};
+  } else if (hist && pct >= 0 && timeValid() && (!hN || t - at(0).t >= STEP_S)) {
     hist[hHead] = {t, (uint8_t)pct, (uint8_t)(hwCharging() || usb), (uint16_t)hwBatteryMv()};
     hHead = (hHead + 1) % HIST;
     if (hN < HIST) hN++;

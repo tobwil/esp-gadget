@@ -29,7 +29,7 @@ struct Ring {
 static Ring music, voice, mic;
 static volatile bool musicPaused = false, musicFlushReq = false, voiceFlushReq = false;
 static volatile uint32_t played = 0;
-static volatile bool micOn = false;
+static volatile bool micOn = false, held = false;
 static volatile float micLvl = 0, outLvl = 0;
 static volatile float gainTarget = 0.86f;
 static float gain = 0;  // nur im Mischer
@@ -45,6 +45,8 @@ void voiceWrite(const int16_t* s, size_t n) { voice.write(s, n); }
 size_t voiceUsed() { return voice.used(); }
 size_t voiceSpace() { return voice.space(); }
 void voiceFlush() { voiceFlushReq = true; }
+
+void hold(bool on) { held = on; }
 
 void micStart() { mic.tail = mic.head; micOn = true; }
 void micStop() { micOn = false; }
@@ -151,6 +153,7 @@ static void task(void*) {
   bool paused = false;
   int16_t vPrev = 0, vCur = 0;
   float vPhase = 1;  // Stimme: Lage zwischen vPrev und vCur
+  float vTail = 0;   // Ausklang, wenn die Stimme endet
   float mAcc = 0, mPhase = 0;  // Mikrofon: Mittelwert bis zum nächsten 16-kHz-Wert
   int mN = 0;
   float hpX = 0, hpY = 0;  // Hochpass für das Mikrofon
@@ -167,7 +170,7 @@ static void task(void*) {
 
     // Nichts zu hören und kein Mikrofon: nach 3 s I2S anhalten (die Codecs bekommen keinen Takt mehr,
     // der Prozessor hat Ruhe), bis wieder etwas kommt – das dauert nur einen Durchlauf
-    bool want = micOn || voice.used() || (!musicPaused && music.used()) || fxActive();
+    bool want = held || micOn || voice.used() || (!musicPaused && music.used()) || fxActive();
     if (want) idleSince = millis();
     if (!paused && !want && millis() - idleSince > 3000) {
       setPa(false);
@@ -195,8 +198,13 @@ static void task(void*) {
       if (voice.used() || vPhase < 1) {  // 16 → 44,1 kHz: linear zwischen zwei Werten
         vPhase += 16000.0f / SR;
         if (vPhase >= 1 && voice.used()) { vPhase -= 1; vPrev = vCur; vCur = voice.pop(); }
-        else if (vPhase >= 1) { vPhase = 1; vPrev = vCur = 0; }
+        else if (vPhase >= 1) { vPhase = 1; vTail = vCur; vPrev = vCur = 0; }  // leer: nicht auf 0 springen (Knacken)
         s += (vPrev + (vCur - vPrev) * fminf(vPhase, 1.0f)) / 32768.0f;
+      }
+      if (vTail != 0) {  // … sondern in ≈ 5 ms ausklingen
+        s += vTail / 32768.0f;
+        vTail *= 0.995f;
+        if (fabsf(vTail) < 1) vTail = 0;
       }
       if (fxOn) s += synth();
       // Lautstärke gleitet zum Ziel (≈ 30 ms), dann weich begrenzen (tanh-Näherung) statt hart zu clippen
@@ -214,7 +222,7 @@ static void task(void*) {
 
     bool active = voiceOn || musicOn || fxOn;
     if (active) quietSince = millis();
-    setPa(codecOk && (active || millis() - quietSince < 1500));
+    setPa(codecOk && (held || active || millis() - quietSince < 1500));  // gehalten: kein Ein-/Ausschalt-Plopp
 
     size_t done;
     i2s_channel_write(tx, out, sizeof(out), &done, portMAX_DELAY);

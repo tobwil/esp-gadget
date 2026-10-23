@@ -36,7 +36,10 @@ static void task(void*) {
     if (xQueueReceive(queue, &it, portMAX_DELAY) != pdTRUE) continue;
     playing = true;
     uint32_t off, len;
-    if (it.gen != gen || !dec || !find(it.id, &off, &len)) continue;
+    if (it.gen != gen || !find(it.id, &off, &len)) continue;
+    if (dec) MP3FreeDecoder(dec);  // frisch für jedes Stück: kein Rest vom vorigen im Überlappungspuffer
+    dec = MP3InitDecoder();
+    if (!dec) continue;
     auto stale = [&] { return it.gen != gen; };
     unsigned char* p = (unsigned char*)voiceStart + off;
     int left = len;

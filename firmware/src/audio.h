@@ -14,6 +14,7 @@ bool begin(int volume);
 void setVolume(int pct);
 void play(Fx fx);
 void shutdown();            // vor dem Tiefschlaf
+void hold(bool on);         // Ausgabe und Verstärker an lassen, auch in Pausen (z. B. Zähneputzen: kein Plopp zwischen Ansagen)
 
 // Musik: der Strom-Task schreibt, der Mischer liest
 size_t musicSpace();

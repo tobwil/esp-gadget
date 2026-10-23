@@ -3,7 +3,7 @@
 //   Innenflächen (2 × ≈ 20 s, von Rot nach Weiß). Der Mund im Bild zeigt, wo; die Figur sagt es an (Sprachclips).
 //   Erst die Figur wählen, dann:
 //   Hörgeschichte – nach jeder Ansage erzählt die Figur ein Stück weiter; mit jedem Putzen ein Kapitel (7 je Figur)
-//   Summ-Ballon   – Summen lässt den Ballon steigen (je höher der Ton, desto höher), Sterne einsammeln; Stille = sinken
+//   Summ-Ballon   – Summen lässt den Ballon steigen, Stille sinken; Sterne einsammeln
 //   Album         – Sticker, die es nach jedem Putzen gibt; 7 Tage am Stück: Pokal und Krone
 //   Putzen zwei Uhren gleichzeitig, zeigen sie sich gegenseitig an (Funk) und es gibt Team-Herzen.
 //   Am Ende: „Ausspucken, nicht ausspülen“, auf Wunsch „Mama oder Papa putzt nach“; „Zähne putzen“ in der Routine
@@ -176,13 +176,14 @@ void show() {  // Szene fertig: Ring, unten schwarz, auf den Bildschirm
 struct Hum {
   int16_t win[640];
   int have = 0;
-  float floor = 0.004f, pitch = 0;
+  float floor = 0.004f;
   bool voiced = false;
 } hum;
 
-// Neue Mikrofonwerte holen und die letzten 32 ms prüfen: laut genug und periodisch (Autokorrelation) = Summen.
+// Neue Mikrofonwerte holen und die letzten 40 ms prüfen: laut genug und periodisch (Autokorrelation) = Summen.
 // Vorher ein Tiefpass (≈ 900 Hz): das Zahnbürsten-Geräusch ist hell und breitbandig, Summen tief – so zählt Summen
-// auch dann, wenn die Bürste dreimal so laut ist (am Rechner mit künstlichen Signalen geprüft). Tonhöhe 175 … 530 Hz.
+// auch dann, wenn die Bürste dreimal so laut ist (am Rechner mit künstlichen Signalen geprüft).
+// Tonhöhen 70 … 530 Hz: Kinder summen um 250 Hz, Erwachsene um 110 Hz – der Ton selbst ist egal.
 void listen() {
   int16_t tmp[512];
   size_t n;
@@ -194,36 +195,28 @@ void listen() {
     hum.have = keep + n;
   }
   hum.voiced = false;
-  if (clips::busy() || hum.have < 512) return;
-  static float x[512];
-  const int16_t* w = hum.win + hum.have - 512;
+  constexpr int N = 640, LAG_MIN = 30, LAG_MAX = 229;
+  if (clips::busy() || hum.have < N) return;
+  static float x[N];
+  const int16_t* w = hum.win + hum.have - N;
   float e = 0, s1 = 0, s2 = 0;
-  for (int i = 0; i < 512; i++) {
+  for (int i = 0; i < N; i++) {
     float v = w[i] / 32768.0f;
     e += v * v;
     s1 += 0.3f * (v - s1);
     s2 += 0.3f * (s1 - s2);
     x[i] = s2;
   }
-  float rms = sqrtf(e / 512);
+  float rms = sqrtf(e / N);
   hum.floor += (rms - hum.floor) * (rms < hum.floor ? 0.3f : 0.01f);  // Grundrauschen: fällt schnell, steigt langsam
-  if (rms < std::max(0.004f, hum.floor * 2.2f)) return;
-  float r[92] = {0}, best = 0;
-  for (int lag = 30; lag <= 91; lag++) {
+  if (rms < std::max(0.002f, hum.floor * 2.2f)) return;
+  float best = 0;
+  for (int lag = LAG_MIN; lag <= LAG_MAX; lag++) {
     float s = 0, a = 0, b = 0;
-    for (int i = 0; i + lag < 512; i++) { s += x[i] * x[i + lag]; a += x[i] * x[i]; b += x[i + lag] * x[i + lag]; }
-    r[lag] = s / (sqrtf(a * b) + 1e-9f);
-    if (lag <= 90) best = std::max(best, r[lag]);
+    for (int i = 0; i + lag < N; i++) { s += x[i] * x[i + lag]; a += x[i] * x[i]; b += x[i + lag] * x[i + lag]; }
+    best = std::max(best, s / (sqrtf(a * b) + 1e-9f));
   }
-  if (best < 0.45f) return;
-  // erster Gipfel nahe am besten – sonst landet man eine Oktave zu tief; dann zwischen den Abständen verfeinern
-  int lag = 31;
-  while (lag < 90 && !(r[lag] >= best * 0.88f && r[lag] >= r[lag - 1] && r[lag] >= r[lag + 1])) lag++;
-  float d = r[lag - 1] - 2 * r[lag] + r[lag + 1];
-  float off = d < 0 ? 0.5f * (r[lag - 1] - r[lag + 1]) / d : 0;
-  hum.voiced = true;
-  float f = 16000.0f / (lag + off);
-  hum.pitch = hum.pitch ? hum.pitch * 0.6f + f * 0.4f : f;
+  hum.voiced = best >= 0.45f;  // deutlich periodisch: ein Ton, kein Rauschen
 }
 
 constexpr int B_TOP = 1, B_BOTTOM = 20, MAXOBJ = 6;  // Ballon oben … auf dem Hügel
@@ -233,11 +226,7 @@ int nObj = 0, by = B_BOTTOM, score = 0, nextSpawn = 0;
 void balloonTick() {
   listen();
   if (hum.voiced) {
-    // 200 Hz unten … 420 Hz oben; wer summt, steigt immer etwas
-    float u = std::min(1.0f, std::max(0.0f, (hum.pitch - 200) / 220.0f));
-    int target = std::min(B_BOTTOM - 4, B_BOTTOM - (int)(u * (B_BOTTOM - B_TOP) + 0.5f));
-    if (by > target) by -= by - target > 4 ? 2 : 1;
-    else if (by < target) by++;
+    if (by > B_TOP) by--;  // Summen: steigen, egal wie hoch der Ton (Kinder und Erwachsene gleich)
   } else if (!clips::busy() && frame % 2 == 0 && by < B_BOTTOM) {
     by++;  // Stille: langsam sinken (während einer Ansage schwebt er)
   }
@@ -367,11 +356,13 @@ void enterSection(int i) {
   setTop(SEC[i].where);
   setBottom(SEC[i].how);
   hintAt = millis();
-  say(SEC[i].cue);
-  if (mode == STORY) {
+  if (mode == STORY) {  // der Putz-Hinweis steckt in der Geschichte – keine eigene Ansage, kein Ton dazwischen
     char part[8];
     snprintf(part, sizeof(part), "%d/%d", chapter, i);
-    say(part, false);  // hinter die Ansage
+    say(part);
+  } else {
+    if (i) audio::play(audio::FX_TICK);
+    say(SEC[i].cue);
   }
 }
 
@@ -384,6 +375,7 @@ void start(Mode m) {
   score = 0;
   dropPanel();
   play(1);
+  audio::hold(true);  // Verstärker bleibt an: kein Plopp zwischen den Stücken
   if (m == STORY) {
     char part[8];
     snprintf(part, sizeof(part), "%d/in", chapter);
@@ -548,7 +540,6 @@ void update() {
   if (in >= len && (!clips::busy() || in >= len + OVERRUN_MS)) {  // nächster Abschnitt – ein Satz darf noch zu Ende gehen
     if (sec + 1 >= SECTIONS) { finish(); return; }
     clips::stop();
-    audio::play(audio::FX_TICK);
     enterSection(sec + 1);
     in = 0;
   }
@@ -568,6 +559,7 @@ void update() {
 }
 
 void leave() {
+  audio::hold(false);
   if (step != DONE) clips::stop();  // „Ausspucken …“ darf nach „Fertig“ noch ausreden
   audio::micStop();
   panel = nullptr;

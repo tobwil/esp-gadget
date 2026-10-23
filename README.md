@@ -147,13 +147,14 @@ Eine App (für Kinder und Erwachsene, in der Weboberfläche abschaltbar): erst *
 dann das Spiel. Geputzt wird nach der **KAI-Methode**, zwei Minuten: erst die **K**auflächen (vier Ecken, hin und
 her), dann **A**ußen (Zähne aufeinander, kleine Kreise – rechts, vorne, links), dann **I**nnen (Mund weit auf, von
 Rot nach Weiß). Der Mund im Bild zeigt wie im Spiegel, wo gerade dran ist, Zahnmonster verschwinden nach und nach,
-und **Luna bzw. Fips sagen es an** – mit echten Stimmen, die Uhr kann ja gegenüber auf dem Tisch stehen.
+und **Luna bzw. Fips sagen, wo es weitergeht** – mit echten Stimmen, die Uhr kann ja gegenüber auf dem Tisch stehen.
 
-- **Hörgeschichte:** Nach jeder Ansage erzählt die Figur ein Stück weiter, mit jedem Putzen ein Kapitel. Luna folgt
-  einer Schatzkarte (Bach, Eule, rote Pilze, Gewitter, das große X), Fips hilft dem Glühwürmchen Lumi (Igel und
-  Frösche, alter Baum, Hängebrücke, Biber, dunkle Höhle). Ein Satz darf noch ausklingen, bevor es weitergeht.
-- **Summ-Ballon:** Summen lässt den Ballon steigen – je höher der Ton, desto höher –, Stille lässt ihn sinken;
-  unterwegs Sterne einsammeln, Regenbogensterne zählen dreifach. Das Mikrofon prüft, ob es wirklich ein Ton ist
+- **Hörgeschichte:** Die Figur erzählt durchgehend, mit jedem Putzen ein Kapitel – der Putz-Hinweis steckt in der
+  Geschichte („Ich scharre im Stroh, hin und her – scharr mit: Backenzähne oben rechts!“). Luna folgt einer
+  Schatzkarte (Bach, Eule, rote Pilze, Gewitter, das große X), Fips hilft dem Glühwürmchen Lumi (Igel und Frösche,
+  alter Baum, Hängebrücke, Biber, dunkle Höhle). Ein Satz darf noch ausklingen, bevor es weitergeht.
+- **Summ-Ballon:** Summen lässt den Ballon steigen, Stille lässt ihn sinken; unterwegs Sterne einsammeln,
+  Regenbogensterne zählen dreifach. Kurze Ansagen sagen, wo geputzt wird. Das Mikrofon prüft, ob es wirklich ein Ton ist
   (Autokorrelation nach einem Tiefpass), das Rauschen der Zahnbürste zählt nicht. Ein kleiner Mund unten zeigt,
   wo geputzt wird. Rekord in der Weboberfläche.
 - **Album:** Nach jedem Putzen ein neuer Sticker (24 Motive). Sieben Tage am Stück: ein Pokal, und Luna und Fips

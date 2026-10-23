@@ -39,7 +39,6 @@ const char* chapter(World w, int day);    // Titel des Kapitels (Montag … Sonn
 enum Hero : uint8_t { LUNA, FIPS };
 const char* heroName(Hero h);
 const char* brushChapter(Hero h, int day);         // Fortsetzungsgeschichte: Kapitel des Tages (0 = Montag)
-const char* brushText(Hero h, int day, int beat);  // ein Satz je Bild (beat 0 … 3)
 void drawBrushStory(uint16_t* px, Hero h, int day, int beat, float prog, int frame);  // Belohnung: Bild des Kapitels
 void drawBrushPick(uint16_t* px, int frame, uint8_t crowns = 0);  // beide Figuren zur Auswahl; Bit 0/1: Krone für Luna/Fips
 // Zahnputz-Spiel nach KAI (Kauflächen, Außenflächen, Innenflächen): der Mund in drei Ansichten, Zahnmonster auf dem

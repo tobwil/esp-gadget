@@ -1073,22 +1073,6 @@ const char* const CHAPTER_T[2][7] = {
     {"Die Schatzkarte", "Am Bach", "Die Eule", "Die roten Pilze", "Das Gewitter", "Das große X", "Das Fest"},
     {"Das Glühwürmchen", "Der Igel und die Frösche", "Der alte Baum", "Die Hängebrücke", "Der Biber", "Die dunkle Höhle", "Der leuchtende Wald"},
 };
-const char* const STORY_T[2][7][4] = {
-    {{"Luna findet im Stall eine alte Karte.", "Darauf ist ein großes X hinter dem Hügel!", "Sie trabt los – doch der Weg ist zugewachsen.", "Morgen sucht Luna einen anderen Weg."},
-     {"Luna kommt an einen breiten Bach.", "Die Steine darin sind nass und glitschig.", "Vorsichtig, Huf für Huf, geht sie hinüber.", "Geschafft! Dahinter beginnt der Wald."},
-     {"Im Wald ist es dunkel und still.", "Eine Eule ruft: „Wohin so spät, Luna?“", "Luna zeigt ihr die Schatzkarte.", "„Folge den roten Pilzen!“, sagt die Eule."},
-     {"Pilz für Pilz geht es tiefer in den Wald.", "Plötzlich gibt es drei Wege!", "Nur der mittlere hat rote Pilze.", "Er führt zu einer hellen Lichtung."},
-     {"Dunkle Wolken ziehen auf.", "Blitz und Donner! Luna stellt sich unter.", "Der Regen trommelt. Luna wartet geduldig.", "Die Sonne kommt – das X ist ganz nah!"},
-     {"Hinter dem Hügel liegt ein großer Stein.", "Luna schiebt mit aller Kraft …", "… und darunter glitzert etwas!", "Eine Kiste voller goldener Hufeisen!"},
-     {"Luna bringt den Schatz zurück zum Hof.", "Alle Tiere kommen und staunen.", "Jedes Tier bekommt ein goldenes Hufeisen.", "Und Luna bekommt den größten Apfel!"}},
-    {{"Zwischen den Bäumen blinkt ein Licht.", "Es ist Lumi, ein kleines Glühwürmchen.", "Lumi weint: „Ich finde meine Freunde nicht.“", "Fips verspricht: „Wir suchen sie zusammen!“"},
-     {"Am Bach sitzt ein Igel.", "„Ich sah Lichter zum Moor fliegen“, sagt er.", "Im Moor quaken die Frösche laut.", "Ein Frosch zeigt auf einen alten Baum."},
-     {"Der alte Baum hat eine kleine Tür!", "Fips klopft dreimal. Knarr …", "Drinnen wohnt eine Maus mit Brille.", "Sie hat eine Karte vom ganzen Wald."},
-     {"Auf der Karte: der Silbersee.", "Der Weg führt über eine Hängebrücke.", "Sie wackelt – aber Fips ist mutig!", "Am anderen Ufer glitzert der See."},
-     {"Am See sitzt ein trauriger Biber.", "Sein Damm ist kaputt gegangen.", "Fips und Lumi helfen beim Bauen.", "Zum Dank zeigt er ihnen eine Höhle."},
-     {"In der Höhle ist es stockdunkel.", "Lumi leuchtet, so hell sie kann.", "Da – ganz viele kleine Lichter!", "Lumis Freunde! Sie hatten sich versteckt."},
-     {"Alle Glühwürmchen fliegen nach Hause.", "Sie tanzen über der Wiese.", "Der ganze Wald leuchtet.", "Fips hat jetzt viele leuchtende Freunde!"}},
-};
 
 void apple(float x, float y) { disc(x, y, 1.2f, rgb(0xe74c3c)); cell((int)x, (int)y - 2, rgb(0x3fa34d)); }
 
@@ -1634,7 +1618,6 @@ const char* petName(Pet p) {
 
 const char* heroName(Hero h) { return h == FIPS ? "Fips" : "Luna"; }
 const char* brushChapter(Hero h, int day) { return CHAPTER_T[h == FIPS][((day % 7) + 7) % 7]; }
-const char* brushText(Hero h, int day, int beat) { return beat >= 0 && beat < 4 ? STORY_T[h == FIPS][((day % 7) + 7) % 7][beat] : ""; }
 
 void drawBrushStory(uint16_t* buf, Hero h, int day, int beat, float prog, int frame) {
   px = buf;

@@ -209,6 +209,9 @@ nav button i{font-style:normal;font-size:22px;line-height:1}nav button.sel{color
 
 <div class="tab" id="t-dev">
  <section><h2>Name</h2><input id="nm" maxlength="16" aria-label="Name"><button class="wide" id="nmgo">Speichern</button></section>
+ <section><h2>Display</h2><label class="f" for="dbr">Helligkeit <span id="dbrv"></span> %</label><input type="range" id="dbr" min="10" max="100" step="10">
+  <label class="f" for="doff">Display aus nach</label><select id="doff"><option value="10">10 Sekunden</option><option value="15">15 Sekunden</option><option value="30">30 Sekunden</option><option value="60">1 Minute</option><option value="120">2 Minuten</option><option value="0">nie</option></select>
+  <p class="note">AMOLED: Schwarz kostet nichts, Helligkeit viel. Wird die Uhr nur durch Funk geweckt, leuchtet sie gedimmt und geht 8 s nach dem Funk wieder aus.</p></section>
  <section><h2>WLAN</h2><div id="wifi"></div>
   <label class="f" for="ss">Netz hinzufügen</label><input id="ss" placeholder="Name (SSID)" autocapitalize="off">
   <label class="f" for="pw">Passwort</label><input id="pw" type="password" placeholder="leer = offenes Netz">
@@ -284,6 +287,8 @@ function render(){
   <span>Verbrauch</span><span>${pw.drain>0?pw.drain.toFixed(1)+' %/h':'–'}</span><span>Sparmodus</span><span>${pw.saving?'an':'aus'}</span>
   <span>Tiefschlaf</span><span>${pw.sleep||'–'}</span>`;
  if(document.activeElement!==$('pmode'))$('pmode').value=pw.mode;
+ if(s.display&&document.activeElement!==$('dbr')){$('dbr').value=s.display.brightness;$('dbrv').textContent=s.display.brightness}
+ if(s.display&&document.activeElement!==$('doff'))$('doff').value=[10,15,30,60,120,0].includes(s.display.screenOff)?s.display.screenOff:30;
  if(document.activeElement!==$('pdeep'))$('pdeep').value=pw.deep;
  batChart(pw.history);
  const mu=s.music;$('np').innerHTML=mu.active?`<b>${mu.playing?'▶':'⏸'} ${esc(mu.title)}</b><br>${esc(mu.artist)}${mu.dur?' · '+Math.floor(mu.pos/60)+':'+String(Math.floor(mu.pos%60)).padStart(2,'0')+' / '+Math.floor(mu.dur/60)+':'+String(mu.dur%60).padStart(2,'0'):''}${mu.msg?'<br><span class="bad">'+esc(mu.msg)+'</span>':''}`:'Gerade läuft nichts.';
@@ -383,6 +388,8 @@ function unallow(id){post('n8n/allow',{items:S.assist.allowed.filter(a=>a.id!=id
 $('phonego').onclick=()=>{location.href='/funk'};
 $('findgo').onclick=()=>post('find',{on:true});
 $('pmode').onchange=e=>post('power',{mode:+e.target.value});
+$('dbr').oninput=e=>$('dbrv').textContent=e.target.value;$('dbr').onchange=e=>post('display',{brightness:+e.target.value},true);
+$('doff').onchange=e=>post('display',{screenOff:+e.target.value});
 $('pdeep').onchange=e=>post('power',{deep:+e.target.value});
 $('fwgo').onclick=()=>{const f=$('fwfile').files[0];if(!f)return toast('Erst eine Datei wählen');
  const fd=new FormData();fd.append('file',f,f.name);const x=new XMLHttpRequest();x.open('POST','/api/update');x.setRequestHeader('X-Pin',pin);
@@ -581,6 +588,9 @@ static void state() {
   JsonObject gm = d["game"].to<JsonObject>();
   gm["level"] = gl;
   gm["ms"] = gms;
+  JsonObject dp = d["display"].to<JsonObject>();
+  dp["brightness"] = cfg.brightness;
+  dp["screenOff"] = cfg.screenOff;
   JsonObject pw = d["power"].to<JsonObject>();
   pw["mode"] = (int)pwr::mode();
   pw["saving"] = pwr::saving();
@@ -766,6 +776,15 @@ void begin() {
   });
   on("/api/update", HTTP_POST, []() {});  // otaReceive
   on("/api/search", HTTP_GET, search);
+  on("/api/display", HTTP_POST, []() {
+    if (!authed()) return;
+    JsonDocument d;
+    if (!body(d)) return msg("Ungültige Anfrage", 400);
+    if (d["brightness"].is<int>()) { cfg.brightness = constrain(d["brightness"].as<int>(), 10, 100); hwBrightness(cfg.brightness); }
+    if (d["screenOff"].is<int>()) cfg.screenOff = constrain(d["screenOff"].as<int>(), 0, 600);
+    settingsSave();
+    msg("Gespeichert");
+  });
   on("/api/kids", HTTP_POST, setKids);
   on("/api/kids/day", HTTP_POST, []() {
     if (!authed()) return;

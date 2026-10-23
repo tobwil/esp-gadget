@@ -24,6 +24,8 @@ lv_obj_t* topScreen() { return depth ? stack[depth - 1].scr : nullptr; }
 void play(uint8_t fx) { audio::play((audio::Fx)fx); }
 
 static bool bezelActive = false, bzMoved = false;
+static uint32_t funkWakeAt = 0;
+bool funkDim() { return funkWakeAt && hwScreenOn() && (int32_t)(hwLastInput() - funkWakeAt) < 0; }
 bool bezelMoved() { return bzMoved; }
 
 // Gesten wie bei Wear OS / watchOS:
@@ -760,7 +762,15 @@ void tick() {
     lv_obj_center(pttRing);
   }
   bool rx = radio::receiving() && top() != &PAGE_RADIO, ph = phone::talking();
-  if (rx || ph) { if (!hwScreenOn()) hwScreen(true); hwActivity(); }
+  if (rx || ph) {
+    if (!hwScreenOn()) {  // vom Funk geweckt: gleich gedimmt (power.cpp hält das, bis jemand die Uhr anfasst)
+      funkWakeAt = millis();
+      hwBrightnessCap(kids::night() ? 20 : 30);
+      hwScreen(true);
+    }
+    hwActivity();
+  }
+  if (!hwScreenOn()) funkWakeAt = 0;
   rxShow(rx || ph, ph ? "Handy" : radio::talker());
   radio::Event ev;
   while (radio::takeEvent(&ev)) {

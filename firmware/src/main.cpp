@@ -164,6 +164,7 @@ static void radioAlarm() {
 static void power() {
   // Display aus nach der eingestellten Zeit ohne Bedienung
   uint32_t off = pwr::screenOffS();
+  if (ui::funkDim()) off = off ? min<uint32_t>(off, 8) : 8;  // nur vom Funk geweckt: bald wieder dunkel
   if (hwScreenOn() && off && hwIdleMs() > off * 1000UL && !cw::ringing() && !radio::transmitting())
     hwScreen(false);
   // Tiefschlaf im Akkubetrieb, wenn nichts mehr läuft (pausierte Musik hält die Uhr nicht wach);
@@ -190,6 +191,7 @@ void loop() {
   hwLoop();
   BtnEvent b;
   while ((b = hwButton()) != BTN_NONE) {
+    hwInput();
     if (b == PWR_SHORT) {
       hwScreen(!hwScreenOn());
       if (hwScreenOn()) ui::wake();
@@ -199,7 +201,7 @@ void loop() {
     if (b != BOOT_HOLD && b != BOOT_RELEASE) hwActivity();
     ui::onButton(b);
   }
-  if (hwWakeRequested()) { hwScreen(true); ui::wake(); }
+  if (hwWakeRequested()) { hwInput(); hwScreen(true); ui::wake(); }
   // Wutmodus: Schütteln weckt das Display
   static uint32_t shakeAt = 0;
   if (kids::angry() && !hwScreenOn() && millis() - shakeAt > 40) {

@@ -208,7 +208,7 @@ void poll() {
   }
 
   // Helligkeit: Obergrenze nachts (Kindermodus) und im Sparmodus
-  hwBrightnessCap(kids::night() ? 20 : active ? 40 : 100);
+  hwBrightnessCap(kids::night() || ui::funkDim() ? (kids::night() ? 20 : 30) : active ? 40 : 100);
 
   // Strom sparen, sobald nichts gestreamt wird: das WLAN-Funkmodul hört dann nur zu den Beacons des Routers
   // hin (Modem-Schlaf; Funk mit anderen Uhren läuft im WLAN per Multicast weiter), bei dunklem Display

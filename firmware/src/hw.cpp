@@ -165,6 +165,9 @@ void hwScreen(bool on) {
 bool hwScreenOn() { return screenOn; }
 void hwActivity() { lastActivity = millis(); }
 uint32_t hwIdleMs() { return millis() - lastActivity; }
+static uint32_t lastInput = 0;
+void hwInput() { lastInput = millis(); }
+uint32_t hwLastInput() { return lastInput; }
 void hwTouchPoll() { if (indev) lv_indev_read(indev); }
 bool hwWakeRequested() { bool w = wakeReq; wakeReq = false; return w; }
 
@@ -236,7 +239,7 @@ static void touchRead(lv_indev_t*, lv_indev_data_t* data) {
   data->point.x = lx;
   data->point.y = ly;
   data->state = pressed && !swallow ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
-  if (pressed) hwActivity();
+  if (pressed) { hwActivity(); hwInput(); }
 }
 
 // ------------------------------------------------------------------ Bildschirmfoto und Fernsteuerung

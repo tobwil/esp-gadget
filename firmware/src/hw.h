@@ -23,6 +23,8 @@ bool hwScreenOn();
 void hwActivity();             // Bedienung: Zeit bis zum Abschalten neu starten
 void hwTouchPoll();  // Touch lesen ohne den Rest der Oberfläche (beim Dösen, für den Doppeltipp)
 uint32_t hwIdleMs();           // ms seit der letzten Bedienung
+void hwInput();                // echte Bedienung (Touch, Taste) – nicht Funk oder Musik
+uint32_t hwLastInput();        // millis() der letzten echten Bedienung
 bool hwWakeRequested();        // Touch bei dunklem Display
 
 int hwBattery();               // %, −1 = kein Akku

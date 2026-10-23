@@ -110,10 +110,10 @@ let ws,ctx,src,proc,on=false,pin='',playAt=0;
 function audio(){if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)();if(ctx.state=='suspended')ctx.resume()}
 document.addEventListener('pointerdown',audio,{once:true});
 setInterval(()=>{if(ws&&ws.readyState==1)ws.send('ping')},5000);
-// Stimme von der Uhr (16 kHz) abspielen
+// Stimme von der Uhr (16 kHz) abspielen – mit 300 ms Puffer, damit verspätete WLAN-Pakete keine Lücken reißen
 function play(buf){if(!ctx)return;const x=new Int16Array(buf),b=ctx.createBuffer(1,x.length,16000),c=b.getChannelData(0);
  for(let i=0;i<x.length;i++)c[i]=x[i]/32768;const s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);
- playAt=Math.max(playAt,ctx.currentTime+0.05);s.start(playAt);playAt+=b.duration}try{pin=localStorage.getItem('pin')||''}catch(e){}
+ if(playAt<ctx.currentTime+0.02)playAt=ctx.currentTime+0.3;s.start(playAt);playAt+=b.duration}try{pin=localStorage.getItem('pin')||''}catch(e){}
 const s=t=>document.getElementById('s').textContent=t,b=document.getElementById('b');
 function connect(){ws=new WebSocket('wss://'+location.host+'/ws');ws.binaryType='arraybuffer';
  ws.onopen=()=>{ws.send('pin:'+pin);s('Bereit')};ws.onclose=()=>{s('Getrennt – verbinde neu …');setTimeout(connect,1500)};

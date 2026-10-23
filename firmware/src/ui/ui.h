@@ -63,6 +63,7 @@ void listFit(lv_obj_t* list);   // nach dem Füllen aufrufen
 
 // Hinweise und Dialoge (oberste Ebene)
 void toast(const char* text, uint32_t ms = 2500);
+bool funkDim();                    // Display nur vom Funk geweckt, noch nicht angefasst: gedimmt, bald aus
 void keyboard(const char* title, const char* initial, bool password, void (*done)(const char* text));
 void powerDialog();
 // Uhr finden (aus der Weboberfläche): 30 s klingeln mit „Hier bin ich!“, Antippen oder BOOT beendet

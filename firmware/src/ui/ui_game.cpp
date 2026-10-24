@@ -558,7 +558,7 @@ static void showTimeUp() {  // freundlich, ohne Knopf zum Weiterspielen
   lv_obj_add_flag(hud, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
   imu::sleep(true);
-  result = lv_obj_create(lv_screen_active());
+  result = lv_obj_create(lv_obj_get_screen(menu));  // nicht lv_screen_active(): beim Aufbau der Seite ist noch die alte aktiv
   lv_obj_remove_style_all(result);
   lv_obj_set_size(result, W, H);
   lv_obj_set_style_bg_color(result, C_BG(), 0);

@@ -69,6 +69,7 @@ bool appCommand(const char* line) {
   else if (sscanf(line, "angry %99s", a) == 1) { kids::Cfg k = kids::cfg(); k.angry = !strcmp(a, "on"); if (k.angry) { k.on = true; music::stop(); } kids::set(k); ui::home(); }
   else if (sscanf(line, "shake %99s", a) == 1) angryTestShake = atof(a);
   else if (sscanf(line, "level %99s", a) == 1) gameTestLevel(atoi(a));
+  else if (sscanf(line, "gameplay %99s", a) == 1) gameTestPlayed(atoi(a));  // Test: heute gespielte Balance-Minuten
   else if (!strcmp(line, "talk on")) assist::talk(true);  // Test: Assistent ohne Finger
   else if (!strcmp(line, "talk off")) assist::talk(false);
   else if (sscanf(line, "sleep %99s", a) == 1) music::sleepSet(atoi(a));  // Test: Sleep-Timer in Minuten

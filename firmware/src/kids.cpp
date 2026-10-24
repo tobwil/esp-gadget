@@ -40,6 +40,7 @@ void begin() {
   c.phases = p.getBool("phases", true);
   c.brushParent = p.getBool("brushpar", true);
   c.brushOn = p.getBool("brushon", true);
+  c.gameMin = p.getUChar("gamemin", 15);
   String day = p.getString("day", "");
   p.end();
   store.begin();
@@ -119,6 +120,7 @@ void set(const Cfg& n) {
   p.putBool("phases", c.phases);
   p.putBool("brushpar", c.brushParent);
   p.putBool("brushon", c.brushOn);
+  p.putUChar("gamemin", c.gameMin);
   p.end();
 }
 

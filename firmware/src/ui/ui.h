@@ -97,6 +97,8 @@ extern int kidFaceTestMin;          // Testzeit für Bildschirmfotos (−1 = ech
 void gameTestLevel(int level);     // Balance: Stufe direkt zeigen (Bildschirmfotos)
 void gameRecords(int& lvl, uint32_t& ms);  // Balance-Rekorde: höchste Stufe, schnellste Zeit „Alle Kugeln“ (0 = keine)
 void gameResetRecords();
+int gameTodayMin();  // Balance: heute gespielte Minuten
+void gameTestPlayed(int minutes);  // Test: heute gespielte Minuten setzen
 struct BrushStats { int streak, best, monster, ball, catcher, meadow; uint32_t have; };  // Zähneputzen (ui_brush.cpp)
 BrushStats brushStats();
 void brushTestState(bool restore);

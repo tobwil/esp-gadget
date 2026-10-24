@@ -250,7 +250,10 @@ nav button.sel{background:rgba(201,138,43,.15);color:var(--acc)}nav button.sel.k
   <p class="note">Nach der KAI-Methode: Kauflächen, außen kleine Kreise, innen von Rot nach Weiß. Luna und Fips sagen an, wo es weitergeht. Bei der Monsterjagd hört die Uhr zu: die Zahnmonster verschwinden nur, solange sie Putzen hört. Dazu drei Kipp-Spiele für die freie Hand: Zahnpasta-Kugel, Sterne fangen und Wiesenlauf. Jeden Tag ist ein anderes Spiel dran. Danach gibt es einen Sticker fürs Album, sieben Tage am Stück einen Pokal. Putzen zwei Uhren gleichzeitig, sehen sie sich gegenseitig und bekommen Team-Herzen.</p>
   <div class="row"><div class="t"><b>Nachputz-Hinweis</b><small>Am Ende: „Jetzt putzt Mama oder Papa nach“</small></div><label class="sw"><input type="checkbox" id="kbrushpar"><span></span></label></div>
   <p class="note" id="kbrushst"></p></section>
- <section class="kidc"><h2>Balance-Rekorde</h2><p class="note" id="grec"></p><button class="wide ghost" id="greset">Rekorde zurücksetzen</button></section>
+ <section class="kidc"><h2>Balance</h2>
+  <label class="f" for="kgame">Spielzeit pro Tag</label><select id="kgame"><option value="10">10 Minuten</option><option value="15">15 Minuten</option><option value="20">20 Minuten</option><option value="30">30 Minuten</option><option value="45">45 Minuten</option><option value="0">ohne Grenze</option></select>
+  <p class="note">Gezählt wird nur echtes Spielen. Zwei Minuten vorher kommt ein Hinweis, die laufende Stufe darf noch zu Ende gespielt werden; dann heißt es „Für heute genug gekugelt – morgen geht’s weiter“. Gilt nur im Kindermodus.</p>
+  <p class="note" id="grec"></p><button class="wide ghost" id="greset">Rekorde zurücksetzen</button></section>
  <section class="kidc"><h2>Schlafenszeit</h2>
   <div class="row"><div class="t"><b>Nachts sperren</b><small>Ab der Bettzeit bis zum Aufstehen: keine Apps, kein Funk, gedimmt</small></div><label class="sw"><input type="checkbox" id="knight"><span></span></label></div>
   <label class="f" for="kstory">Abends hören: so lange nach der Bettzeit</label>
@@ -359,7 +362,7 @@ function render(){
  if(document.activeElement!==$('kw'))$('kw').value=hm(k.wake);if(document.activeElement!==$('kb'))$('kb').value=hm(k.bed);
  [...$('kplace').children].forEach(b=>b.classList.toggle('sel',+b.dataset.v==+k.school));
  const r=s.routines;
- $('grec').innerHTML=s.game?`Ins Ziel: ${s.game.level?'<b>Stufe '+s.game.level+'</b>':'noch keiner'} · Alle Kugeln: ${s.game.ms?'<b>'+(s.game.ms/1000).toFixed(1).replace('.',',')+' s</b>':'noch keiner'}`:'';
+ $('grec').innerHTML=s.game?`Heute gespielt: <b>${s.game.todayMin} min</b>${k.gameMin?' von '+k.gameMin:''}<br>Rekorde – Ins Ziel: ${s.game.level?'<b>Stufe '+s.game.level+'</b>':'noch keiner'} · Alle Kugeln: ${s.game.ms?'<b>'+(s.game.ms/1000).toFixed(1).replace('.',',')+' s</b>':'noch keiner'}`:'';if(document.activeElement!==$('kgame'))$('kgame').value=k.gameMin;
  $('rst2').innerHTML=`⭐ heute <b>${r.today}</b> · Woche <b>${r.week}</b> · insgesamt <b>${r.total}</b>`;
  $('rnow').innerHTML=[['Morgens',r.morning],['Abends',r.evening]].map(([n,l])=>`<p class="note">${n}: `+l.map(i=>(i.done?'✅ ':'⬜ ')+esc(i.text)).join(' · ')+'</p>').join('');
  if(document.activeElement!==$('rmorn'))$('rmorn').value=r.morning.map(i=>i.text).join('\n');
@@ -474,7 +477,7 @@ $('dadd').onclick=()=>{const L=dPlan[dDay];L.push({t:L.length?Math.min(L[L.lengt
 $('dday').onclick=e=>{if(!e.target.dataset.v)return;dDay=e.target.dataset.v;[...$('dday').children].forEach(b=>b.classList.toggle('sel',b==e.target));dRender()};
 $('dsave').onclick=()=>{dDirty=false;post('kids/day',{weekday:dPlan.weekday,weekend:dPlan.weekend})};
 $('dreset').onclick=()=>{if(!confirm('Eigenen Ablauf verwerfen und den Standard nehmen?'))return;dDirty=false;post('kids/day',{reset:true})};
-$('knight').onchange=e=>kids({nightLock:e.target.checked});$('kstory').onchange=e=>kids({storyMin:+e.target.value});
+$('knight').onchange=e=>kids({nightLock:e.target.checked});$('kgame').onchange=e=>kids({gameMin:+e.target.value});$('kstory').onchange=e=>kids({storyMin:+e.target.value});
 $('kv').oninput=e=>$('kvv').textContent=e.target.value;$('kv').onchange=e=>kids({maxVol:+e.target.value});
 $('ssrc').onclick=e=>{if(!e.target.dataset.v)return;src=e.target.dataset.v;[...$('ssrc').children].forEach(b=>b.classList.toggle('sel',b==e.target));if(val('sq'))search()};
 $('sgo').onclick=search;$('sq').onkeydown=e=>{if(e.key=='Enter')search()};
@@ -710,6 +713,7 @@ static void state() {
   JsonObject gm = d["game"].to<JsonObject>();
   gm["level"] = gl;
   gm["ms"] = gms;
+  gm["todayMin"] = gameTodayMin();
   JsonObject dp = d["display"].to<JsonObject>();
   dp["brightness"] = cfg.brightness;
   dp["screenOff"] = cfg.screenOff;
@@ -759,6 +763,7 @@ static void state() {
   ko["nap"] = kc.nap;
   ko["nightLock"] = kc.nightLock;
   ko["storyMin"] = kc.storyMin;
+  ko["gameMin"] = kc.gameMin;
   ko["world"] = kc.world;
   ko["pet"] = kc.pet;
   ko["petName"] = kc.petName;
@@ -807,6 +812,7 @@ static void setKids() {
   c.nap = d["nap"] | c.nap;
   c.nightLock = d["nightLock"] | c.nightLock;
   c.storyMin = d["storyMin"] | c.storyMin;
+  c.gameMin = d["gameMin"] | c.gameMin;
   c.angry = d["angry"] | c.angry;
   c.world = d["world"] | c.world;
   c.pet = d["pet"] | c.pet;

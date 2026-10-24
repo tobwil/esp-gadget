@@ -6,6 +6,8 @@
 #include <math.h>
 #include "../audio.h"
 #include "../imu.h"
+#include "../kids.h"
+#include "../net.h"
 #include "game_theme.h"
 #include "ui.h"
 
@@ -68,6 +70,59 @@ static void saveBest() {
   p.putUInt("ms", bestMs);
   p.end();
 }
+
+// ------------------------------------------------------------------ Spielzeit pro Tag (Kindermodus)
+// Gezählt wird nur, solange eine Runde läuft. Zwei Minuten vorher ein Hinweis; ist die Zeit um, darf die laufende
+// Stufe noch zu Ende gespielt werden (höchstens 3 Minuten länger), dann „Für heute genug gekugelt“. Neuer Tag um
+// Mitternacht; der Stand übersteht Neustarts (NVS „game“: pd Tag, pm gespielte ms).
+
+static uint32_t playedMs = 0, savedPlayedMs = 0;
+static int playDay = -1;
+static bool warned = false;
+
+static int dayNow() {
+  if (!timeValid()) return -1;
+  time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+  t.tm_hour = 12;
+  t.tm_min = t.tm_sec = 0;
+  return (int)(mktime(&t) / 86400);
+}
+
+static void loadPlay() {
+  Preferences p;
+  p.begin("game", true);
+  playDay = p.getInt("pd", -1);
+  playedMs = savedPlayedMs = p.getUInt("pm", 0);
+  p.end();
+}
+
+static void savePlay() {
+  if (playedMs == savedPlayedMs) return;
+  Preferences p;
+  p.begin("game", false);
+  p.putInt("pd", playDay);
+  p.putUInt("pm", playedMs);
+  p.end();
+  savedPlayedMs = playedMs;
+}
+
+static void rollPlayDay() {
+  int d = dayNow();
+  if (d >= 0 && d != playDay) { playDay = d; playedMs = 0; warned = false; savedPlayedMs = UINT32_MAX; savePlay(); }
+}
+
+static uint32_t limitMs() { return kids::on() && kids::cfg().gameMin ? kids::cfg().gameMin * 60000u : 0; }
+static bool timeUp() { rollPlayDay(); return limitMs() && playedMs >= limitMs(); }
+
+int gameTodayMin() {
+  if (playDay < 0 && playedMs == 0) loadPlay();
+  rollPlayDay();
+  return (playedMs + 30000) / 60000;
+}
+
+static void showTimeUp();
 
 // ------------------------------------------------------------------ Aufbau einer Runde
 
@@ -297,6 +352,7 @@ static void showResult(const char* line1, const char* line2) {
   lv_obj_add_event_cb(again, [](lv_event_t*) {
     lv_obj_delete(result);
     result = nullptr;
+    if (timeUp()) { showTimeUp(); return; }
     if (mode == 1) level = 1;
     newRound();
   }, LV_EVENT_CLICKED, nullptr);
@@ -320,6 +376,17 @@ static void step(lv_timer_t*) {
   lastStep = now;
   if (!mode || result) return;
   hwActivity();  // Display bleibt beim Spielen an
+  if (limitMs()) {
+    rollPlayDay();
+    playedMs += (uint32_t)(dt * 1000);
+    static uint32_t savedAt = 0;
+    if (now - savedAt > 30000) { savedAt = now; savePlay(); }
+    if (!warned && playedMs + 120000 >= limitMs() && playedMs < limitMs()) {
+      warned = true;
+      toast("Noch 2 Minuten Balance für heute");
+    }
+    if (playedMs >= limitMs() + 180000) { showTimeUp(); return; }  // an einer Stufe festgebissen: trotzdem Schluss
+  }
   float gx = 0, gy = 0;
   imu::gravity(gx, gy);
   if (mode == 2) setHud();  // laufende Zeit
@@ -333,7 +400,12 @@ static void step(lv_timer_t*) {
   }
   if (endAt && now > endAt) {
     endAt = 0;
-    if (mode == 1) { level++; if (level - 1 > bestLevel) { bestLevel = level - 1; saveBest(); } newRound(); }
+    if (mode == 1) {
+      level++;
+      if (level - 1 > bestLevel) { bestLevel = level - 1; saveBest(); }
+      if (timeUp()) showTimeUp();  // Stufe geschafft, Zeit um: hier aufhören
+      else newRound();
+    }
     return;
   }
 
@@ -463,7 +535,37 @@ static void step(lv_timer_t*) {
 
 // ------------------------------------------------------------------ Seite
 
+static void showTimeUp() {  // freundlich, ohne Knopf zum Weiterspielen
+  savePlay();
+  mode = 0;
+  clearField(false);
+  lv_obj_add_flag(hud, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
+  imu::sleep(true);
+  result = lv_obj_create(lv_screen_active());
+  lv_obj_remove_style_all(result);
+  lv_obj_set_size(result, W, H);
+  lv_obj_set_style_bg_color(result, C_BG(), 0);
+  lv_obj_set_style_bg_opa(result, LV_OPA_COVER, 0);
+  lv_obj_t* a = label(result, &font_text_32, C_BRASS(), "Für heute genug gekugelt!");
+  lv_label_set_long_mode(a, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(a, 330);
+  lv_obj_set_style_text_align(a, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_align(a, LV_ALIGN_CENTER, 0, -70);
+  char b[80];
+  if (bestLevel) snprintf(b, sizeof(b), "Morgen geht's weiter.\nDein Rekord: Stufe %d", bestLevel);
+  else snprintf(b, sizeof(b), "Morgen geht's weiter.");
+  lv_obj_t* t = label(result, &font_text_20, C_TEXT(), b);
+  lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_align(t, LV_ALIGN_CENTER, 0, 10);
+  lv_obj_t* ok = pill(result, "OK", C_BRASS(), C_BG());
+  lv_obj_align(ok, LV_ALIGN_CENTER, 0, 90);
+  lv_obj_add_event_cb(ok, [](lv_event_t*) { back(); }, LV_EVENT_CLICKED, nullptr);
+  audio::play(audio::FX_CHIME);
+}
+
 static void start(int m) {
+  if (timeUp()) { showTimeUp(); return; }
   mode = m;
   level = 1;
   lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
@@ -517,9 +619,12 @@ static void build(lv_obj_t* scr) {
   result = nullptr;
   lastStep = millis();
   timer = lv_timer_create(step, 16, nullptr);
+  loadPlay();
+  if (timeUp()) showTimeUp();
 }
 
 static void leave() {
+  savePlay();
   if (timer) { lv_timer_delete(timer); timer = nullptr; }
   imu::sleep(true);
   mode = 0;
@@ -537,6 +642,15 @@ void gameResetRecords() {
   bestLevel = 0;
   bestMs = 0;
   saveBest();
+}
+
+// Test über USB („gameplay MIN“): heute gespielte Minuten setzen
+void gameTestPlayed(int minutes) {
+  loadPlay();
+  rollPlayDay();
+  playedMs = (uint32_t)std::max(0, minutes) * 60000u;
+  warned = false;
+  savePlay();
 }
 
 // Für Bildschirmfotos: direkt eine Stufe zeigen

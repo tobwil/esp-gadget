@@ -102,6 +102,11 @@ hat ein eigenes Thema. **Alle Kugeln**: drei Kugeln in drei Löcher, auf Zeit, m
 Stufe bzw. laufende Zeit und der Rekord; die Rekorde zeigt auch die Weboberfläche (Reiter Kinder), nur dort
 lassen sie sich zurücksetzen.
 
+**Spielzeit pro Tag** (Kindermodus, Weboberfläche → Kinder → Balance, Standard 15 Minuten, auch 10–45 oder ohne
+Grenze): Gezählt wird nur echtes Spielen. Zwei Minuten vorher kommt ein Hinweis, die laufende Stufe darf noch zu Ende
+gespielt werden, dann heißt es freundlich „Für heute genug gekugelt – morgen geht's weiter“ (der Rekord bleibt).
+Neuer Tag um Mitternacht, der Stand übersteht Neustarts; die Weboberfläche zeigt, wie viel heute gespielt wurde.
+
 ## Kindermodus
 
 ![Tagesablauf](docs/screens/kindertag.png)
@@ -323,7 +328,7 @@ Befehle im seriellen Monitor:
 - **Eingaben:** `tap X Y`, `hold X Y`, `swipe l|r|u|d`, `boot`, `pwr`, `shot`
 - **Seiten:** `page apps|music|timer|stopwatch|alarm|radio|settings|game|brush|web`, `home`, `browse search:Coldplay`
 - **Musik:** `toggle`, `next`, `vol 60`, `browse rl:tag:kids`, `browse ard:soccer`, `voice start` / `voice stop`, `page assist`, `talk on` / `talk off` (Assistentin), `sleep 1` (Sleep-Timer), `alarm 7:30`, `alarmsrc ard:set:10815223 Name` (`-` = Ton)
-- **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung), `tilt 0.3 -0.2` / `tilt off` (Neigung vortäuschen), `angry on|off`, `shake 10` (10 s Schütteln vortäuschen)
+- **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `gameplay 10` (heute gespielte Balance-Minuten setzen), `imu` (Neigung), `tilt 0.3 -0.2` / `tilt off` (Neigung vortäuschen), `angry on|off`, `shake 10` (10 s Schütteln vortäuschen)
 - **Zähneputzen:** `page brush`, `brush save` / `brush load` (Album, Serie und Rekorde sichern und zurückholen; dazwischen wird die Routine nicht abgehakt), `ear on|off` (was das Mikrofon bei der Monsterjagd hört, je Prüfung eine Zeile)
 - **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status` (mit Laufzeit, freiem Speicher und Temperaturen), `dump` (alle Texte auf dem Bildschirm und der obersten Ebene mit Lage), `poweroff`
 

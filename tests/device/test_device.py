@@ -717,6 +717,34 @@ def funk_aus(w, ctx):
 
 
 @test
+def balance_tageslimit(w, ctx):
+    """Kindermodus: ist die Spielzeit für heute um, zeigt Balance „Für heute genug“ statt des Menüs."""
+    ip = ctx["ip"]
+    st = json.loads(http(f"https://{ip}/api/state")[1])
+    if not st["kids"]["on"]:
+        return "übersprungen (Kindermodus aus)"
+    k0, played0 = st["kids"]["gameMin"], st["game"]["todayMin"]
+    try:
+        assert http(f"https://{ip}/api/kids", {"gameMin": 10})[0] == 200
+        w.send("gameplay 3", 0.3)
+        w.send("home", 0.8)
+        w.send("page game", 1.5)
+        assert w.has("Ins Ziel") and not w.has("genug"), f"bei 3 von 10 min gesperrt: {w.texts()}"
+        w.send("gameplay 10", 0.3)
+        w.send("home", 0.8)
+        w.send("page game", 1.5)
+        w.shot("balance_genug")
+        assert w.has("Für heute genug gekugelt"), f"Limit greift nicht: {w.texts()}"
+        assert not w.has("Ins Ziel") or w.has("genug"), "Spielmenü trotz Limit"
+        st2 = json.loads(http(f"https://{ip}/api/state")[1])
+        assert st2["game"]["todayMin"] == 10, f"heute gespielt: {st2['game']['todayMin']} statt 10"
+    finally:
+        w.send(f"gameplay {played0}", 0.3)
+        http(f"https://{ip}/api/kids", {"gameMin": k0})
+        w.send("home", 0.8)
+
+
+@test
 def voller_durchlauf(w, ctx):
     if not FULL:
         return "übersprungen"

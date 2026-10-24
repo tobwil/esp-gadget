@@ -29,6 +29,7 @@ struct Cfg {
   bool phases;           // Tagesablauf auf dem Zifferblatt (sonst nur Tag und Nacht)
   bool brushParent;      // Zähneputzen: am Ende „Mama oder Papa putzt nach“
   bool brushOn;          // Zähneputzen-App anbieten
+  uint8_t gameMin;       // Balance: Spielzeit pro Tag in Minuten (0 = ohne Grenze)
 };
 
 void begin();

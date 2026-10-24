@@ -74,6 +74,7 @@ String make(bool secrets) {
   ko["adventure"] = k.adventure;
   ko["brushParent"] = k.brushParent;
   ko["brushOn"] = k.brushOn;
+  ko["gameMin"] = k.gameMin;
   {
     JsonDocument dd;
     deserializeJson(dd, kids::dayJson());
@@ -159,6 +160,7 @@ bool restore(const String& json, String& err) {
     k.adventure = ko["adventure"] | k.adventure;
     k.brushParent = ko["brushParent"] | k.brushParent;
     k.brushOn = ko["brushOn"] | k.brushOn;
+    k.gameMin = ko["gameMin"] | k.gameMin;
     if (ko["pin"].is<const char*>()) snprintf(k.pin, sizeof(k.pin), "%s", (const char*)ko["pin"]);
     kids::set(k);
     if (ko["day"]) {

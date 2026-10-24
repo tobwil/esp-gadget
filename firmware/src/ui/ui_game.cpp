@@ -230,6 +230,16 @@ static void addBall(float x, float y) {
 }
 
 // Anzeige oben: Stufe bzw. Kugeln und laufende Zeit, darunter der Rekord
+// Die Anzeige oben (Stufe, Rekord bzw. Kugeln und Zeit) erscheint nur kurz: zu Beginn jeder Stufe und wenn eine
+// Kugel ins Loch fällt – sonst verdeckt sie Eingänge im Spielfeld
+static uint32_t hudUntil = 0;
+
+static void hudFlash(uint32_t ms) {
+  lv_anim_delete(hud, nullptr);  // laufendes Ausblenden abbrechen
+  lv_obj_set_style_opa(hud, LV_OPA_COVER, 0);
+  hudUntil = millis() + ms;
+}
+
 static void setHud() {
   char t[80], r[32] = "";
   if (mode == 1) {
@@ -332,6 +342,7 @@ static void newRound() {
   endAt = resetAt = 0;
   setHud();
   lv_obj_move_foreground(hud);
+  hudFlash(2500);
 }
 
 // ------------------------------------------------------------------ Ergebnis
@@ -389,7 +400,11 @@ static void step(lv_timer_t*) {
   }
   float gx = 0, gy = 0;
   imu::gravity(gx, gy);
-  if (mode == 2) setHud();  // laufende Zeit
+  if (mode == 2) setHud();  // laufende Zeit (sichtbar nur, solange die Anzeige eingeblendet ist)
+  if (hudUntil && now > hudUntil) {
+    hudUntil = 0;
+    lv_obj_fade_out(hud, 400, 0);
+  }
 
   if (resetAt && now > resetAt) {  // nach einem Fehler: Kugel zurück zum Start
     resetAt = 0;
@@ -515,6 +530,7 @@ static void step(lv_timer_t*) {
         h.filled = true;
         audio::play(audio::FX_TAP);
         setHud();
+        hudFlash(1500);  // „2 von 3“ kurz zeigen
         int in = 0;
         for (int q = 0; q < nb; q++) in += balls[q].in;
         if (in == nb) {

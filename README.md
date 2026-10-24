@@ -231,7 +231,10 @@ Direkt verlinkbar (`#kinder`, `#musik`, `#ki`, `#geraet`). Schlüssel und Tokens
 
 **Nur HTTPS:** Die Uhr stellt sich beim ersten Start ein eigenes Zertifikat aus, deshalb warnt der Browser
 einmal („trotzdem öffnen“) – danach ist die Verbindung verschlüsselt, auch PIN und Schlüssel. HTTPS ist
-außerdem nötig, damit der Browser das Mikrofon für den Funk freigibt.
+außerdem nötig, damit der Browser das Mikrofon für den Funk freigibt. Das Zertifikat hält sich an die Regeln der Browser: 397 Tage
+gültig (Chrome, Brave & Co. lehnen längere als „Gültigkeitsdauer zu lang“ ab), Name und IP als Subject Alternative
+Name, Serverzertifikat; die Uhr erneuert es 30 Tage vor Ablauf und wenn sie eine neue IP bekommt (dann warnt der
+Browser einmal neu).
 
 **Sicherung:** Gerät → Sicherung lädt alle Einstellungen als JSON herunter (WLAN, Kindermodus, Freigaben,
 Routinen, Favoriten, KI, n8n-Freigaben) und spielt sie wieder ein – etwa auf die zweite Uhr. Passwörter, PIN und
@@ -368,7 +371,7 @@ sh tests/run_host.sh                                              # am Rechner: 
 - **TLS:** mbedTLS mit dem CA-Bundle aus ESP-IDF (`tools/make_crt_bundle.sh`), Speicher dafür im PSRAM.
 - **Cover:** JPEG-Decoder des Chips, rund maskiert; andere Formate über den Bild-Proxy wsrv.nl.
 - **Bewegungssensor:** QMI8658, läuft nur im Spiel und im Wutmodus.
-- **Weboberfläche:** esp_https_server mit selbst ausgestelltem EC-Zertifikat (im NVS); der HTTPS-Task übergibt
+- **Weboberfläche:** esp_https_server mit selbst ausgestelltem EC-Zertifikat (im NVS, 397 Tage, SAN, EKU serverAuth); der HTTPS-Task übergibt
   jede Anfrage an die Hauptschleife, weil Oberfläche und Wiedergabe nicht threadsicher sind. Firmware-Uploads
   schreibt er direkt in den Flash.
 - **KI:** Gemini 3.8 Live über einen eigenen WebSocket-Client (TLS), Push-to-Talk, 16 kHz hinein, 24 kHz Stimme in den Sprachkanal; n8n über den MCP-Server der Instanz (JSON-RPC, Server-Sent Events).

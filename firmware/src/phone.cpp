@@ -4,7 +4,9 @@
 #include <esp_random.h>
 #include <mbedtls/ecp.h>
 #include <mbedtls/pk.h>
+#include <mbedtls/oid.h>
 #include <mbedtls/x509_crt.h>
+#include <time.h>
 #include "audio.h"
 #include "hw.h"
 #include "kids.h"
@@ -47,13 +49,55 @@ String url() { return srv ? "https://" + netIp() + "/funk" : ""; }
 
 static int rng(void*, unsigned char* out, size_t n) { esp_fill_random(out, n); return 0; }
 
+// Selbst ausgestelltes Zertifikat nach den Regeln der Browser: höchstens 397 Tage gültig (Chrome/Brave lehnen
+// längere ab – „Gültigkeitsdauer zu lang“), Name und IP als Subject Alternative Name, Serverzertifikat (EKU).
+// Liegt in NVS („tls“, Fassung „v“) und wird 30 Tage vor Ablauf erneuert. Ohne bekannte Uhrzeit zählt das Baudatum.
+static const int CERT_VERSION = 2, CERT_DAYS = 397;
+
+static time_t buildTime() {  // __DATE__ „Oct 24 2026“
+  static const char* M = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  char mon[4] = "";
+  int d = 1, y = 2026;
+  sscanf(__DATE__, "%3s %d %d", mon, &d, &y);
+  struct tm t = {};
+  t.tm_year = y - 1900;
+  t.tm_mon = (int)((strstr(M, mon) - M) / 3);
+  t.tm_mday = d;
+  t.tm_hour = 12;
+  return mktime(&t);
+}
+
+static void stamp(time_t when, char* out) {  // „YYYYMMDDhhmmss“ (UTC)
+  struct tm t;
+  gmtime_r(&when, &t);
+  strftime(out, 15, "%Y%m%d%H%M%S", &t);
+}
+
+static bool certFresh() {  // Fassung stimmt und (bei bekannter Uhrzeit) noch mehr als 30 Tage gültig
+  mbedtls_x509_crt c;
+  mbedtls_x509_crt_init(&c);
+  bool ok = !mbedtls_x509_crt_parse(&c, (const unsigned char*)cert.c_str(), cert.length() + 1);
+  if (ok && timeValid()) {
+    struct tm e = {};
+    e.tm_year = c.valid_to.year - 1900;
+    e.tm_mon = c.valid_to.mon - 1;
+    e.tm_mday = c.valid_to.day;
+    ok = mktime(&e) - time(nullptr) > 30L * 86400;
+  }
+  mbedtls_x509_crt_free(&c);
+  return ok;
+}
+
 static bool makeCert() {
   Preferences p;
   p.begin("tls", true);
   cert = p.getString("crt", "");
   key = p.getString("key", "");
+  int version = p.getInt("v", 1);
+  String forIp = p.getString("ip", "");
   p.end();
-  if (cert.length() && key.length()) return true;
+  bool sameIp = forIp == netIp();  // neue IP vom Router: neues Zertifikat, sonst passt der Name im Zertifikat nicht
+  if (cert.length() && key.length() && version == CERT_VERSION && sameIp && certFresh()) return true;
   Serial.println("Funk vom Handy: erzeuge Zertifikat …");
   mbedtls_pk_context pk;
   mbedtls_x509write_cert crt;
@@ -76,8 +120,33 @@ static bool makeCert() {
     esp_fill_random(serial, sizeof(serial));
     serial[0] &= 0x7F;
     mbedtls_x509write_crt_set_serial_raw(&crt, serial, sizeof(serial));
-    mbedtls_x509write_crt_set_validity(&crt, "20260101000000", "20460101000000");
-    mbedtls_x509write_crt_set_basic_constraints(&crt, 1, -1);
+    time_t from = (timeValid() ? time(nullptr) : buildTime()) - 86400;  // ein Tag Puffer für schiefe Uhren
+    char nb[16], na[16];
+    stamp(from, nb);
+    stamp(from + (time_t)CERT_DAYS * 86400, na);
+    if (mbedtls_x509write_crt_set_validity(&crt, nb, na)) break;
+    mbedtls_x509write_crt_set_basic_constraints(&crt, 0, -1);  // kein CA, ein Serverzertifikat
+    mbedtls_x509write_crt_set_key_usage(&crt, MBEDTLS_X509_KU_DIGITAL_SIGNATURE | MBEDTLS_X509_KU_KEY_AGREEMENT);
+    mbedtls_asn1_sequence eku = {};
+    eku.buf.tag = MBEDTLS_ASN1_OID;
+    eku.buf.p = (unsigned char*)MBEDTLS_OID_SERVER_AUTH;
+    eku.buf.len = MBEDTLS_OID_SIZE(MBEDTLS_OID_SERVER_AUTH);
+    mbedtls_x509write_crt_set_ext_key_usage(&crt, &eku);
+    // Subject Alternative Name: Name im Netz und die aktuelle IP
+    char dns[48];
+    snprintf(dns, sizeof(dns), "%s.local", netHost());
+    IPAddress ipa;
+    ipa.fromString(netIp());
+    unsigned char ip4[4] = {ipa[0], ipa[1], ipa[2], ipa[3]};
+    mbedtls_x509_san_list ipSan = {}, dnsSan = {};
+    dnsSan.node.type = MBEDTLS_X509_SAN_DNS_NAME;
+    dnsSan.node.san.unstructured_name.p = (unsigned char*)dns;
+    dnsSan.node.san.unstructured_name.len = strlen(dns);
+    ipSan.node.type = MBEDTLS_X509_SAN_IP_ADDRESS;
+    ipSan.node.san.unstructured_name.p = ip4;
+    ipSan.node.san.unstructured_name.len = 4;
+    dnsSan.next = ip4[0] ? &ipSan : nullptr;
+    if (mbedtls_x509write_crt_set_subject_alternative_name(&crt, &dnsSan)) break;
     if (mbedtls_x509write_crt_pem(&crt, buf, 4096, rng, nullptr)) break;
     cert = (const char*)buf;
     if (mbedtls_pk_write_key_pem(&pk, buf, 4096)) break;
@@ -91,6 +160,8 @@ static bool makeCert() {
   p.begin("tls", false);
   p.putString("crt", cert);
   p.putString("key", key);
+  p.putInt("v", CERT_VERSION);
+  p.putString("ip", netIp());
   p.end();
   return true;
 }

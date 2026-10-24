@@ -192,7 +192,7 @@ bis 2 Stunden, Standard 30 Minuten) und wird dann sanft ausgeblendet. Der Wecker
 
 *(abschaltbar: Kinder → Routinen → „Aufgaben auf der Uhr“)*
 
-Morgens (ab dem Aufstehen 2 Stunden) und abends (2 Stunden vor der Bettzeit) zeigt die App **Aufgaben** eine
+Morgens (ab dem Aufstehen – am Wochenende ab dem ersten Eintrag im Wochenend-Plan, wenn die Kinder länger schlafen – bis zum Mittagessen laut Tagesablauf; ist alles abgehakt, nach 2 Stunden) und abends (2 Stunden vor der Bettzeit) zeigt die App **Aufgaben** eine
 kurze Liste zum Abhaken – Anziehen, Zähne putzen, Schlafanzug an … Jeder Haken gibt einen **Stern**, eine ganz
 geschaffte Routine zwei Extrasterne und eine kleine Feier. Läuft eine Routine, öffnet ein Tipp aufs Zifferblatt
 direkt die Liste. Die Aufgaben stehen in der Weboberfläche (Reiter „Kinder“, eine pro Zeile, bis zu acht), dort

@@ -50,9 +50,12 @@ int browseCopy(char* title, size_t titleLen, Item* out, int max, char* err, size
 int query(const char* path, char* title, size_t titleLen, Item* out, int max, char* err, size_t errLen);
 
 void playList(const Item* items, int n, int start, bool force = false);  // force: auch nachts (Eltern per Weboberfläche)
-bool last(Item& out, uint32_t& posSec);  // zuletzt gehörte Folge mit gemerkter Stelle (false = keine oder zu Ende)
-void resumeLast();                        // dort weiterhören
-void forgetLast();                        // „Weiter hören“ ausblenden
+// „Zuletzt gehört“ (Liste „recent“): die letzten 10 Folgen und Sender, neueste zuerst. Folgen setzen an der gemerkten
+// Stelle fort. Im Kindermodus nur, was dort gehört wurde (kid).
+struct Recent { Item item; bool kid; uint32_t posSec; };
+int recent(Recent* out, int max);         // alle Einträge (für die Weboberfläche)
+bool recentRemove(const char* id);        // entfernt den Eintrag und vergisst die Stelle
+void recentClear();
 // Was sich vom gerade Laufenden merken lässt: Sender, Audiothek-Sendung oder Podcast (false = nichts)
 bool favTarget(String& path, String& title, String& sub);
 void toggle();

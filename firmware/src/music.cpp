@@ -64,56 +64,99 @@ static const char* favKind(const char* path) {
 
 static char lastTitle[72] = "";
 
-// zuletzt gehörte Folge (Audiothek, Podcast): „Weiter hören“ oben in der Musik, solange sie nicht zu Ende ist
-static Item lastItem;
-static bool lastKid = false;
+// „Zuletzt gehört“: die letzten Folgen und Sender (neueste zuerst), im PSRAM und in NVS („music“/„recent“).
+// Früher stand nur die letzte Folge oben in jeder Liste – jetzt ein eigener Menüpunkt, Einträge lassen sich entfernen.
+static const int RECENT_MAX = 10;
+struct RecentRec { Item item; bool kid; };
+static RecentRec* rec = nullptr;
+static int recN = 0;
 
-bool last(Item& out, uint32_t& posSec) {
-  if (!lastItem.id[0]) return false;
-  posSec = podcast::resumeSec(lastItem.id);
-  if (posSec < 30) return false;
-  out = lastItem;
+static void recentSave() {
+  Preferences p;
+  p.begin("music", false);
+  if (recN) p.putBytes("recent", rec, recN * sizeof(RecentRec));
+  else p.remove("recent");
+  p.end();
+}
+
+static void remember(const Item& it) {  // nach vorn; doppelte fallen weg
+  if (!rec || it.kind != K_TRACK || !it.id[0]) return;
+  bool kid = kids::on();
+  xSemaphoreTake(mtx, portMAX_DELAY);
+  int at = recN < RECENT_MAX ? recN : RECENT_MAX - 1;
+  for (int i = 0; i < recN; i++)
+    if (!strcmp(rec[i].item.id, it.id)) { at = i; break; }
+  bool same = at == 0 && recN && !strcmp(rec[0].item.id, it.id) && rec[0].kid == kid;
+  if (!same) {
+    memmove(rec + 1, rec, at * sizeof(RecentRec));
+    rec[0] = {it, kid};
+    if (at >= recN) recN = std::min(recN + 1, RECENT_MAX);
+  }
+  xSemaphoreGive(mtx);
+  if (!same) recentSave();
+}
+
+int recent(Recent* out, int max) {
+  int n = 0;
+  xSemaphoreTake(mtx, portMAX_DELAY);
+  for (int i = 0; i < recN && n < max; i++) out[n++] = {rec[i].item, rec[i].kid, 0};
+  xSemaphoreGive(mtx);
+  for (int i = 0; i < n; i++)
+    if (strncmp(out[i].item.id, "radio:", 6)) out[i].posSec = podcast::resumeSec(out[i].item.id);
+  return n;
+}
+
+bool recentRemove(const char* id) {
+  bool found = false;
+  xSemaphoreTake(mtx, portMAX_DELAY);
+  for (int i = 0; i < recN; i++)
+    if (!strcmp(rec[i].item.id, id)) {
+      memmove(rec + i, rec + i + 1, (recN - i - 1) * sizeof(RecentRec));
+      recN--;
+      found = true;
+      break;
+    }
+  xSemaphoreGive(mtx);
+  if (!found) return false;
+  if (strncmp(id, "radio:", 6)) podcast::forgetPos(id);
+  recentSave();
   return true;
 }
 
-static void addResume(Item* it, int* n, bool kid) {
-  Item li;
-  uint32_t sec;
-  if (*n >= BROWSE_MAX || !last(li, sec) || (kid && !lastKid)) return;
-  memmove(it + 1, it, *n * sizeof(Item));
-  (*n)++;
-  it[0] = li;
-  char t[72], sub[56];
-  snprintf(t, sizeof(t), "▶ %s", li.title);
-  snprintf(sub, sizeof(sub), "Weiter bei %u:%02u", (unsigned)(sec / 60), (unsigned)(sec % 60));
-  ucopy(it[0].title, sizeof(it[0].title), t);
-  ucopy(it[0].sub, sizeof(it[0].sub), sub);
+void recentClear() {
+  xSemaphoreTake(mtx, portMAX_DELAY);
+  int n = recN;
+  recN = 0;
+  xSemaphoreGive(mtx);
+  for (int i = 0; i < n; i++)
+    if (strncmp(rec[i].item.id, "radio:", 6)) podcast::forgetPos(rec[i].item.id);
+  recentSave();
 }
 
-// Folge merken für „Weiter hören“ (nur die Anzeige – die Stelle merkt sich der Spieler selbst)
-static void rememberLast(const Item& it) {
-  if (!strcmp(it.id, lastItem.id)) return;  // dieselbe Folge (auch über „Weiter hören“): Titel bleibt
-  lastItem = it;
-  lastKid = kids::on();
-  Preferences p;
-  p.begin("music", false);
-  p.putBytes("last", &lastItem, sizeof(lastItem));
-  p.putBool("lastkid", lastKid);
-  p.end();
+// Liste „recent“ für die Uhr (im Kindermodus nur die eigenen); die Stelle hängt markResume an
+static int recentItems(Item* out, int max, bool kidOnly) {
+  int n = 0;
+  xSemaphoreTake(mtx, portMAX_DELAY);
+  for (int i = 0; i < recN && n < max; i++) {
+    if (kidOnly && !rec[i].kid) continue;
+    out[n] = rec[i].item;
+    if (!out[n].sub[0] && !strncmp(out[n].id, "radio:", 6)) ucopy(out[n].sub, sizeof(out[n].sub), "Radio");
+    n++;
+  }
+  xSemaphoreGive(mtx);
+  return n;
 }
 
-void forgetLast() {
-  lastItem.id[0] = 0;
-  Preferences p;
-  p.begin("music", false);
-  p.remove("last");
-  p.end();
-}
-
-void resumeLast() {
-  Item li;
-  uint32_t sec;
-  if (last(li, sec)) playList(&li, 1, 0, false);
+static void addRecentFolder(Item* it, int* n, bool kidOnly) {
+  if (*n >= BROWSE_MAX) return;
+  int c = 0;
+  xSemaphoreTake(mtx, portMAX_DELAY);
+  for (int i = 0; i < recN; i++) c += !kidOnly || rec[i].kid;
+  xSemaphoreGive(mtx);
+  if (!c) return;
+  char sub[56];
+  snprintf(sub, sizeof(sub), "%d %s · lange drücken = entfernen", c, c == 1 ? "Eintrag" : "Einträge");
+  addList(it, n, "recent", "Zuletzt gehört", sub);
 }
 
 // angefangene Folgen: „· bei 12:34“ an den Untertitel
@@ -135,7 +178,7 @@ static void home(Item* it, int* n, char* title, size_t titleLen) {
   addList(it, n, "ard:home", "ARD Audiothek", "Hörspiele, Wissen, Kinder …");
   addList(it, n, "pc:subs", "Podcasts", "Meine Podcasts und Suche");
   addList(it, n, "favs", "Favoriten", "Gemerkte Sender, Sendungen, Podcasts");
-  addResume(it, n, false);
+  addRecentFolder(it, n, false);
 }
 
 // Kindermodus: nur die freigegebenen Listen
@@ -143,7 +186,7 @@ static void kidsHome(Item* it, int* n, char* title, size_t titleLen, char* err, 
   ucopy(title, titleLen, "Musik");
   *n = kids::list(it, BROWSE_MAX);
   markResume(it, *n);
-  addResume(it, n, true);
+  addRecentFolder(it, n, true);
   if (!*n) ucopy(err, errLen, "Noch nichts freigegeben");
 }
 
@@ -232,9 +275,19 @@ static void worker(void*) {
       ucopy(err, sizeof(err), e);
     } else if (kid) {
       if (!strcmp(path, "home")) kidsHome(tmp, &n, title, sizeof(title), err, sizeof(err));
+      else if (!strcmp(path, "recent")) {
+        ucopy(title, sizeof(title), "Zuletzt gehört");
+        n = recentItems(tmp, BROWSE_MAX, true);
+        if (!n) ucopy(err, sizeof(err), "Noch nichts gehört");
+      }
       else if (kids::released(path)) n = fetch(path, tmp, title, sizeof(title), err, sizeof(err));
       else ucopy(err, sizeof(err), "Nicht freigegeben");
     } else if (!strcmp(path, "home")) home(tmp, &n, title, sizeof(title));
+    else if (!strcmp(path, "recent")) {
+      ucopy(title, sizeof(title), "Zuletzt gehört");
+      n = recentItems(tmp, BROWSE_MAX, false);
+      if (!n) ucopy(err, sizeof(err), "Noch nichts gehört");
+    }
     else if (!strcmp(path, "favs")) {
       ucopy(title, sizeof(title), "Favoriten");
       n = favs::list(tmp, BROWSE_MAX);
@@ -286,6 +339,7 @@ void playList(const Item* list, int n, int start, bool force) {
   if (start < 0 || start >= n || list[start].kind != K_TRACK) return;
   if (kids::musicLocked() && !force) return;  // Schlafenszeit
   const char* id = list[start].id;
+  remember(list[start]);
   if (!strncmp(id, "radio:", 6)) {
     stations.clear();
     int index = 0;
@@ -297,7 +351,6 @@ void playList(const Item* list, int n, int start, bool force) {
     playStation(index);
     active = SRC_RADIO;
   } else if (!strncmp(id, "ard:a:", 6)) {
-    rememberLast(list[start]);
     String show, image, set;
     ard::meta(id + 6, show, image, set);
     favPath = set;
@@ -306,7 +359,6 @@ void playList(const Item* list, int n, int start, bool force) {
     podcast::playUrl(id + 6, list[start].title, show.c_str(), image.c_str(), list[start].dur, false);
     active = SRC_PODCAST;
   } else {
-    rememberLast(list[start]);
     podcast::play(list[start]);
     active = SRC_PODCAST;
     String feed;
@@ -405,10 +457,21 @@ void begin() {
   art::begin();
   favs::begin();
   podcast::begin();
+  rec = (RecentRec*)heap_caps_calloc(RECENT_MAX, sizeof(RecentRec), MALLOC_CAP_SPIRAM);
   Preferences p;
-  p.begin("music", true);
-  if (p.getBytesLength("last") == sizeof(lastItem)) p.getBytes("last", &lastItem, sizeof(lastItem));
-  lastKid = p.getBool("lastkid", false);
+  p.begin("music", false);
+  size_t len = p.getBytesLength("recent");
+  if (rec && len && len % sizeof(RecentRec) == 0 && len <= RECENT_MAX * sizeof(RecentRec)) {
+    p.getBytes("recent", rec, len);
+    recN = len / sizeof(RecentRec);
+  } else if (rec && p.getBytesLength("last") == sizeof(Item)) {  // früher: nur die letzte Folge
+    p.getBytes("last", &rec[0].item, sizeof(Item));
+    rec[0].kid = p.getBool("lastkid", false);
+    recN = rec[0].item.id[0] ? 1 : 0;
+    if (recN) p.putBytes("recent", rec, sizeof(RecentRec));
+  }
+  p.remove("last");
+  p.remove("lastkid");
   p.end();
   xTaskCreatePinnedToCore(worker, "browse", 12288, nullptr, 3, nullptr, 1);
 }

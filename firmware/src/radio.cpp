@@ -75,6 +75,7 @@ static Event events[4];
 static uint8_t evHead = 0, evTail = 0;
 
 uint32_t myId() { return me; }
+bool enabled() { return kids::allowed(kids::A_RADIO); }  // außerhalb des Kindermodus immer an
 bool transmitting() { return txOn; }
 bool receiving() { return rxFrom && millis() - rxLast < 600; }
 const char* talker() { return rxName; }
@@ -162,7 +163,7 @@ static void sendHello() {
 }
 
 void pttDown(uint32_t to) {
-  if (txOn) return;
+  if (txOn || !enabled()) return;
   txTo = to;
   txStop = false;
   audio::play(audio::FX_PTT_ON);
@@ -174,12 +175,14 @@ void pttUp() {
 }
 
 void knock(uint32_t to) {
+  if (!enabled()) return;
   Hdr h{};
   fill(h, P_KNOCK, to);
   send(&h, sizeof(h));
 }
 
 void brushSend(uint8_t hero, uint8_t mode, uint8_t section, uint8_t score, bool done) {
+  if (!enabled()) return;
   BrushPkt p{};
   fill(p.h, P_BRUSH, 0);
   p.hero = hero;
@@ -191,6 +194,7 @@ void brushSend(uint8_t hero, uint8_t mode, uint8_t section, uint8_t score, bool 
 }
 
 bool brushMate(BrushMate* out) {
+  if (!enabled()) return false;
   xSemaphoreTake(lock, portMAX_DELAY);
   bool ok = mate.id && millis() - mate.seen < 6000;
   if (ok) *out = mate;
@@ -204,7 +208,7 @@ void nameChanged() { helloNow = true; }
 // ------------------------------------------------------------------ Empfangen
 
 static void onNow(const esp_now_recv_info_t* info, const uint8_t* data, int len) {
-  if (len < (int)sizeof(Hdr) || len > 250 || data[0] != 'T' || data[1] != 'F') return;
+  if (len < (int)sizeof(Hdr) || len > 250 || data[0] != 'T' || data[1] != 'F' || !enabled()) return;
   RxPkt p;
   p.len = len;
   p.rssi = info->rx_ctrl ? info->rx_ctrl->rssi : 0;
@@ -327,6 +331,15 @@ static void task(void*) {
   bool micRunning = false;
   for (;;) {
     RxPkt p;
+    if (!enabled()) {  // Funk aus: nichts senden, nichts hören, nur einmal je Sekunde nachsehen, ob er wieder an ist
+      if (micRunning) { audio::micStop(); micRunning = false; }
+      txOn = txStop = false;
+      if (udpOn) { udp.stop(); udpOn = false; }
+      xQueueReset(rxq);
+      helloNow = true;  // wieder an: gleich „Hallo“ sagen
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
+    }
     while (xQueueReceive(rxq, &p, txOn ? 0 : pdMS_TO_TICKS(pwr::dozing() ? 100 : 10)) == pdTRUE) handle(p);
 
     // UDP im WLAN
@@ -383,6 +396,7 @@ static void task(void*) {
 }
 
 int peers(Peer* out, int max) {
+  if (!enabled()) return 0;
   xSemaphoreTake(lock, portMAX_DELAY);
   int n = 0;
   for (int i = 0; i < PEER_MAX && n < max; i++)

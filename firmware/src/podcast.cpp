@@ -69,6 +69,11 @@ static void loadPos(const char* url, uint32_t* bytes, uint32_t* sec) {
   *sec = v & 0xFFFFF;
 }
 
+void forgetPos(const char* id) {
+  String url = !strncmp(id, "ard:a:", 6) ? String(id + 6) : episodeUrl(id);
+  if (url.length()) savePos(url.c_str(), 0, 0);
+}
+
 uint32_t resumeSec(const char* id) {
   String url = !strncmp(id, "ard:a:", 6) ? String(id + 6) : episodeUrl(id);
   if (!url.length()) return 0;

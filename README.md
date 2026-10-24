@@ -58,8 +58,10 @@ Wie bei Pixel Watch und Apple Watch ist das Zifferblatt die Mitte:
   gemerkter Position, **alle ARD-Radiosender live** und **„Fußball live“** – die Sportschau-Übertragungen
   (Bundesliga-Konferenz und Einzelspiele, 2. Liga, Pokal, Europapokal), laufende und kommende.
 - **Podcasts** über die iTunes-Suche.
-- **Weiter hören:** Angefangene Folgen zeigen in den Listen „bei 12:34“; nach dem Stoppen steht die zuletzt gehörte
-  Folge oben in der Musik (und in der Weboberfläche) zum Weiterhören – bis sie zu Ende gehört ist.
+- **Zuletzt gehört:** eigener Menüpunkt in der Musik mit den letzten 10 Folgen und Sendern, neueste zuerst; Folgen
+  setzen an der gemerkten Stelle fort („bei 12:34“ steht auch in allen Listen). Lange drücken entfernt einen Eintrag
+  samt Stelle. Im Kindermodus erscheint nur, was dort gehört wurde. In der Weboberfläche (Musik) dieselbe Liste mit
+  ▶, ✕ und „Alle entfernen“ – 🧸 markiert, was die Kinder gehört haben.
 - **Favoriten:** auf der Wiedergabe-Seite das **Herz** antippen – gemerkt wird der Sender, die
   Audiothek-Sendung bzw. der Podcast, der gerade läuft. In Listen geht es auch: Sender lange drücken, bei
   Sendungen und Podcasts die oberste Zeile „Als Favorit merken“.
@@ -114,7 +116,8 @@ Ein- und ausgeschaltet wird **nur über die Weboberfläche** (Reiter „Kinder�
 - **Musik:** nur, was die Eltern freigegeben haben – Radiosender, ganze Audiothek-Sendungen und Podcasts oder
   einzelne Folgen.
 - **Apps:** Musik ist immer da; Funk, Timer, Stoppuhr, Balance, Wecker, Wetter einzeln erlaubt. Keine
-  Einstellungen, keine Zifferblatt-Wahl, keine KI.
+  Einstellungen, keine Zifferblatt-Wahl, keine KI. Ohne die App **Funk** ist der Funk ganz aus: die Uhr sendet und
+  empfängt nichts (auch kein „Hallo“ – für andere Uhren unsichtbar, kein Zähneputzen im Team) und spart Akku.
 - **Lautstärke** mit Obergrenze (Standard 60 %).
 - **Fernbedienung:** in der Weboberfläche (Reiter „Musik“) Sender, Sendungen und Podcasts aussuchen, starten,
   anhalten, weiterschalten, Lautstärke und Sleep-Timer setzen – die Eltern dürfen alles, auch nachts.

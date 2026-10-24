@@ -666,6 +666,57 @@ def erwachsenen_modus(w, ctx):
 
 
 @test
+def zuletzt_gehoert(w, ctx):
+    """Verlauf: ein Sender landet oben, lässt sich entfernen; die alten Einzel-Endpunkte sind weg."""
+    ip = ctx["ip"]
+    code, body, _ = http(f"https://{ip}/api/search?q=Deutschlandfunk&src=radio")
+    items = [i for i in json.loads(body).get("items", []) if i["path"].startswith("radio:")]
+    assert items, "Radiosuche ohne Ergebnis"
+    it = items[0]
+    before = json.loads(http(f"https://{ip}/api/music/recent")[1])["items"]
+    try:
+        assert http(f"https://{ip}/api/music/play", {"items": [{"kind": 0, "id": it["path"], "title": it["title"], "sub": it["sub"]}],
+                                                       "index": 0})[0] == 200
+        time.sleep(2)
+        rec = json.loads(http(f"https://{ip}/api/music/recent")[1])["items"]
+        assert rec and rec[0]["id"] == it["path"], "gespielter Sender steht nicht oben in „Zuletzt gehört“"
+        assert len(rec) <= 10, f"{len(rec)} Einträge (höchstens 10)"
+        assert len({r["id"] for r in rec}) == len(rec), "doppelte Einträge"
+    finally:
+        http(f"https://{ip}/api/music/ctl", {"cmd": "stop"})
+    was_there = any(r["id"] == it["path"] for r in before)
+    if not was_there:  # nur entfernen, was der Test selbst hinzugefügt hat
+        assert http(f"https://{ip}/api/music/recent", {"remove": it["path"]})[0] == 200
+        rec = json.loads(http(f"https://{ip}/api/music/recent")[1])["items"]
+        assert all(r["id"] != it["path"] for r in rec), "Eintrag lässt sich nicht entfernen"
+    assert http(f"https://{ip}/api/music/recent", {"remove": "gibt-es-nicht"})[0] == 404
+    for old in ("/api/music/resume", "/api/music/forget"):
+        assert http(f"https://{ip}{old}", {})[0] == 404, f"{old} gibt es noch"
+
+
+@test
+def funk_aus(w, ctx):
+    """Kindermodus ohne App „Funk“: Funk ganz aus (keine Nachbarn), mit App wieder an."""
+    ip = ctx["ip"]
+    st = json.loads(http(f"https://{ip}/api/state")[1])
+    if not st["kids"]["on"]:
+        assert st["radioOn"], "außerhalb des Kindermodus muss Funk an sein"
+        return "Kindermodus aus – nur „an“ geprüft"
+    apps0 = st["kids"]["apps"]
+    try:
+        for on in (False, True):
+            assert http(f"https://{ip}/api/kids", {"apps": (apps0 | 1) if on else (apps0 & ~1)})[0] == 200
+            time.sleep(2)
+            s2 = json.loads(http(f"https://{ip}/api/state")[1])
+            assert s2["radioOn"] == on, f"Funk {'an' if on else 'aus'} erwartet, radioOn={s2['radioOn']}"
+            if not on:
+                assert s2["peers"] == 0, f"Funk aus, aber {s2['peers']} Nachbarn"
+    finally:
+        http(f"https://{ip}/api/kids", {"apps": apps0})
+    assert json.loads(http(f"https://{ip}/api/state")[1])["kids"]["apps"] == apps0, "Apps nicht zurückgestellt"
+
+
+@test
 def voller_durchlauf(w, ctx):
     if not FULL:
         return "übersprungen"

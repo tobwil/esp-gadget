@@ -251,7 +251,8 @@ eingetragen wird, speichert die Uhr im NVS.
 
 ## Akku und Sparmodus
 
-Die Weboberfläche zeigt Stand, Spannung, Verbrauch (%/h), eine geschätzte Restlaufzeit und den Verlauf der
+Die Weboberfläche zeigt Stand, Spannung, Verbrauch (%/h), die **Temperatur** (Ladechip neben dem Akku – beim Laden
+wärmer als die Zelle, gelb ab 50 °C, rot ab 60 °C – und Prozessor), eine geschätzte Restlaufzeit und den Verlauf der
 letzten sechs Stunden (alle 2 Minuten ein Messpunkt). Die Restlaufzeit steht auch auf der Uhr im
 Kontrollzentrum („noch ca. 5 h 20 min“). Geschätzt wird aus mindestens 20 Minuten ohne Laden; der Verlauf
 übersteht Neustarts, Updates und Tiefschlaf. Bei 10 % gibt es eine Warnung, bei 3 % schaltet die Uhr
@@ -321,7 +322,7 @@ Befehle im seriellen Monitor:
 - **Musik:** `toggle`, `next`, `vol 60`, `browse rl:tag:kids`, `browse ard:soccer`, `voice start` / `voice stop`, `page assist`, `talk on` / `talk off` (Assistentin), `sleep 1` (Sleep-Timer), `alarm 7:30`, `alarmsrc ard:set:10815223 Name` (`-` = Ton)
 - **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung), `tilt 0.3 -0.2` / `tilt off` (Neigung vortäuschen), `angry on|off`, `shake 10` (10 s Schütteln vortäuschen)
 - **Zähneputzen:** `page brush`, `brush save` / `brush load` (Album, Serie und Rekorde sichern und zurückholen; dazwischen wird die Routine nicht abgehakt), `ear on|off` (was das Mikrofon bei der Monsterjagd hört, je Prüfung eine Zeile)
-- **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status` (mit Laufzeit und freiem Speicher), `dump` (alle Texte auf dem Bildschirm und der obersten Ebene mit Lage), `poweroff`
+- **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status` (mit Laufzeit, freiem Speicher und Temperaturen), `dump` (alle Texte auf dem Bildschirm und der obersten Ebene mit Lage), `poweroff`
 
 ### Testsammlung
 

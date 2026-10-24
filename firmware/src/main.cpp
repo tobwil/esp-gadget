@@ -102,9 +102,10 @@ bool appCommand(const char* line) {
   }
   else if (!strcmp(line, "status")) {
     music::State s = music::state();
-    Serial.printf("WLAN %s %s · Musik %s %s %.0f/%u s %s · Akku %d%% · Heap %u · Laufzeit %lu s\n", netOnline() ? "an" : "aus",
-                  netOnline() ? netIp().c_str() : "", s.active ? (s.playing ? "spielt" : "Pause") : "aus", s.title, s.pos, s.dur, s.msg,
-                  hwBattery(), heap_caps_get_free_size(MALLOC_CAP_INTERNAL), (unsigned long)(millis() / 1000));
+    Serial.printf("WLAN %s %s · Musik %s %s %.0f/%u s %s · Akku %d%% · Heap %u · Laufzeit %lu s · Temperatur Ladechip %.1f °C, Prozessor %.1f °C\n",
+                  netOnline() ? "an" : "aus", netOnline() ? netIp().c_str() : "", s.active ? (s.playing ? "spielt" : "Pause") : "aus",
+                  s.title, s.pos, s.dur, s.msg, hwBattery(), heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                  (unsigned long)(millis() / 1000), hwTempBattery(), hwTempCpu());
   } else return false;
   return true;
 }

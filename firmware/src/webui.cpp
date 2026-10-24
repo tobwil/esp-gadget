@@ -387,6 +387,7 @@ function render(){
  $('batkv').innerHTML=`<span>Stand</span><span>${s.battery<0?'kein Akku':s.battery+' %'}${pw.mv?' · '+(pw.mv/1000).toFixed(2)+' V':''}${s.charging?' · lädt':''}</span>
   <span>Restlaufzeit</span><span>${pw.remainMin>=0?Math.floor(pw.remainMin/60)+' h '+pw.remainMin%60+' min':'wird gemessen …'}</span>
   <span>Verbrauch</span><span>${pw.drain>0?pw.drain.toFixed(1)+' %/h':'–'}</span><span>Sparmodus</span><span>${pw.saving?'an':'aus'}</span>
+  ${pw.tempBat!=null?`<span>Temperatur</span><span${pw.tempBat>=60?' style="color:var(--bad)"':pw.tempBat>=50?' style="color:var(--warn)"':''}>Ladechip ${pw.tempBat.toFixed(0)} °C${pw.tempBat>=60?' – sehr warm':''}${pw.tempCpu!=null?' · Prozessor '+pw.tempCpu.toFixed(0)+' °C':''}</span>`:''}
   <span>Tiefschlaf</span><span>${pw.sleep||'–'}</span>`;
  if(document.activeElement!==$('pmode'))$('pmode').value=pw.mode;
  if(s.display&&document.activeElement!==$('dbr')){$('dbr').value=s.display.brightness;$('dbrv').textContent=s.display.brightness}
@@ -729,6 +730,8 @@ static void state() {
     pw["nightTo"] = t;
   }
   pw["drain"] = pwr::drainPerHour();
+  if (!isnan(hwTempBattery())) pw["tempBat"] = roundf(hwTempBattery() * 10) / 10;
+  if (!isnan(hwTempCpu())) pw["tempCpu"] = roundf(hwTempCpu() * 10) / 10;
   JsonDocument hd;
   deserializeJson(hd, pwr::historyJson());
   pw["history"] = hd;

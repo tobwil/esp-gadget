@@ -126,7 +126,7 @@ static void testHearing() {
     auto r = hearing::analyze(Sig().hum(260, 0.006f).room(0.0008f).pcm().data(), floor);
     CHECK(r.voiced, "leises Summen nicht erkannt (rms %.4f)", r.rms);
   }
-  // Höher/tiefer als die eigene Lage (Hoch oder tief: gut ein Halbton = 6 %)
+  // Höher/tiefer als die eigene Lage (gut ein Halbton = 6 %) – hearing liefert die Tonhöhe weiterhin
   {
     float floor = quietFloor();
     auto a = hearing::analyze(Sig().hum(200, 0.03f).pcm().data(), floor);

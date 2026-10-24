@@ -63,7 +63,7 @@ def test_voice():
     check(len(secs) == 9, f"{len(secs)} statt 9 Abschnitte erkannt")
     for cid, mp3 in sorted(cl.items()):
         d = duration(mp3)
-        intro = cid.split("/")[-1] in ("monster", "pitch", "hum", "ball", "catch", "run")
+        intro = cid.split("/")[-1] in ("monster", "ball", "catch", "run")
         check(0.4 < d < (14 if intro else 8), f"{cid}: {d:.1f} s – zu lang (Erklärungen ≤ 14 s, sonst ≤ 8 s)")
         c = cid.split("/", 1)[1]
         if c in secs:

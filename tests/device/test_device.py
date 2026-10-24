@@ -290,10 +290,14 @@ def weboberflaeche(w, ctx):
     for k in ("name", "battery", "kids", "music"):
         assert k in st, f"/api/state ohne „{k}“"
     br = st["kids"].get("brush", {})
-    for k in ("streak", "best", "monster", "pitch", "balloon", "ball", "catcher", "meadow", "total", "names"):
+    for k in ("streak", "best", "monster", "ball", "catcher", "meadow", "total", "names"):
         assert k in br, f"Zahnputz-Werte ohne „{k}“"
+    for k in ("pitch", "balloon"):  # Summ-Spiele sind entfernt
+        assert k not in br, f"Zahnputz-Werte noch mit „{k}“"
     assert br["total"] == 26, f"{br['total']} Sticker statt 26"
     assert "brushParent" in st["kids"] and "brushHard" not in st["kids"], "Einstellung Nachputz-Hinweis fehlt"
+    for k in ("tempBat", "tempCpu"):  # Ladechip und Prozessor
+        assert k in st["power"] and 10 <= st["power"][k] <= 80, f"Temperatur {k} fehlt oder unplausibel: {st['power'].get(k)}"
     code, body, _ = http(f"https://{ip}/")
     page = body.decode(errors="replace")
     assert code == 200 and "Nachputz-Hinweis" in page and "kbrushpar" in page, "Seite ohne Zahnputz-Karte"

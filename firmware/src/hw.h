@@ -34,6 +34,8 @@ int hwBattery();               // %, −1 = kein Akku
 int hwBatteryMv();             // Akkuspannung in mV, 0 = unbekannt
 bool hwUsb();
 bool hwCharging();
+float hwTempBattery();         // °C im Ladechip neben dem Akku (nicht die Zelle selbst; beim Laden wärmer), NAN = unbekannt
+float hwTempCpu();             // °C im Prozessor (NAN = unbekannt)
 void hwPowerOff();
 void hwDeepSleep(uint32_t wakeInS);  // kehrt nicht zurück; 0 = nur Tasten/Touch wecken
 bool hwWokeFromSleep();

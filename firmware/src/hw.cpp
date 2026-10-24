@@ -46,7 +46,7 @@ static void pmuBegin() {
   if (!pmuOk) { Serial.println("AXP2101: nicht gefunden"); return; }
   if (!(r & 0x08)) pmuWrite(0x18, r | 0x08);  // Akkustands-Messung an
   int a = pmuRead(0x30);
-  if (a >= 0 && !(a & 0x01)) pmuWrite(0x30, a | 0x01);  // Spannungsmessung des Akkus (ADC) an
+  if (a >= 0 && (a & 0x11) != 0x11) pmuWrite(0x30, a | 0x11);  // ADC: Akkuspannung (Bit 0) und Chiptemperatur (Bit 4) an
   int e = pmuRead(0x41);
   pmuWrite(0x41, (e < 0 ? 0 : e) | 0x0C);     // IRQ-Status für PWR kurz/lang freigeben
   pmuWrite(0x49, 0xFF);                       // alte Meldungen löschen
@@ -57,6 +57,7 @@ static void pmuBegin() {
 }
 
 static int pmuPct = -1, pmuMv = 0;
+static float pmuTemp = NAN, cpuTemp = NAN;
 static bool pmuUsb = false, pmuChg = false;
 static uint32_t pmuAt = 0;
 
@@ -69,6 +70,17 @@ static void pmuUpdate() {
   int pct = s0 >= 0 && (s0 & 0x08) && p >= 0 && p <= 100 ? p : -1;
   int h = pmuRead(0x34), l = pmuRead(0x35);
   if (h >= 0 && l >= 0) pmuMv = ((h & 0x3F) << 8) | l;
+  // Temperatur des Ladechips (sitzt beim Akku): 14-Bit-Wert, 22 °C bei 7274, 20 Schritte je Grad (Datenblatt AXP2101)
+  int th = pmuRead(0x3C), tl = pmuRead(0x3D);
+  if (th >= 0 && tl >= 0) {
+    int raw = ((th & 0x3F) << 8) | tl;
+    if (raw) pmuTemp = 22.0f + (7274 - raw) / 20.0f;
+  }
+  static uint32_t cpuAt = 0;
+  if (!cpuAt || millis() - cpuAt > 10000) {  // Prozessor (eingebauter Fühler), seltener
+    cpuAt = millis();
+    cpuTemp = temperatureRead();
+  }
   // Beim Laden meldet der AXP2101 den Akku manchmal kurz als fehlend: letzten Wert 30 s halten
   static uint32_t validAt = 0;
   if (pct >= 0) { pmuPct = pct; validAt = millis(); }
@@ -80,6 +92,8 @@ int hwBattery() { return pmuPct; }
 int hwBatteryMv() { return pmuMv; }
 bool hwUsb() { return pmuUsb; }
 bool hwCharging() { return pmuChg; }
+float hwTempBattery() { return pmuTemp; }
+float hwTempCpu() { return cpuTemp; }
 
 void hwPowerOff() {
   gfx->displayOff();

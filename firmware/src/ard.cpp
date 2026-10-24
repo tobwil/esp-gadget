@@ -249,11 +249,34 @@ bool browse(const char* path, char* title, size_t titleLen, music::Item* items, 
   } else if (!strncmp(path, "ardsearch:", 10)) {
     String q = "{ search(query:" + quote(path + 10) +
                ", limit:15){ programSets{ nodes{ id title numberOfElements publicationService{title} } }"
-               " items{ nodes{ id title duration publishDate image{url} audios{url} programSet{id title} } } } }";
+               " items{ nodes{ id title duration publishDate image{url} audios{url}"
+               " programSet{ id title numberOfElements publicationService{title} } } } } }";
     if (!gql(q, d, err, errLen)) return false;
     snprintf(title, titleLen, "„%s“", path + 10);
     JsonObject r = d["data"]["search"];
     for (JsonObject s : r["programSets"]["nodes"].as<JsonArray>()) addSet(s, items, max, count);
+    // Die Suche findet Sendungen oft nicht („Tigerentenclub“ nur als „Tigerenten Club“), die Folgen aber schon –
+    // deshalb auch deren Sendungen anbieten, damit man sie als Ganzes freigeben kann
+    // (die Sendung mit den meisten gefundenen Folgen zuerst)
+    JsonArray found = r["items"]["nodes"].as<JsonArray>();
+    for (;;) {
+      JsonObject best;
+      int bestN = 0;
+      for (JsonObject e : found) {
+        JsonObject s = e["programSet"];
+        const char* id = s["id"] | "";
+        char full[40];
+        snprintf(full, sizeof(full), "ard:set:%s", id);
+        bool seen = !id[0];
+        for (int i = 0; i < *count && !seen; i++) seen = !strcmp(items[i].id, full);
+        if (seen) continue;
+        int n = 0;
+        for (JsonObject f : found) n += !strcmp(f["programSet"]["id"] | "", id);
+        if (n > bestN) { bestN = n; best = s; }
+      }
+      if (!bestN) break;
+      addSet(best, items, max, count);
+    }
     for (JsonObject e : r["items"]["nodes"].as<JsonArray>()) addEpisode(e, "", "", "", items, max, count);
   } else {
     snprintf(err, errLen, "Unbekannte Liste");

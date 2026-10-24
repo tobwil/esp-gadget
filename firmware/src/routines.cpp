@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "routines.h"
 #include <ArduinoJson.h>
 #include <Preferences.h>
@@ -111,17 +112,40 @@ static int nowMin() {
   return t.tm_hour * 60 + t.tm_min;
 }
 
+// Morgens: ab dem Aufstehen – am Wochenende ab dem ersten Eintrag im Wochenend-Plan, wenn der deutlich später
+// liegt (ausschlafen) – bis zum Mittagessen laut Tagesablauf (sonst 12 Uhr). Ist alles abgehakt, endet sie wie
+// früher nach zwei Stunden. (Früher immer nur zwei Stunden ab dem Aufstehen: wer später aufstand, sah keine Aufgaben.)
+static void morningWindow(int& from, int& to) {
+  time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+  bool weekend = t.tm_wday == 0 || t.tm_wday == 6;
+  kids::Slot sl[kids::SLOTS_MAX];
+  int ns = kids::schedule(sl, weekend);
+  from = kids::cfg().wake;
+  if (weekend && ns > 2 && sl[1].act != kids::SLEEP && sl[1].start > from + 60) from = sl[1].start;
+  to = 12 * 60;
+  for (int i = 1; i < ns; i++)
+    if (sl[i].act == kids::LUNCH && sl[i].start > from) { to = sl[i].start; break; }
+  if (to <= from + 60) to = from + 120;  // sehr frühes Mittagessen: wenigstens zwei Stunden
+  if (complete(MORNING)) to = std::min(to, from + 120);
+  to = std::min(to, kids::cfg().bed - 120);  // nie in die Abendroutine hinein
+}
+
 Which active() {
   if (!en || !kids::on() || time(nullptr) < 1700000000) return NONE;
   rollDay();
-  int m = nowMin(), w = kids::cfg().wake, b = kids::cfg().bed;
-  if (n[MORNING] && m >= w && m < w + 120) return MORNING;
+  int m = nowMin(), b = kids::cfg().bed, from, to;
+  morningWindow(from, to);
+  if (n[MORNING] && m >= from && m < to) return MORNING;
   if (n[EVENING] && m >= b - 120 && m < b) return EVENING;
   return NONE;
 }
 
 Which next(int* startMin) {
-  int m = nowMin(), w = kids::cfg().wake, b = kids::cfg().bed - 120;
+  int from, to;
+  morningWindow(from, to);
+  int m = nowMin(), w = from, b = kids::cfg().bed - 120;
   if (m < w) { *startMin = w; return MORNING; }
   if (m < b) { *startMin = b; return EVENING; }
   *startMin = w;

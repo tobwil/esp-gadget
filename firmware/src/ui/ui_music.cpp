@@ -379,8 +379,22 @@ static void fill(BrowseCtx* c) {
     lv_color_t ic = liked ? C_MUSIC() : it.kind == music::K_TRACK ? C_DIM() : !strncmp(it.id, "fav:", 4) ? C_BRASS() : C_MUSIC();
     lv_obj_t* r = listRow(c->list, icon, ic, it.title, sub[0] ? sub : nullptr);
     lv_obj_add_event_cb(r, itemClicked, LV_EVENT_SHORT_CLICKED, (void*)(intptr_t)i);
+    // „Zuletzt gehört“: lange drücken entfernt den Eintrag (und die gemerkte Stelle)
+    if (!strcmp(c->path, "recent"))
+      lv_obj_add_event_cb(r, [](lv_event_t* e) {
+        BrowseCtx* c = ctx();
+        int k = (int)(intptr_t)lv_event_get_user_data(e);
+        if (!c || k >= c->n) return;
+        music::recentRemove(c->items[k].id);
+        play(0);
+        toast("Aus „Zuletzt gehört“ entfernt");
+        c->seq = music::browseSeq();  // Liste neu holen
+        c->waiting = true;
+        lv_obj_remove_flag(c->spin, LV_OBJ_FLAG_HIDDEN);
+        music::browse(c->path);
+      }, LV_EVENT_LONG_PRESSED, (void*)(intptr_t)i);
     // Sender lange drücken: merken bzw. aus den Favoriten nehmen (nicht im Kindermodus)
-    if (station && !kids::on())
+    else if (station && !kids::on())
       lv_obj_add_event_cb(r, [](lv_event_t* e) {
         BrowseCtx* c = ctx();
         int k = (int)(intptr_t)lv_event_get_user_data(e);

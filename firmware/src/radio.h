@@ -20,6 +20,9 @@ enum EventType : uint8_t { EV_KNOCK, EV_TALK };
 struct Event { EventType type; char name[17]; };
 
 void begin();
+// Funk an? Im Kindermodus ohne die App „Funk“ ist er ganz aus: kein Senden (auch kein „Hallo“ – die Uhr ist für
+// andere unsichtbar), kein Empfang, kein Zähneputzen im Team; die Funk-Aufgabe schläft dann und spart Akku.
+bool enabled();
 void pttDown(uint32_t to = 0);  // 0 = an alle
 void pttUp();
 void knock(uint32_t to);        // „Anklopfen“: kurzer Ton beim anderen

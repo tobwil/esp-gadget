@@ -268,7 +268,7 @@ nav button.sel{background:rgba(201,138,43,.15);color:var(--acc)}nav button.sel.k
 </div>
 
 <div class="tab" id="t-music">
- <section><h2>Läuft auf der Uhr</h2><div id="np" class="note">Nichts</div>
+ <section><h2>Läuft auf der Uhr</h2><div id="np" class="note">Nichts</div><div id="recent"></div>
   <div class="ctl"><button id="mstop" aria-label="Stopp"><svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg></button><button id="mprev" aria-label="Zurück"><svg viewBox="0 0 24 24"><path d="M18 6v12l-8.5-6zM6 6v12"/></svg></button><button id="mtog" aria-label="Wiedergabe/Pause"><svg viewBox="0 0 24 24"><path d="M7 5v14l7-7zM16 6v12M20 6v12"/></svg></button><button id="mnext" aria-label="Weiter"><svg viewBox="0 0 24 24"><path d="M6 6v12l8.5-6zM18 6v12"/></svg></button></div>
   <label class="f" for="mvol">Lautstärke <span id="mvolv"></span> %</label><input type="range" id="mvol" min="0" max="100" step="5">
   <label class="f" for="msleep">Sleep-Timer</label><select id="msleep"><option value="0">aus</option><option value="15">15 Min.</option><option value="30">30 Min.</option><option value="45">45 Min.</option><option value="60">60 Min.</option><option value="90">90 Min.</option></select></section>
@@ -325,7 +325,7 @@ nav button.sel{background:rgba(201,138,43,.15);color:var(--acc)}nav button.sel.k
 <div id="lock"><h1>Eltern-PIN</h1><p class="note">Diese Uhr ist geschützt.</p><input id="lpin" type="password" inputmode="numeric" autocomplete="off"><button class="wide" id="lgo">Entsperren</button></div>
 <script>
 const $=id=>document.getElementById(id),val=id=>$(id).value.trim();
-const APPS=[[1,'Funk','Walkie-Talkie mit anderen Uhren'],[2,'Timer',''],[4,'Stoppuhr',''],[8,'Balance','Kugel-Spiel'],[16,'Wecker',''],[32,'Wetter','']];
+const APPS=[[1,'Funk','Walkie-Talkie mit anderen Uhren – aus: Funk ganz aus (spart Akku, für andere Uhren unsichtbar, kein Zähneputzen im Team)'],[2,'Timer',''],[4,'Stoppuhr',''],[8,'Balance','Kugel-Spiel'],[16,'Wecker',''],[32,'Wetter','']];
 let S=null,pin='',src='radio';
 try{pin=localStorage.getItem('pin')||''}catch(e){}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -349,9 +349,9 @@ function render(){
  $('stat').innerHTML=`<span class="chip ${bc}">${s.battery<0?'USB':s.battery+' %'}${s.charging?' ⚡':''}</span><span class="chip">${s.ssid?esc(s.ssid):'offline'}</span>`;
  const pr=s.power||{},rm=pr.remainMin,ring=s.battery<0?100:s.battery,rc=bc=='r'?'var(--bad)':bc=='y'?'var(--warn)':'var(--ok)';
  $('hero').innerHTML=`<div class="ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--fill2)" stroke-width="10"/><circle cx="50" cy="50" r="42" fill="none" stroke="${rc}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(ring*2.639).toFixed(1)} 264"/></svg><b>${s.battery<0?'USB':s.battery+'%'}</b></div>
-  <div class="t"><b>${s.charging?'Lädt':rm>=0?'noch ca. '+(rm>=60?Math.floor(rm/60)+' h '+String(rm%60).padStart(2,'0')+' min':rm+' min'):'Akku'}</b><small>${esc(pr.sleep||'')}</small><small>${esc(s.name)} · ${s.peers} Funk-Nachbar${s.peers==1?'':'n'}</small></div>`;
+  <div class="t"><b>${s.charging?'Lädt':rm>=0?'noch ca. '+(rm>=60?Math.floor(rm/60)+' h '+String(rm%60).padStart(2,'0')+' min':rm+' min'):'Akku'}</b><small>${esc(pr.sleep||'')}</small><small>${esc(s.name)} · ${s.radioOn===false?'Funk aus':s.peers+' Funk-Nachbar'+(s.peers==1?'':'n')}</small></div>`;
  $('info').innerHTML=`<span>Akku</span><span>${s.battery<0?'kein Akku':s.battery+' %'}${s.charging?' · lädt':''}</span><span>WLAN</span><span>${esc(s.ssid||'–')}${s.rssi?' ('+s.rssi+' dBm)':''}</span>
-  <span>Adresse</span><span>${esc(s.ip)}</span><span>Funk-Nachbarn</span><span>${s.peers}</span><span>Version</span><span>${esc(s.version)}</span>`;
+  <span>Adresse</span><span>${esc(s.ip)}</span><span>Funk-Nachbarn</span><span>${s.radioOn===false?'Funk aus (Kindermodus)':s.peers}</span><span>Version</span><span>${esc(s.version)}</span>`;
  $('kon').checked=$('kon2').checked=k.on;$('kangry').checked=$('kangry2').checked=k.angry&&k.on;
  $('angst').textContent=(k.angryToday?`Heute ${k.angryToday}× Wut rausgeschüttelt`:'Heute noch nicht benutzt')+(k.angryLast?' · zuletzt '+new Date(k.angryLast*1000).toLocaleTimeString('de',{hour:'2-digit',minute:'2-digit'}):'');
  $('kidb').textContent=k.angry&&k.on?'Wutmodus':'Kindermodus';
@@ -396,14 +396,23 @@ function render(){
  $('nkids').checked=pw.nightKids;$('nadult').checked=pw.nightAdult;
  if(document.activeElement!==$('nfrom'))$('nfrom').value=hm(pw.nightFrom);if(document.activeElement!==$('nto'))$('nto').value=hm(pw.nightTo);
  batChart(pw.history);
- const mu=s.music;$('np').innerHTML=mu.active?`<b>${mu.playing?'▶':'⏸'} ${esc(mu.title)}</b><br>${esc(mu.artist)}${mu.dur?' · '+Math.floor(mu.pos/60)+':'+String(Math.floor(mu.pos%60)).padStart(2,'0')+' / '+Math.floor(mu.dur/60)+':'+String(mu.dur%60).padStart(2,'0'):''}${mu.msg?'<br><span class="bad">'+esc(mu.msg)+'</span>':''}`:mu.last?`<b>Zuletzt gehört</b>${esc(mu.last.title)}<br><span class="note">angehalten bei ${Math.floor(mu.last.pos/60)}:${String(mu.last.pos%60).padStart(2,'0')}${mu.last.dur?' von '+Math.floor(mu.last.dur/60)+':'+String(mu.last.dur%60).padStart(2,'0'):''}</span><br><button class="ghost" style="margin-top:8px" onclick="post('music/resume',{},true)">▶ Weiter hören</button> <button class="ghost" style="margin-top:8px" onclick="post('music/forget',{},true)">✕ Vergessen</button>`:'Gerade läuft nichts.';
+ const mu=s.music;$('np').innerHTML=mu.active?`<b>${mu.playing?'▶':'⏸'} ${esc(mu.title)}</b><br>${esc(mu.artist)}${mu.dur?' · '+Math.floor(mu.pos/60)+':'+String(Math.floor(mu.pos%60)).padStart(2,'0')+' / '+Math.floor(mu.dur/60)+':'+String(mu.dur%60).padStart(2,'0'):''}${mu.msg?'<br><span class="bad">'+esc(mu.msg)+'</span>':''}`:'Gerade läuft nichts.';
  if(document.activeElement!==$('mvol')){$('mvol').value=mu.volume;$('mvolv').textContent=mu.volume}
  if(document.activeElement!==$('msleep'))$('msleep').value=[0,15,30,45,60,90].reduce((a,v)=>Math.abs(v-mu.sleepMin)<Math.abs(a-mu.sleepMin)?v:a,0);
  if($('t-music').classList.contains('sel')&&!mStack.length)mStart();
  $('fwst').textContent=`Version ${s.version} · ${s.board} · gebaut ${s.built}`;
  $('gst').innerHTML=s.gemini?'<span class="ok">Schlüssel gesetzt</span>':'<span class="bad">Kein Schlüssel – Spracheingabe aus</span>';
 }
-async function load(){try{S=await api('state');render()}catch(e){if(e.message!='pin')$('stat').textContent='Uhr nicht erreichbar'}}
+async function load(){try{S=await api('state');render();if(S.music.title!==lastTitle){lastTitle=S.music.title;loadRecent()}}catch(e){if(e.message!='pin')$('stat').textContent='Uhr nicht erreichbar'}}
+// „Zuletzt gehört“: eigene Liste (nicht im Status, der alle 10 s kommt); 🧸 = im Kindermodus gehört
+let RC=[],lastTitle=null;
+const mmss=t=>Math.floor(t/60)+':'+String(t%60).padStart(2,'0');
+async function loadRecent(){try{RC=(await api('music/recent')).items||[];renderRecent()}catch(e){}}
+function renderRecent(){$('recent').innerHTML=RC.length?'<h3 style="margin:16px 0 4px">Zuletzt gehört</h3>'+RC.map((r,i)=>row((r.kid?'🧸 ':'')+r.title,
+  [r.sub,r.pos?'bei '+mmss(r.pos):''].filter(Boolean).join(' · '),'<span class="bt">'+btn('▶',`recentDo(${i},"play")`)+btn('✕',`recentDo(${i},"remove")`)+'</span>')).join('')+
+  btn('Alle entfernen','recentClear()'):''}
+async function recentDo(i,what){const r=RC[i];if(!r)return;await post('music/recent',{[what]:r.id},true);toast(what=='play'?'Läuft auf der Uhr':'Entfernt');loadRecent()}
+async function recentClear(){if(!confirm('Alle Einträge aus „Zuletzt gehört“ entfernen? Gemerkte Stellen gehen verloren.'))return;await post('music/recent',{clear:true},true);toast('Verlauf geleert');loadRecent()}
 let lastRes=null;
 function showRes(items){lastRes=items;$('sres').innerHTML=items.map(it=>row(it.title,it.sub,relBtn(it))).join('')||'<p class="note">Nichts gefunden</p>'}
 async function search(){const q=val('sq');if(!q)return;$('sres').innerHTML='<p class="note">Suche …</p>';
@@ -676,6 +685,7 @@ static void state() {
   d["rssi"] = netOnline() ? netRssi() : 0;
   radio::Peer ps[12];
   d["peers"] = radio::peers(ps, 12);
+  d["radioOn"] = radio::enabled();
   JsonArray k = d["known"].to<JsonArray>();
   for (int i = 0; i < knownCount; i++) k.add(known[i].ssid);
   d["gemini"] = voice::configured();
@@ -691,16 +701,6 @@ static void state() {
   mu["msg"] = ms.msg;
   mu["volume"] = cfg.volume;
   mu["sleepMin"] = (music::sleepLeftS() + 59) / 60;
-  {
-    music::Item li;
-    uint32_t ls;
-    if (!ms.active && music::last(li, ls)) {
-      JsonObject l = mu["last"].to<JsonObject>();
-      l["title"] = li.title;
-      l["pos"] = ls;
-      l["dur"] = li.dur;
-    }
-  }
   JsonDocument rd;
   deserializeJson(rd, routines::stateJson());
   d["routines"] = rd;
@@ -1054,15 +1054,41 @@ void begin() {
     routines::setEnabled(d["on"] | true);
     msg(routines::enabled() ? "Aufgaben an" : "Aufgaben aus");
   });
-  on("/api/music/forget", HTTP_POST, []() {
+  on("/api/music/recent", HTTP_GET, []() {
     if (!authed()) return;
-    music::forgetLast();
-    msg("Vergessen");
+    static music::Recent* r = nullptr;  // ≈ 4 KB: PSRAM statt Stapel
+    if (!r) r = (music::Recent*)heap_caps_calloc(10, sizeof(music::Recent), MALLOC_CAP_SPIRAM);
+    int n = r ? music::recent(r, 10) : 0;
+    JsonDocument d;
+    JsonArray a = d["items"].to<JsonArray>();
+    for (int i = 0; i < n; i++) {
+      JsonObject o = a.add<JsonObject>();
+      o["id"] = r[i].item.id;
+      o["title"] = r[i].item.title;
+      o["sub"] = r[i].item.sub;
+      o["dur"] = r[i].item.dur;
+      o["pos"] = r[i].posSec;
+      o["kid"] = r[i].kid;
+    }
+    json(200, d);
   });
-  on("/api/music/resume", HTTP_POST, []() {
+  on("/api/music/recent", HTTP_POST, []() {  // {"play": id} · {"remove": id} · {"clear": true}
     if (!authed()) return;
-    music::resumeLast();
-    msg("Läuft auf der Uhr");
+    JsonDocument d;
+    if (!body(d)) return msg("Ungültige Anfrage", 400);
+    if (d["clear"] | false) { music::recentClear(); return msg("Verlauf geleert"); }
+    const char* id = d["remove"] | "";
+    if (id[0]) return music::recentRemove(id) ? msg("Entfernt") : msg("Nicht gefunden", 404);
+    id = d["play"] | "";
+    static music::Recent* r = nullptr;
+    if (!r) r = (music::Recent*)heap_caps_calloc(10, sizeof(music::Recent), MALLOC_CAP_SPIRAM);
+    int n = id[0] && r ? music::recent(r, 10) : 0;
+    for (int i = 0; i < n; i++)
+      if (!strcmp(r[i].item.id, id)) {
+        music::playList(&r[i].item, 1, 0, true);
+        return msg("Läuft auf der Uhr");
+      }
+    msg("Nicht gefunden", 404);
   });
   on("/api/routines/reset", HTTP_POST, []() {
     if (!authed()) return;

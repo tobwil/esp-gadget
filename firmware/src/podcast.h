@@ -14,6 +14,7 @@ bool browse(const char* path, char* title, size_t titleLen, music::Item* items, 
 // Wiedergabe einer Folge (id = Audio-URL)
 void play(const music::Item& episode);
 uint32_t resumeSec(const char* id);  // gemerkte Stelle einer Folge in Sekunden (0 = keine oder zu Ende gehört)
+void forgetPos(const char* id);      // gemerkte Stelle löschen (aus „Zuletzt gehört“ entfernt)
 void currentFeed(String& url, String& title);  // Feed der zuletzt gestarteten Folge (für „merken“)
 // beliebige MP3-Adresse: Audiothek-Folge (mit gemerkter Position) oder Radiosender (live = ohne Position,
 // ohne Springen, Titel aus dem Stream, verbindet bei Abbruch neu)

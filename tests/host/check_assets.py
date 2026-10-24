@@ -54,7 +54,7 @@ def test_voice():
     check(len(data) < 600 * 1024, f"brushvoice.bin zu groß ({len(data) // 1024} KB) – Geschichten gehören nicht auf die Uhr")
     src = open(os.path.join(ROOT, "firmware", "src", "ui", "ui_brush.cpp")).read()
     needed = sorted(set(re.findall(r'"(c/[a-z0-9]+)"', src)))
-    check(len(needed) >= 20, f"nur {len(needed)} Ansagen in ui_brush.cpp gefunden")
+    check(len(needed) >= 18, f"nur {len(needed)} Ansagen in ui_brush.cpp gefunden")  # 9 KAI, 5 Schluss/Team, 4 Spiele
     for hero in ("luna", "fips"):
         for c in needed:
             check(f"{hero}/{c}" in cl, f"Ansage {hero}/{c} fehlt in brushvoice.bin")

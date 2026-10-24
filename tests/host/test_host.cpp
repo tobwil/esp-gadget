@@ -192,11 +192,7 @@ static void testDrawing() {
         for (int a = 0; a < areas[v]; a++) {
           snprintf(d, sizeof(d), "Monsterjagd %d/%d", v, a);
           for (int g = 0; g <= 3; g++) DRAW(d, drawBrushGame(px(), (Hero)h, views[v], a, g, f % 2, f));
-          BalloonObj o[3] = {{-5, 3, 0}, {30, 20, 1}, {70, 50, 0}};  // auch außerhalb
-          DRAW("Summ-Ballon", drawBalloon(px(), (Hero)h, f * 4 - 5, o, 3, views[v], a, f % 2, f));
-          for (int t = 0; t < 3; t++)
-            for (int pos = 0; pos < 3; pos++)
-              DRAW("Hoch oder tief", drawPitchGame(px(), (Hero)h, (PitchTarget)t, pos, (pos + f) % 3, f % 2, views[v], a, f));
+          GameObj o[3] = {{-5, 3, 0}, {30, 20, 1}, {70, 50, 0}};  // auch außerhalb
           DRAW("Zahnpasta-Kugel", drawTiltBall(px(), (Hero)h, views[v], a, -20.0f + f * 12, 60.0f - f * 9, f, f % 2, f));
           DRAW("Sterne fangen", drawCatch(px(), (Hero)h, -10.0f + f * 10, o, 3, views[v], a, f));
           DRAW("Wiesenlauf", drawMeadowRun(px(), (Hero)h, -5.0f + f * 6, o, 3, f % 2, views[v], a, f));

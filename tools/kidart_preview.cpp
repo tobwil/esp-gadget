@@ -52,20 +52,9 @@ int main(int argc, char** argv) {
       snprintf(path, sizeof(path), "%s/g%d_%d.ppm", out, i, k);
       save(path, px);
     }
-  // Auswahl mit Kronen (7 Tage am Stück), Summ-Ballon, Album, Sticker groß
+  // Auswahl mit Kronen (7 Tage am Stück), Album, Sticker groß
   drawBrushPick(px, 1, 3);
   save((std::string(out) + "/pick.ppm").c_str(), px);
-  BalloonObj o[4] = {{30, 10, 0}, {44, 22, 1}, {52, 6, 0}, {18, 30, 0}};
-  int bys[3] = {2, 10, 20};
-  for (int k = 0; k < 3; k++) {
-    drawBalloon(px, k == 1 ? FIPS : LUNA, bys[k], o, 4, k == 0 ? M_CHEW : k == 1 ? M_OUTER : M_INNER, k, k < 2, 5 + k * 9);
-    save((std::string(out) + "/b" + std::to_string(k) + ".ppm").c_str(), px);
-  }
-  struct { PitchTarget t; int pos, res; bool hum; } pg4[4] = {{T_HIGH, 0, 0, false}, {T_HIGH, 1, 1, true}, {T_LOW, 2, 1, true}, {T_LOW, 0, 2, false}};
-  for (int k = 0; k < 4; k++) {
-    drawPitchGame(px, LUNA, pg4[k].t, pg4[k].pos, pg4[k].res, pg4[k].hum, M_OUTER, 1, 3 + k);
-    save((std::string(out) + "/p" + std::to_string(k) + ".ppm").c_str(), px);
-  }
   // Kipp-Spiele
   drawTiltBall(px, LUNA, M_CHEW, 0, 20.0f, 24.0f, 1, false, 2);
   save((std::string(out) + "/t0.ppm").c_str(), px);
@@ -73,10 +62,10 @@ int main(int argc, char** argv) {
   tiltTarget(M_OUTER, 1, 2, tx, ty);
   drawTiltBall(px, FIPS, M_OUTER, 1, tx - 1.0f, ty + 0.0f, 2, true, 3);
   save((std::string(out) + "/t1.ppm").c_str(), px);
-  BalloonObj fall[4] = {{12, 8, 0}, {30, 18, 1}, {44, 4, 0}, {24, 27, 0}};
+  GameObj fall[4] = {{12, 8, 0}, {30, 18, 1}, {44, 4, 0}, {24, 27, 0}};
   drawCatch(px, LUNA, 24.0f, fall, 4, M_INNER, 0, 4);
   save((std::string(out) + "/t2.ppm").c_str(), px);
-  BalloonObj run[4] = {{30, 26, 0}, {44, 18, 1}, {52, 30, 1}, {20, 34, 0}};
+  GameObj run[4] = {{30, 26, 0}, {44, 18, 1}, {52, 30, 1}, {20, 34, 0}};
   drawMeadowRun(px, LUNA, 18.0f, run, 4, false, M_CHEW, 2, 5);
   save((std::string(out) + "/t3.ppm").c_str(), px);
   drawMeadowRun(px, FIPS, 24.0f, run, 4, false, M_OUTER, 0, 6);

@@ -28,14 +28,13 @@ for w, wn in enumerate(worlds):
         o.paste(im, (lw + pad + i * (size + pad), y))
 o.save(OUT, optimize=True)
 print(OUT)
-# Zähneputzen: Auswahl, die drei Spiele, Album und Sticker; darunter die neun Abschnitte nach KAI
+# Zähneputzen: Auswahl, die vier Spiele, Album und Sticker; darunter die neun Abschnitte nach KAI
 B = OUT.replace("kinderwelten", "zahnputzen") if "kinderwelten" in OUT else OUT.replace(".png", "_zahnputzen.png")
 secs = ["Kaufl. oben re.", "Kaufl. oben li.", "Kaufl. unten li.", "Kaufl. unten re.", "Außen rechts", "Außen vorne", "Außen links", "Innen oben", "Innen unten"]
 sz = 200
 hh = int(sz * 96 / 116)
 rows = [
-    [("pick", "Wer putzt mit?"), ("g0_0", "Monsterjagd"), ("g0_1", "Still: Monster da"), ("p1", "Hoch: Frosch springt"), ("p2", "Tief: Frosch taucht")],
-    [("p0", "Hoch oder tief?"), ("b0", "Summ-Ballon"), ("b2", "Stille: Ballon sinkt"), ("st11", "Neuer Sticker"), ("a3", "Album")],
+    [("pick", "Wer putzt mit?"), ("g0_0", "Monsterjagd"), ("g0_1", "Still: Monster da"), ("st11", "Neuer Sticker"), ("a3", "Album")],
     [("t0", "Zahnpasta-Kugel"), ("t1", "Kugel am Stern"), ("t2", "Sterne fangen"), ("t3", "Wiesenlauf: Luna"), ("t4", "Wiesenlauf: Fips")],
     [(f"g{i}_0", secs[i]) for i in range(5)],
     [(f"g{i}_0", secs[i]) for i in range(5, 9)] + [("st24", "7 Tage: Pokal")],

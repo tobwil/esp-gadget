@@ -147,26 +147,16 @@ Eine App (für Kinder und Erwachsene, in der Weboberfläche abschaltbar): erst *
 dann das Spiel. Geputzt wird nach der **KAI-Methode**, zwei Minuten: erst die **K**auflächen (vier Ecken, hin und
 her), dann **A**ußen (Zähne aufeinander, kleine Kreise – rechts, vorne, links), dann **I**nnen (Mund weit auf, von
 Rot nach Weiß). Der Mund im Bild zeigt wie im Spiegel, wo gerade dran ist, Zahnmonster verschwinden nach und nach,
-und **Luna bzw. Fips sagen, wo es weitergeht** – mit echten Stimmen, die Uhr steht ja gegenüber auf dem Tisch. Dabei
-**hört sie zu** (Mikrofon), und jeden Tag ist ein anderes Spiel das „Spiel des Tages“:
+und **Luna bzw. Fips sagen, wo es weitergeht** – mit echten Stimmen. Vier Spiele, jeden Tag ist ein anderes das
+„Spiel des Tages“ (oben in Gold):
 
-- **Monsterjagd:** Die Zahnmonster verschwinden nur, solange die Uhr Putzen hört; wird es still, kommen sie zurück
-  und grinsen.
-- **Hoch oder tief:** Kommt der Schmetterling, hoch summen – kommt der Fisch, tief summen; dann springt der Frosch
-  hinterher. Die erste Runde („Summ erst einmal ganz normal“) merkt sich die eigene Stimmlage, deshalb klappt es
-  für Kinder und Erwachsene gleich.
-- **Summ-Ballon:** Summen lässt den Ballon steigen, Stille lässt ihn sinken; unterwegs Sterne einsammeln,
-  Regenbogensterne zählen dreifach.
-
-Dazu drei **Kipp-Spiele** für die freie Hand – die andere hält ja die Zahnbürste:
-
-- **Zahnpasta-Kugel:** Die Kugel durch Kippen zum leuchtenden Stern rollen – der liegt immer in dem Bereich, der
-  gerade geputzt wird.
-- **Sterne fangen:** Luna bzw. Fips schaut aus dem Korb; nach links und rechts kippen und Sterne und Äpfel fangen.
-- **Wiesenlauf:** Nach vorn und hinten kippen: Steinen ausweichen, Hufeisen (Luna) bzw. Kleeblätter (Fips) sammeln.
-
-Erkennung: Summen ist ein Ton, das Bürstengeräusch Rauschen – nach einem Tiefpass entscheidet die Autokorrelation
-(70–530 Hz); Summen zählt auch unter dreifach lauter Bürste. Während eigener Ansagen hört die Uhr weg.
+- **Monsterjagd** – die Uhr steht gegenüber auf dem Tisch und **hört zu**: Die Zahnmonster verschwinden nur,
+  solange sie Putzen hört; wird es still, kommen sie zurück und grinsen. Das Bürstengeräusch erkennt sie auch nach
+  zwei Minuten Dauerputzen noch (das Grundrauschen steigt nur in Stille mit); während eigener Ansagen hört sie weg.
+- **Zahnpasta-Kugel** – Uhr in der freien Hand, die andere hält die Zahnbürste: die Kugel durch Kippen zum
+  leuchtenden Stern rollen, der liegt immer in dem Bereich, der gerade geputzt wird.
+- **Sterne fangen** – Luna bzw. Fips schaut aus dem Korb; nach links und rechts kippen und Sterne und Äpfel fangen.
+- **Wiesenlauf** – nach vorn und hinten kippen: Steinen ausweichen, Hufeisen (Luna) bzw. Kleeblätter (Fips) sammeln.
 
 - **Album:** Nach jedem Putzen ein neuer Sticker (24 Motive). Sieben Tage am Stück: ein Pokal, und Luna und Fips
   tragen eine Krone.
@@ -330,7 +320,7 @@ Befehle im seriellen Monitor:
 - **Seiten:** `page apps|music|timer|stopwatch|alarm|radio|settings|game|brush|web`, `home`, `browse search:Coldplay`
 - **Musik:** `toggle`, `next`, `vol 60`, `browse rl:tag:kids`, `browse ard:soccer`, `voice start` / `voice stop`, `page assist`, `talk on` / `talk off` (Assistentin), `sleep 1` (Sleep-Timer), `alarm 7:30`, `alarmsrc ard:set:10815223 Name` (`-` = Ton)
 - **Kindermodus und Spiel:** `kids on|off`, `kidtime 7:10` (Zifferblatt zu einer Uhrzeit zeigen, `-1` = echte Zeit), `level 3` (Balance-Stufe), `imu` (Neigung), `tilt 0.3 -0.2` / `tilt off` (Neigung vortäuschen), `angry on|off`, `shake 10` (10 s Schütteln vortäuschen)
-- **Zähneputzen:** `page brush`, `brush save` / `brush load` (Album, Serie und Rekorde sichern und zurückholen; dazwischen wird die Routine nicht abgehakt), `ear on|off` (was das Mikrofon in den Summ-Spielen hört, je Prüfung eine Zeile)
+- **Zähneputzen:** `page brush`, `brush save` / `brush load` (Album, Serie und Rekorde sichern und zurückholen; dazwischen wird die Routine nicht abgehakt), `ear on|off` (was das Mikrofon bei der Monsterjagd hört, je Prüfung eine Zeile)
 - **Sonstiges:** `wifi SSID PASSWORT`, `face 0…4`, `timer 10`, `kb`, `status` (mit Laufzeit und freiem Speicher), `dump` (alle Texte auf dem Bildschirm und der obersten Ebene mit Lage), `poweroff`
 
 ### Testsammlung
@@ -338,11 +328,11 @@ Befehle im seriellen Monitor:
 ```bash
 sh tests/run_host.sh                                              # am Rechner: Hören, Zeichnen, Sprachdatei, Weboberfläche, beide Builds
 ~/.platformio/penv/bin/python tests/device/test_device.py          # auf der Uhr (USB + WLAN), lautlos
-~/.platformio/penv/bin/python tests/device/test_device.py --sound  # dazu die Summ-Spiele mit Tönen aus dem Rechner (hörbar!)
+~/.platformio/penv/bin/python tests/device/test_device.py --sound  # dazu die Monsterjagd mit Rauschen aus dem Rechner (hörbar!)
 ```
 
-- **Am Rechner** (`tests/host`, ≈ 5 600 Prüfungen): Die Summ-Erkennung (`hearing.cpp`, derselbe Code wie auf der Uhr)
-  bekommt künstliches Summen von 80 bis 520 Hz, Bürstenrauschen, beides gemischt und zwei Minuten Dauerputzen. Alle
+- **Am Rechner** (`tests/host`): Die Geräuscherkennung (`hearing.cpp`, derselbe Code wie auf der Uhr) bekommt
+  Bürstenrauschen, Stille, Summen von 80 bis 520 Hz, beides gemischt und zwei Minuten Dauerputzen. Alle
   Zeichnungen laufen mit vielen Werten (auch außerhalb des Bildes) gegen Schutzbereiche; Sticker müssen sich
   unterscheiden, Ziele der Zahnpasta-Kugel erreichbar sein. Die Sprachdatei muss jede Ansage für beide Figuren
   enthalten, jedes Stück muss sich dekodieren lassen und in seinen Abschnitt passen; das Skript der Weboberfläche muss
@@ -354,7 +344,7 @@ sh tests/run_host.sh                                              # am Rechner: 
   Zifferblätter, Wischen hin und zurück (Kacheln, Apps, Kontrollzentrum), Timer mit Klingeln und Stopp, Balance mit
   vorgetäuschter Neigung (Rekorde bleiben), ein Radiosender mit gleichzeitigen Web-Anfragen, Funk-Seite; dazu das
   ganze Zahnputz-Menü, die drei Kipp-Spiele (der Test steuert Korb, Kugel und Figur anhand der Bildschirmfotos), mit
-  `--sound` die drei Summ-Spiele, ein voller Zwei-Minuten-Durchlauf (KAI-Reihenfolge, Dauer, Sticker, Serie) und zum
+  `--sound` die Monsterjagd, ein voller Zwei-Minuten-Durchlauf (KAI-Reihenfolge, Dauer, Sticker, Serie) und zum
   Schluss: kein Neustart, genug interner Speicher, keine Musik.
 - **Leise und ohne Spuren:** Die Uhr steht während der Tests auf Lautstärke 0. Album, Serie und Rekorde werden vorher
   gesichert und danach zurückgeholt, Kindermodus, Zifferblatt und Lautstärke wieder eingestellt, die Routine wird

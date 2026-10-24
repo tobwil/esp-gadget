@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Regressionstests auf der Uhr: über USB bedienen (antippen, Texte lesen, Bildschirmfotos, Neigung vortäuschen),
-über WLAN die Weboberfläche abfragen, und für die Summ-Spiele echtes Summen und Bürstenrauschen aus dem
-Lautsprecher des Rechners abspielen.
+über WLAN die Weboberfläche abfragen, und für die Monsterjagd (mit --sound) Bürstenrauschen aus dem Lautsprecher
+des Rechners abspielen.
 
     ~/.platformio/penv/bin/python tests/device/test_device.py [/dev/cu.usbmodem…] [--sound] [--no-full]
 
   Leise: die Uhr steht während der Tests auf Lautstärke 0 (Klingeln, Radio, Ansagen sind stumm).
-  --sound     zusätzlich die Summ-Spiele mit Summen und Rauschen aus dem Lautsprecher des Rechners prüfen –
+  --sound     zusätzlich die Monsterjagd mit Bürstenrauschen aus dem Lautsprecher des Rechners prüfen –
               das ist hörbar, also nicht nachts
   --no-full   ohne den vollen Zwei-Minuten-Durchlauf
   --only a,b  nur diese Tests (Namen wie in der Ausgabe; boot_und_status läuft immer mit)
@@ -258,14 +258,13 @@ def score(w):
     return None
 
 
-def open_game(w, group, game, hero="Pferd Luna"):
+def open_game(w, game, hero="Pferd Luna"):
     w.send("home", 0.8)
     w.send("page brush", 1.2)
     assert w.wait_for("Wer putzt mit?", 5), "Zahnputz-App startet nicht"
     w.tap(hero)
     assert w.wait_for("Album", 4), "Spielauswahl fehlt"
-    w.tap(group)
-    assert w.wait_for(game, 4), f"{game} fehlt in {group}"
+    assert w.has(game), f"{game} fehlt in der Spielauswahl"
     w.tap(game)
     assert w.wait_for(game, 3), f"{game} startet nicht"
 
@@ -342,7 +341,12 @@ def zahnputz_menue(w, ctx):
     assert w.has("Pferd Luna") and w.has("Reh Fips")
     w.shot("brush_auswahl")
     w.tap("Reh Fips")
-    assert w.wait_for("Summ-Spiele", 4) and w.has("Kipp-Spiele") and w.has("Album")
+    assert w.wait_for("Album", 4), "Spielauswahl fehlt"
+    games = ["Monsterjagd", "Zahnpasta-Kugel", "Sterne fangen", "Wiesenlauf"]
+    for g in games:
+        assert w.has(g), f"{g} fehlt in der Spielauswahl"
+    for gone in ("Summ-Ballon", "Hoch oder tief", "Summ-Spiele", "Kipp-Spiele"):
+        assert not w.has(gone), f"„{gone}“ sollte weg sein"
     w.shot("brush_spiele")
     w.tap("Album")
     assert w.wait_for("Mein Album", 3) and w.has("von 26 Stickern")
@@ -350,20 +354,14 @@ def zahnputz_menue(w, ctx):
     assert w.wait_for("Seite 2/3", 3), "Album blättert nicht"
     w.shot("brush_album")
     w.tap("Zurück")
-    assert w.wait_for("Summ-Spiele", 3)
-    w.tap("Summ-Spiele")
-    assert w.wait_for("Monsterjagd", 3) and w.has("Hoch oder tief") and w.has("Summ-Ballon")
-    w.tap("Zurück")
-    w.tap("Kipp-Spiele")
-    assert w.wait_for("Zahnpasta-Kugel", 3) and w.has("Sterne fangen") and w.has("Wiesenlauf")
-    w.shot("brush_kippspiele")
+    assert w.wait_for("Wiesenlauf", 3), "Zurück aus dem Album führt nicht zur Spielauswahl"
     w.send("home", 1)
 
 
 @test
 def sterne_fangen(w, ctx):
     BASKET = [0xe8bf72]
-    open_game(w, "Kipp-Spiele", "Sterne fangen")
+    open_game(w, "Sterne fangen")
     w.send("tilt -0.7 0", 0.8)
     left = w.shot("fangen_links").where(BASKET, y0=200, y1=330)
     w.send("tilt 0.7 0", 0.8)
@@ -391,7 +389,7 @@ def sterne_fangen(w, ctx):
 
 @test
 def zahnpasta_kugel(w, ctx):
-    open_game(w, "Kipp-Spiele", "Zahnpasta-Kugel")
+    open_game(w, "Zahnpasta-Kugel")
     wait_section(w)
     end, last = time.time() + 30, None
     while time.time() < end and (score(w) or 0) < 2:
@@ -413,7 +411,7 @@ def zahnpasta_kugel(w, ctx):
 @test
 def wiesenlauf(w, ctx):
     LUNA = [0xb5703a]
-    open_game(w, "Kipp-Spiele", "Wiesenlauf")
+    open_game(w, "Wiesenlauf")
     w.send("tilt 0 -0.7", 0.9)
     up = w.shot("wiese_oben").where(LUNA, y0=30, y1=380)
     w.send("tilt 0 0.7", 0.9)
@@ -453,7 +451,7 @@ def monsterjagd_hoert_putzen(w, ctx):
         return "übersprungen"
     # Der Lautsprecher des Rechners setzt manchmal verspätet ein: bis zu drei Versuche, gewertet wird nur,
     # wenn die Uhr das Rauschen nachweislich gehört hat (Ohr-Protokoll)
-    open_game(w, "Summ-Spiele", "Monsterjagd")
+    open_game(w, "Monsterjagd")
     wait_section(w)
     for attempt in range(3):
         listening(w)  # Ansage ausreden lassen
@@ -465,53 +463,6 @@ def monsterjagd_hoert_putzen(w, ctx):
     w.shot("monster_ende")
     assert n >= 20, f"die Uhr hat das Rauschen in drei Versuchen höchstens {n}-mal gehört (Lautsprecher des Rechners?)"
     assert sc - s0 >= 2, f"Bürstenrauschen {n}-mal gehört, aber nur {sc - s0} Monster weg"
-
-
-@test
-def summ_ballon(w, ctx):
-    if not SOUND:
-        return "übersprungen"
-    BLUE = [0x5ec8ff]
-    open_game(w, "Summ-Spiele", "Summ-Ballon")
-    wait_section(w)
-    for attempt in range(3):  # siehe Monsterjagd: nur werten, was die Uhr wirklich gehört hat
-        listening(w)
-        time.sleep(4)  # Ballon sinkt ganz nach unten
-        low = w.shot("ballon_unten").where(BLUE, y0=10, y1=390)  # (ein Foto hält die Uhr ≈ 2 s an – nur davor und danach)
-        n = heard(w, "hum220", "TON")
-        high = w.shot("ballon_oben").where(BLUE, y0=10, y1=390)
-        if n >= 8:
-            break
-    assert n >= 8, f"die Uhr hat das Summen in drei Versuchen höchstens {n}-mal gehört (Lautsprecher des Rechners?)"
-    assert low["n"] > 20 and high["n"] > 20, "Ballon nicht gefunden"
-    assert low["top"] - high["top"] >= 40, f"Summen {n}-mal gehört, aber der Ballon steigt nicht ({low['top']} → {high['top']})"
-    time.sleep(5)
-    sunk = w.shot("ballon_sinkt").where(BLUE, y0=10, y1=390)
-    assert sunk["top"] - high["top"] >= 24, f"Ballon sinkt in der Stille nicht ({high['top']} → {sunk['top']})"
-
-
-@test
-def hoch_oder_tief(w, ctx):
-    if not SOUND:
-        return "übersprungen"
-    YELLOW = [0xffd23f]
-    open_game(w, "Summ-Spiele", "Hoch oder tief")
-    time.sleep(13)  # Erklärung
-    play("hum200")  # „Summ erst einmal ganz normal“
-    end = time.time() + 45
-    while time.time() < end and (score(w) or 0) < 3:
-        s = w.shot()
-        up = s.where(YELLOW, x0=36, y0=20, x1=100, y1=100)["n"]
-        down = s.where(YELLOW, x0=36, y0=212, x1=100, y1=292)["n"]
-        if up > 40:
-            play("hum250")
-        elif down > 40:
-            play("hum160")
-        else:
-            time.sleep(0.4)
-    sc = score(w)
-    w.shot("hochtief_ende")
-    assert sc is not None and sc >= 3, f"nur {sc} Treffer"
 
 
 def secrets():
@@ -715,7 +666,7 @@ def voller_durchlauf(w, ctx):
     if not FULL:
         return "übersprungen"
     st0 = json.loads(http(f"https://{ctx['ip']}/api/state")[1])["kids"]["brush"]
-    open_game(w, "Kipp-Spiele", "Sterne fangen", hero="Reh Fips")
+    open_game(w, "Sterne fangen", hero="Reh Fips")
     sections = ["Oben rechts", "Oben links", "Unten links", "Unten rechts", "Außen rechts", "Vorne", "Außen links", "Innen oben", "Innen unten"]
     seen, t0 = [], time.time()
     while time.time() - t0 < 170:
@@ -758,8 +709,7 @@ def main():
         sys.exit("keine Uhr am USB")
     w = Watch(path)
     tmp = tempfile.mkdtemp()
-    for name, kw in {"brush": dict(secs=7, noise=True, amp=0.5), "hum220": dict(secs=4, f=220), "hum200": dict(secs=3, f=200),
-                     "hum250": dict(secs=1.6, f=250), "hum160": dict(secs=1.6, f=160)}.items():
+    for name, kw in {"brush": dict(secs=7, noise=True, amp=0.5)}.items():
         SOUNDS[name] = os.path.join(tmp, name + ".wav")
         tone(SOUNDS[name], **kw)
     SOUNDS["wake"] = os.path.join(tmp, "wake.wav")

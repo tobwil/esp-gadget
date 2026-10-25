@@ -255,7 +255,7 @@ static void worker(void*) {
       qWanted = false;
       qDone = true;
     }
-    if (!wanted) { vTaskDelay(pdMS_TO_TICKS(pwr::dozing() ? 250 : 30)); continue; }
+    if (!wanted) { vTaskDelay(pdMS_TO_TICKS(pwr::dozing() ? 1000 : 30)); continue; }  // dösend seltener nachsehen
     char path[240], title[72] = "", err[64] = "";
     xSemaphoreTake(mtx, portMAX_DELAY);
     ucopy(path, sizeof(path), want);

@@ -275,12 +275,16 @@ void poll() {
                    voice::phase() == voice::THINKING || phone::connected() || radio::transmitting() ||
                    radio::receiving() || radio::screenOpen;
   bool modemSleep = netOnline() && !streaming;
+  // 0 wach (Streaming), 1 leichter Modem-Schlaf (jeder Beacon, ≈ 100 ms), 2 tiefer (jeder 3., ≈ 300 ms).
+  // Tief nur beim Dösen und ohne Funk: dann muss kein Funk-Multicast ankommen. Gemessen beim Dösen: Leichtschlaf
+  // 72 % → 88 % (das WLAN hielt den Prozessor vorher ein Viertel der Zeit wach).
+  int psWant = !modemSleep ? 0 : doze && !radio::enabled() ? 2 : 1;
   static int ps = -1;
-  if (modemSleep != ps) {
-    ps = modemSleep;
-    WiFi.setSleep(modemSleep);
+  if (psWant != ps) {
+    ps = psWant;
+    WiFi.setSleep(ps == 2 ? WIFI_PS_MAX_MODEM : ps == 1 ? WIFI_PS_MIN_MODEM : WIFI_PS_NONE);
     // ESP-NOW hält das Funkmodul sonst ständig wach; im WLAN kommt der Funk ohnehin per Multicast
-    esp_now_set_wake_window(modemSleep ? 0 : 65535);
+    esp_now_set_wake_window(ps ? 0 : 65535);
   }
   streamingNow = streaming;
 }

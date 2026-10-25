@@ -418,7 +418,7 @@ static void task(void*) {
     }
     // Sender weg: nach kurzer Pause neu verbinden
     if (!c && live && retryAt && !paused && st.active && millis() > retryAt) { setMsg("Verbinde neu …"); openAt(0, 0); continue; }
-    if (!c) { vTaskDelay(pdMS_TO_TICKS(pwr::dozing() ? 250 : 50)); continue; }
+    if (!c) { vTaskDelay(pdMS_TO_TICKS(pwr::dozing() ? 1000 : 50)); continue; }  // dösend seltener nachsehen
 
     // lange Pause: Verbindung schließen, beim Weiterhören mit Range neu öffnen
     if (paused && millis() - pausedAt > 30000) { close(); reopen = true; continue; }

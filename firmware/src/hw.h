@@ -22,6 +22,11 @@ void hwScreen(bool on);        // Display an/aus (Touch weckt es wieder)
 bool hwScreenOn();
 void hwActivity();             // Bedienung: Zeit bis zum Abschalten neu starten
 void hwTouchPoll();  // Touch lesen ohne den Rest der Oberfläche (beim Dösen, für den Doppeltipp)
+bool hwTouchRecent();  // in den letzten 0,8 s berührt (dann eng abfragen, damit der Doppeltipp erkannt wird)
+// Dösen: die Hauptschleife schläft bis zu ms, wacht aber sofort bei Berührung (Touch-INT), BOOT oder hwDozeKick()
+// (z. B. eine Anfrage an die Weboberfläche) – statt alle 20 ms den Touch-Chip zu fragen.
+void hwDozeWait(uint32_t ms);
+void hwDozeKick();
 uint32_t hwIdleMs();           // ms seit der letzten Bedienung
 void hwInput();                // echte Bedienung (Touch, Taste) – nicht Funk oder Musik
 uint32_t hwLastInput();        // millis() der letzten echten Bedienung

@@ -340,7 +340,8 @@ static void task(void*) {
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }
-    while (xQueueReceive(rxq, &p, txOn ? 0 : pdMS_TO_TICKS(pwr::dozing() ? 100 : 10)) == pdTRUE) handle(p);
+    // ESP-NOW-Pakete wecken sofort (Warteschlange); die Wartezeit zählt nur fürs UDP-Nachsehen und das „Hallo“
+    while (xQueueReceive(rxq, &p, txOn ? 0 : pdMS_TO_TICKS(pwr::dozing() ? 500 : 10)) == pdTRUE) handle(p);
 
     // UDP im WLAN
     bool online = netOnline();

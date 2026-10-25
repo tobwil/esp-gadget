@@ -273,7 +273,12 @@ geordnet aus.
 anderen Uhren läuft im WLAN per Multicast weiter). Bei dunklem Display **döst** die Uhr: Der Prozessor geht
 automatisch in den Leichtschlaf (ESP-IDF Power Management), die Oberfläche zeichnet nichts, der Audio-Teil
 hält 3 s nach dem letzten Ton an. Sie bleibt dabei im WLAN erreichbar – für Funk und die Weboberfläche – und
-wacht per Doppeltipp sofort auf. Ohne WLAN (nur ESP-NOW) bleibt das Funkmodul wach.
+wacht per Doppeltipp sofort auf. Beim Dösen wartet alles auf Ereignisse statt nachzusehen: Touch-Chip (INT) und
+BOOT wecken den Prozessor per Unterbrechung, Web-Anfragen wecken die Hauptschleife, Mischer und Hintergrundaufgaben
+schlafen, bis es etwas zu tun gibt (gemessen: 62 → 20 Aufwach-Vorgänge je Sekunde). Ist Funk aus (Kindermodus ohne
+App „Funk“), hört das WLAN beim Dösen nur jeden 3. Beacon – Leichtschlaf 74 % → 88 %; mit Funk bleibt es beim
+leichten Modem-Schlaf, damit Funk-Multicast sicher ankommt. Ein Wächter startet die Uhr neu, falls die
+Hauptschleife einmal länger als 60 s hängt. Ohne WLAN (nur ESP-NOW) bleibt das Funkmodul wach.
 
 **Nachtruhe** (Weboberfläche → Akku): Im Kindermodus schläft die Uhr von Bettzeit + Einschlafzeit bis zum
 Aufstehen im Tiefschlaf (Standard an), sonst auf Wunsch zwischen eigenen Zeiten. Sie schläft in Etappen von

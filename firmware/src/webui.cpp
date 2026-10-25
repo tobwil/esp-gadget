@@ -875,6 +875,7 @@ static esp_err_t respond(httpd_req_t* r) {
 
 // fn in der Hauptschleife ausführen und auf ihre Antwort warten (die Hauptschleife ruft poll() alle paar ms)
 static bool runInLoop(void (*fn)(), uint32_t ms) {
+  hwDozeKick();  // auch wenn noch eine Anfrage wartet: die Hauptschleife soll sie abarbeiten
   for (uint32_t t = millis(); req.state && millis() - t < ms;) delay(5);  // die vorige Anfrage läuft noch
   if (req.state) return false;
   xSemaphoreTake(req.ready, 0);
@@ -882,6 +883,7 @@ static bool runInLoop(void (*fn)(), uint32_t ms) {
   req.disp = "";
   req.fn = fn;
   req.state = 1;
+  hwDozeKick();  // dösende Hauptschleife sofort wecken, sonst wartet die Anfrage bis zu 0,5 s
   return xSemaphoreTake(req.ready, pdMS_TO_TICKS(ms)) == pdTRUE;
 }
 

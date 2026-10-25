@@ -1,3 +1,4 @@
+#include <esp_task_wdt.h>
 #include <math.h>
 // Taschenfunk – YT-Music-Player, Taschenuhr, Timer und Walkie-Talkie
 // für das Waveshare ESP32-S3-Touch-AMOLED-1.75C.
@@ -143,6 +144,11 @@ void setup() {
   if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER && pwr::nightRest(nullptr) && !cw::ringing()) hwScreen(false);
   hwBrightness(cfg.brightness);
   Serial.printf("Taschenfunk %s bereit (%s)\n", FW_VERSION, cfg.name);
+  // Wächter für die Hauptschleife: hängt sie länger als 60 s (z. B. ein Treiber, der nicht zurückkehrt), startet die
+  // Uhr neu statt dunkel und unerreichbar zu bleiben. 60 s, weil manche Web-Anfragen die Schleife bis 20 s belegen.
+  esp_task_wdt_config_t wdt = {.timeout_ms = 60000, .idle_core_mask = 0, .trigger_panic = true};
+  if (esp_task_wdt_reconfigure(&wdt) == ESP_ERR_INVALID_STATE) esp_task_wdt_init(&wdt);
+  esp_task_wdt_add(nullptr);
 }
 
 // Radiowecker: statt zu piepen einen Sender bzw. die neueste Folge spielen. Kommt nach 20 s kein Ton
@@ -210,6 +216,7 @@ static void power() {
 }
 
 void loop() {
+  esp_task_wdt_reset();
   hwLoop();
   BtnEvent b;
   while ((b = hwButton()) != BTN_NONE) {
@@ -237,13 +244,16 @@ void loop() {
     }
   }
 
-  // Dösen (dunkel, nichts läuft): nur Tasten und Touch (Doppeltipp) alle 20 ms, der Rest alle 250 ms –
-  // so bleibt der Prozessor die meiste Zeit im Leichtschlaf
+  // Dösen (dunkel, nichts läuft): der Rest alle 500 ms; dazwischen schläft die Hauptschleife, bis der Touch-Chip,
+  // BOOT oder eine Web-Anfrage sie weckt (hwDozeWait). Nach einer Berührung 0,8 s lang alle 20 ms den Touch
+  // lesen – so wird der Doppeltipp erkannt.
   static uint32_t dozeAt = 0;
-  if (pwr::dozing() && millis() - dozeAt < 250) {
+  if (pwr::dozing() && millis() - dozeAt < 500) {
     hwTouchPoll();
     pwr::poll();
-    delay(20);
+    uint32_t used = millis() - dozeAt;  // kann schon über 500 liegen – dann nicht warten (früher: Unterlauf → 49 Tage)
+    if (hwTouchRecent()) delay(20);
+    else if (used < 500) hwDozeWait(500 - used);
     return;
   }
   dozeAt = millis();

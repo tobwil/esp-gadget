@@ -36,19 +36,22 @@ static float gain = 0;  // nur im Mischer
 
 size_t musicSpace() { return music.space(); }
 size_t musicUsed() { return music.used(); }
-void musicWrite(const int16_t* s, size_t n) { music.write(s, n); }
+static TaskHandle_t mixTask = nullptr;
+static inline void kick() { if (mixTask) xTaskNotifyGive(mixTask); }  // Mischer aus der Pause holen
+
+void musicWrite(const int16_t* s, size_t n) { music.write(s, n); kick(); }
 void musicFlush() { musicFlushReq = true; while (musicFlushReq) vTaskDelay(1); }
-void musicPause(bool p) { musicPaused = p; }
+void musicPause(bool p) { musicPaused = p; if (!p) kick(); }
 uint32_t musicPlayed() { return played; }
 
-void voiceWrite(const int16_t* s, size_t n) { voice.write(s, n); }
+void voiceWrite(const int16_t* s, size_t n) { voice.write(s, n); kick(); }
 size_t voiceUsed() { return voice.used(); }
 size_t voiceSpace() { return voice.space(); }
 void voiceFlush() { voiceFlushReq = true; }
 
-void hold(bool on) { held = on; }
+void hold(bool on) { held = on; if (on) kick(); }
 
-void micStart() { mic.tail = mic.head; micOn = true; }
+void micStart() { mic.tail = mic.head; micOn = true; kick(); }
 void micStop() { micOn = false; }
 size_t micRead(int16_t* out, size_t max) {
   size_t n = 0;
@@ -79,6 +82,7 @@ static void tone(VType t, float f0, float f1, int ms, float amp, int delayMs = 0
   v.delay = delayMs * SR / 1000;
   v.attack = max(1, attackMs * SR / 1000);
   if (fxQueue) xQueueSend(fxQueue, &v, 0);
+  kick();
 }
 
 void play(Fx fx) {
@@ -188,7 +192,8 @@ static void task(void*) {
       outLvl = micLvl = 0;
     }
     if (paused) {
-      if (!want) { vTaskDelay(pdMS_TO_TICKS(pwr::dozing() ? 50 : 10)); continue; }
+      // nichts zu tun: schlafen, bis etwas kommt (kick) – beim Dösen bis zu 1 s statt alle 50 ms nachzusehen
+      if (!want) { ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(pwr::dozing() ? 1000 : 10)); continue; }
       i2s_channel_enable(tx);
       i2s_channel_enable(rx);
       paused = false;
@@ -384,7 +389,7 @@ bool begin(int volume) {
   mic.cap = 16000 * 2;
   mic.buf = (int16_t*)heap_caps_malloc(mic.cap * 2, MALLOC_CAP_SPIRAM);
   fxQueue = xQueueCreate(24, sizeof(Voice));
-  xTaskCreatePinnedToCore(task, "audio", 4096, nullptr, 19, nullptr, 0);
+  xTaskCreatePinnedToCore(task, "audio", 4096, nullptr, 19, &mixTask, 0);
   Serial.printf("Audio: Lautsprecher %s, Mikrofon %s\n", codecOk ? "ok" : "–", micOk ? "ok" : "–");
   return codecOk;
 }

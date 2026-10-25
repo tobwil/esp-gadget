@@ -3,6 +3,7 @@
 #include <TouchDrvCSTXXX.hpp>
 #include <Wire.h>
 #include <functional>
+#include <driver/gpio.h>
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
 #include "config.h"
@@ -183,6 +184,52 @@ static uint32_t lastInput = 0;
 void hwInput() { lastInput = millis(); }
 uint32_t hwLastInput() { return lastInput; }
 void hwTouchPoll() { if (indev) lv_indev_read(indev); }
+
+static volatile uint32_t touchSeenAt = 0;
+bool hwTouchRecent() { return touchSeenAt && millis() - touchSeenAt < 800; }
+
+// ------------------------------------------------------------------ Dösen: auf Ereignisse warten statt abfragen
+// Touch-INT (GPIO 11, low bei Berührung) und BOOT (GPIO 0, low gedrückt) wecken den Prozessor aus dem Leichtschlaf
+// (GPIO-Weckquelle) und die Hauptschleife (Task-Benachrichtigung aus der Unterbrechung). Der Pegel-Interrupt wird
+// in der Unterbrechung sofort abgeschaltet und erst vor dem nächsten Warten wieder an – sonst feuert er, solange
+// der Finger liegt. Gemessen: vorher ≈ 60 Aufwach-Vorgänge je Sekunde beim Dösen (Touch alle 20 ms).
+static TaskHandle_t dozeTask = nullptr;
+static bool dozeIrq = false;
+
+static void IRAM_ATTR dozeIsr(void* pin) {
+  gpio_intr_disable((gpio_num_t)(intptr_t)pin);
+  BaseType_t woke = pdFALSE;
+  if (dozeTask) vTaskNotifyGiveFromISR(dozeTask, &woke);
+  if (woke) portYIELD_FROM_ISR();
+}
+
+void hwDozeKick() {
+  if (dozeTask) xTaskNotifyGive(dozeTask);
+}
+
+void hwDozeWait(uint32_t ms) {
+  static const gpio_num_t PINS[2] = {(gpio_num_t)TP_INT, (gpio_num_t)BTN_BOOT};
+  if (!dozeIrq) {
+    dozeIrq = true;
+    dozeTask = xTaskGetCurrentTaskHandle();
+    esp_err_t e = gpio_install_isr_service(0);
+    if (e != ESP_OK && e != ESP_ERR_INVALID_STATE) { dozeTask = nullptr; Serial.println("Dösen: kein GPIO-Interrupt"); }
+    for (gpio_num_t p : PINS) {
+      gpio_set_intr_type(p, GPIO_INTR_LOW_LEVEL);
+      gpio_isr_handler_add(p, dozeIsr, (void*)(intptr_t)p);
+      gpio_intr_disable(p);
+      gpio_wakeup_enable(p, GPIO_INTR_LOW_LEVEL);
+    }
+    esp_sleep_enable_gpio_wakeup();
+  }
+  if (!dozeTask) { delay(20); return; }  // ohne Interrupt wie früher abfragen
+  if (!gpio_get_level(PINS[0]) || !gpio_get_level(PINS[1])) { delay(20); return; }  // gerade berührt/gedrückt
+  // Wartende Weckrufe NICHT verwerfen: kam gerade eine Web-Anfrage (hwDozeKick), geht es sofort weiter – sonst wartet
+  // sie, und weitere Anfragen wecken nicht mehr (sie warten auf die erste). Nie länger als 1 s schlafen.
+  for (gpio_num_t p : PINS) gpio_intr_enable(p);
+  ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(std::min<uint32_t>(ms, 1000)));
+  for (gpio_num_t p : PINS) gpio_intr_disable(p);
+}
 bool hwWakeRequested() { bool w = wakeReq; wakeReq = false; return w; }
 
 static void flushCb(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
@@ -249,6 +296,7 @@ static void touchReadRaw(lv_indev_t*, lv_indev_data_t* data) {
   int n = touchOk ? touch.getPoint(x, y, 2) : 0;
   bool pressed = n > 0;
   if (pressed) { lx = constrain(x[0] - PANEL_X, 0, LCD_W - 1); ly = constrain(y[0] - PANEL_Y, 0, LCD_H - 1); }
+  if (pressed) touchSeenAt = millis();
   // Bei dunklem Display weckt nur ein Doppeltipp: zwei kurze Tipps kurz nacheinander an etwa derselben Stelle.
   // Stoff in der Hosentasche oder eine Hand am Gehäuse berühren lang, flächig oder wandernd – das zählt nicht,
   // und es hält die Uhr auch nicht vom Tiefschlaf ab. Die Berührung geht nicht an die Oberfläche.

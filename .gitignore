@@ -12,3 +12,4 @@ firmware/dependencies.lock
 tools/.tts-cache/
 tests/device/out/
 __pycache__/
+backups/

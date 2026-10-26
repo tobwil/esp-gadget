@@ -1,5 +1,7 @@
 // Kontrollzentrum wie bei Wear OS / watchOS: vom Zifferblatt herunterwischen, hochwischen schließt.
 // Oben Uhrzeit, Akku (mit geschätzter Restlaufzeit) und WLAN, darunter sechs Schalter.
+// Versteckt: Taschenlampe 5× in 15 s an → „Modus wechseln“ (Kinder ↔ Erwachsene, auch ohne Netz). Zu den
+// Erwachsenen nur mit der Eltern-PIN, falls eine gesetzt ist (nach 3 falschen 1 min Pause).
 #include <time.h>
 #include "../kids.h"
 #include "../power.h"
@@ -14,6 +16,69 @@ static lv_obj_t* torch = nullptr;
 static uint8_t torchBright = 0;
 
 static void hint(const char* t) { lv_label_set_text(hintL, t); }
+
+// ------------------------------------------------------------------ Modus wechseln (versteckt)
+
+static lv_obj_t* modeDlg = nullptr;
+static uint32_t torchTimes[5];
+static uint8_t torchN = 0, pinWrong = 0;
+static uint32_t pinLockUntil = 0;
+
+static void modeClose() {
+  if (modeDlg) { lv_obj_delete(modeDlg); modeDlg = nullptr; }
+}
+
+static void modeApply() {
+  kids::Cfg k = kids::cfg();
+  k.on = !k.on;
+  kids::set(k);
+  modeClose();
+  toast(k.on ? "Kindermodus an" : "Erwachsenen-Modus");
+  home();
+}
+
+static void modeDialog() {
+  modeClose();
+  modeDlg = overlay(C_BG(), LV_OPA_COVER);
+  bool kid = kids::on();
+  lv_obj_t* t = label(modeDlg, &font_text_24, C_BRASS(), "Modus wechseln");
+  lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 70);
+  lv_obj_t* n = label(modeDlg, &font_text_20, C_TEXT(), kid ? "Jetzt: Kindermodus" : "Jetzt: Erwachsenen-Modus");
+  lv_obj_align(n, LV_ALIGN_TOP_MID, 0, 120);
+  if (kid && kids::cfg().pin[0]) {
+    lv_obj_t* h = label(modeDlg, &font_text_20, C_DIM(), "mit Eltern-PIN");
+    lv_obj_align(h, LV_ALIGN_TOP_MID, 0, 152);
+  }
+  lv_obj_t* go = pill(modeDlg, kid ? "Erwachsenen-Modus" : "Kindermodus", C_BRASS(), C_BG());
+  lv_obj_align(go, LV_ALIGN_CENTER, 0, 20);
+  lv_obj_add_event_cb(go, [](lv_event_t*) {
+    if (!kids::on() || !kids::cfg().pin[0]) { modeApply(); return; }  // zu den Kindern: ohne PIN
+    if (pinLockUntil && millis() < pinLockUntil) { toast("Zu oft falsch – bitte 1 Minute warten"); return; }
+    keyboard("Eltern-PIN", "", true, [](const char* pin) {
+      if (pin && !strcmp(pin, kids::cfg().pin)) { pinWrong = 0; modeApply(); return; }
+      if (!pin) return;  // abgebrochen
+      if (++pinWrong >= 3) { pinWrong = 0; pinLockUntil = millis() + 60000; }
+      toast("Falsche PIN");
+    }, true);
+  }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* no = pill(modeDlg, "Abbrechen", C_SURF2(), C_TEXT());
+  lv_obj_align(no, LV_ALIGN_CENTER, 0, 90);
+  lv_obj_add_event_cb(no, [](lv_event_t*) { modeClose(); }, LV_EVENT_CLICKED, nullptr);
+}
+
+// zählt, wie oft die Taschenlampe angeht; beim 5. Mal in 15 s statt Licht der Dialog
+static bool torchSecret() {
+  uint32_t now = millis();
+  memmove(torchTimes, torchTimes + 1, sizeof(torchTimes) - sizeof(torchTimes[0]));
+  torchTimes[4] = now;
+  torchN = torchN < 5 ? torchN + 1 : 5;
+  if (torchN == 5 && now - torchTimes[0] < 15000) {
+    torchN = 0;
+    modeDialog();
+    return true;
+  }
+  return false;
+}
 
 static void torchOff() {
   if (!torch) return;
@@ -71,6 +136,7 @@ static void build(lv_obj_t* scr) {
 
   lv_obj_t* tb = roundButton(grid, I_TORCH, 92, C_SURF(), C_TEXT());
   lv_obj_add_event_cb(tb, [](lv_event_t*) {
+    if (torchSecret()) return;
     // Taschenlampe: ganzer Bildschirm weiß mit voller Helligkeit, Antippen schaltet aus
     torchBright = cfg.brightness;
     torch = lv_obj_create(lv_layer_top());
@@ -116,6 +182,9 @@ static void update() {
   if (strcmp(lv_label_get_text(remainL), r.c_str())) lv_label_set_text(remainL, r.c_str());
 }
 
-static void leave() { torchOff(); }
+static void leave() {
+  torchOff();
+  modeClose();
+}
 
 const Page PAGE_CONTROL = {build, update, leave, nullptr, false, ENTER_TOP};

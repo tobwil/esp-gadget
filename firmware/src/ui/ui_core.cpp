@@ -250,7 +250,7 @@ void fmtTime(char* out, size_t n, uint32_t ms, bool tenths) {
 
 // ------------------------------------------------------------------ Einblendungen
 
-static lv_obj_t* overlay(lv_color_t bg, lv_opa_t opa) {
+lv_obj_t* overlay(lv_color_t bg, lv_opa_t opa) {
   lv_obj_t* o = lv_obj_create(lv_layer_top());
   lv_obj_set_size(o, W, H);
   lv_obj_set_pos(o, 0, 0);
@@ -647,7 +647,7 @@ static void kbKey(lv_event_t*) {
   }
 }
 
-void keyboard(const char* ttl, const char* initial, bool password, void (*done)(const char*)) {
+void keyboard(const char* ttl, const char* initial, bool password, void (*done)(const char*), bool numbers) {
   if (kbObj) lv_obj_delete(kbObj);
   kbDone = done;
   kbShift = false;
@@ -687,7 +687,7 @@ void keyboard(const char* ttl, const char* initial, bool password, void (*done)(
   lv_obj_set_style_shadow_width(kbBm, 0, LV_PART_ITEMS);
   lv_obj_set_style_text_font(kbBm, &font_text_24, LV_PART_ITEMS);
   lv_obj_set_style_text_color(kbBm, C_TEXT(), LV_PART_ITEMS);
-  kbSetMap(MAP_LOWER);
+  kbSetMap(numbers ? MAP_NUM : MAP_LOWER);  // PIN: gleich die Ziffern
   lv_obj_add_event_cb(kbBm, kbKey, LV_EVENT_VALUE_CHANGED, nullptr);
   // „Fertig“ grün hervorheben
   lv_obj_add_event_cb(kbBm, [](lv_event_t* e) {

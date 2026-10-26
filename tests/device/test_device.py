@@ -745,6 +745,30 @@ def balance_tageslimit(w, ctx):
 
 
 @test
+def modus_wechsel_versteckt(w, ctx):
+    """Kontrollzentrum: Taschenlampe 5× → „Modus wechseln“; Abbrechen ändert nichts (der Wechsel selbst ist von Hand geprüft)."""
+    ip = ctx["ip"]
+    on0 = json.loads(http(f"https://{ip}/api/state")[1])["kids"]["on"]
+    w.send("wake", 0.4)
+    w.send("home", 1.0)
+    w.send("swipe d", 1.5)
+    t = [l for l in w.labels() if l[4] == "\uf00b"]
+    assert t, "Taschenlampe im Kontrollzentrum fehlt"
+    x, y, wd, h, _ = t[0]
+    for i in range(5):
+        w.send(f"tap {x + wd // 2} {y + h // 2}", 0.8)
+        if i < 4:
+            w.send("tap 233 233", 0.6)  # weiß → Antippen schaltet die Lampe aus
+    assert w.wait_for("Modus wechseln", 3), "Dialog erscheint nicht"
+    w.shot("modus_dialog")
+    w.tap("Abbrechen")
+    time.sleep(0.6)
+    assert not w.has("Modus wechseln"), "Dialog schließt nicht"
+    assert json.loads(http(f"https://{ip}/api/state")[1])["kids"]["on"] == on0, "Modus hat sich geändert"
+    w.send("home", 0.8)
+
+
+@test
 def voller_durchlauf(w, ctx):
     if not FULL:
         return "übersprungen"

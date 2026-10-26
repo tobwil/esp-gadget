@@ -111,7 +111,10 @@ Neuer Tag um Mitternacht, der Stand übersteht Neustarts; die Weboberfläche zei
 
 ![Tagesablauf](docs/screens/kindertag.png)
 
-Ein- und ausgeschaltet wird **nur über die Weboberfläche** (Reiter „Kinder“, auf Wunsch mit Eltern-PIN).
+**Ein- und ausschalten** über die Weboberfläche (Reiter Kinder) – oder **ohne Netz direkt an der Uhr**: im
+Kontrollzentrum die Taschenlampe fünfmal hintereinander an- und ausschalten (innerhalb von 15 s), dann erscheint
+„Modus wechseln“. Zum Erwachsenen-Modus fragt die Uhr nach der Eltern-PIN, falls eine gesetzt ist (Ziffernfeld;
+nach drei falschen Versuchen eine Minute Pause), zurück zum Kindermodus geht es ohne PIN.
 
 - **Zifferblatt:** eine Pixel-Geschichte durch den Tag – ein Mädchen steht auf, frühstückt, geht in die Kita
   (am Wochenende: spielen), isst zu Mittag, ruht, spielt draußen, isst zu Abend, badet, hört eine
